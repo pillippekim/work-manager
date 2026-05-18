@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>금형 적치대 현황 - HKHT</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif; background:#f1f3f9; color:#1e293b; }
+
+/* 헤더 */
+.header { background:#243bb2; color:#fff; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+.header h1 { font-size:18px; font-weight:700; }
+.header .sub { font-size:12px; opacity:0.8; }
+.btn-back { background:none; border:1px solid rgba(255,255,255,0.4); color:#fff; padding:6px 14px; border-radius:6px; font-size:13px; cursor:pointer; }
+.btn-back:hover { background:rgba(255,255,255,0.15); }
+
+/* 요약 카드 */
+.summary-bar { display:flex; gap:8px; padding:12px 16px; overflow-x:auto; }
+.summary-card { flex-shrink:0; background:#fff; border-radius:10px; padding:10px 14px; min-width:90px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+.summary-card .num { font-size:22px; font-weight:700; }
+.summary-card .label { font-size:11px; color:#64748b; margin-top:2px; }
+.sc-total .num { color:#243bb2; }
+.sc-stored .num { color:#16a34a; }
+.sc-inuse .num { color:#dc2626; }
+.sc-repair .num { color:#f59e0b; }
+.sc-retired .num { color:#9ca3af; }
+
+/* 검색 */
+.search-wrap { padding:0 16px 8px; }
+.search-box { width:100%; padding:10px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none; }
+.search-box:focus { border-color:#243bb2; box-shadow:0 0 0 3px rgba(36,59,178,0.15); }
+
+/* 구역 탭 */
+.zone-tabs { display:flex; gap:0; padding:0 16px; border-bottom:2px solid #e2e8f0; overflow-x:auto; }
+.zone-tab { padding:10px 18px; font-size:14px; font-weight:600; color:#64748b; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; white-space:nowrap; transition:all 0.2s; }
+.zone-tab.active { color:#243bb2; border-bottom-color:#243bb2; }
+.zone-tab:hover { color:#243bb2; }
+
+/* 동 선택 버튼 */
+.building-selector { display:flex; gap:6px; padding:12px 16px; flex-wrap:wrap; }
+.building-btn { padding:8px 16px; border:1px solid #d1d5db; border-radius:8px; background:#fff; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; }
+.building-btn.active { background:#243bb2; color:#fff; border-color:#243bb2; }
+.building-btn:hover:not(.active) { background:#eef0ff; border-color:#243bb2; }
+
+/* 동 정보 바 */
+.building-info { padding:8px 16px; display:flex; align-items:center; gap:12px; font-size:13px; color:#475569; }
+.building-info span { background:#f1f5f9; padding:3px 10px; border-radius:4px; }
+
+/* 그리드 컨테이너 */
+.grid-container { padding:8px 16px 80px; overflow-x:auto; }
+.grid-table { border-collapse:separate; border-spacing:3px; }
+.grid-table th { font-size:11px; font-weight:600; color:#64748b; padding:4px 6px; text-align:center; min-width:44px; }
+.grid-table .floor-label { font-size:11px; font-weight:600; color:#64748b; text-align:right; padding-right:6px; min-width:30px; }
+
+/* 슬롯 셀 */
+.slot-cell { width:52px; height:48px; border-radius:6px; cursor:pointer; text-align:center; font-size:9px; font-weight:600; line-height:1.2; padding:3px 2px; transition:all 0.15s; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; border:1px solid transparent; }
+.slot-cell:hover { transform:scale(1.08); z-index:5; box-shadow:0 2px 8px rgba(0,0,0,0.2); }
+
+/* 상태별 색상 */
+.slot-stored { background:#dcfce7; color:#166534; border-color:#86efac; }
+.slot-inuse { background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
+.slot-repair { background:#fef3c7; color:#92400e; border-color:#fcd34d; }
+.slot-retired { background:#f1f5f9; color:#94a3b8; border-color:#cbd5e1; }
+.slot-empty { background:#fafafa; color:#d1d5db; border:1px dashed #e2e8f0; cursor:default; }
+.slot-empty:hover { transform:none; box-shadow:none; }
+.slot-spare { position:relative; }
+.slot-spare::after { content:'S'; position:absolute; top:2px; right:3px; font-size:7px; background:#3b82f6; color:#fff; border-radius:2px; padding:0 2px; line-height:1.4; }
+.slot-shared::before { content:'*'; position:absolute; top:2px; left:3px; font-size:9px; color:#7c3aed; font-weight:800; }
+
+/* 검색 하이라이트 */
+.slot-highlight { animation:pulse 1s ease-in-out 3; box-shadow:0 0 0 3px #243bb2, 0 0 12px rgba(36,59,178,0.4) !important; transform:scale(1.12) !important; z-index:10 !important; }
+@keyframes pulse {
+    0%,100% { box-shadow:0 0 0 3px #243bb2, 0 0 12px rgba(36,59,178,0.4); }
+    50% { box-shadow:0 0 0 6px #243bb2, 0 0 20px rgba(36,59,178,0.6); }
+}
+
+/* 범례 */
+.legend { display:flex; gap:12px; padding:8px 16px; flex-wrap:wrap; }
+.legend-item { display:flex; align-items:center; gap:4px; font-size:11px; color:#64748b; }
+.legend-dot { width:14px; height:14px; border-radius:3px; }
+
+/* 팝업 모달 */
+.modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; }
+.modal-overlay.show { display:flex; }
+.modal-content { background:#fff; border-radius:14px; padding:24px; max-width:380px; width:90%; max-height:80vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
+.modal-content h3 { font-size:18px; color:#243bb2; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; }
+.modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:#94a3b8; padding:4px; }
+.modal-close:hover { color:#1e293b; }
+.modal-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f1f5f9; font-size:14px; }
+.modal-row .label { color:#64748b; }
+.modal-row .value { font-weight:600; color:#1e293b; }
+.status-badge { padding:3px 10px; border-radius:12px; font-size:12px; font-weight:600; }
+.badge-stored { background:#dcfce7; color:#166534; }
+.badge-inuse { background:#fee2e2; color:#991b1b; }
+.badge-repair { background:#fef3c7; color:#92400e; }
+.badge-retired { background:#f1f5f9; color:#64748b; }
+
+/* 로딩 */
+.loading { text-align:center; padding:60px 20px; color:#64748b; font-size:14px; }
+.spinner { display:inline-block; width:32px; height:32px; border:3px solid #e2e8f0; border-top-color:#243bb2; border-radius:50%; animation:spin 0.8s linear infinite; margin-bottom:12px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* 반응형 */
+@media(max-width:640px) {
+    .slot-cell { width:44px; height:40px; font-size:8px; }
+    .summary-card { min-width:75px; padding:8px 10px; }
+    .summary-card .num { font-size:18px; }
+}
+</style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<div class="header">
+    <div>
+        <h1>금형 적치대 현황</h1>
+        <div class="sub">Mold Storage Layout</div>
+    </div>
+    <button class="btn-back" onclick="history.back()">← 돌아가기</button>
+</div>
+
+<!-- 요약 카드 -->
+<div class="summary-bar" id="summaryBar">
+    <div class="summary-card sc-total"><div class="num" id="cntTotal">-</div><div class="label">전체</div></div>
+    <div class="summary-card sc-stored"><div class="num" id="cntStored">-</div><div class="label">보관중</div></div>
+    <div class="summary-card sc-inuse"><div class="num" id="cntInuse">-</div><div class="label">사용중</div></div>
+    <div class="summary-card sc-repair"><div class="num" id="cntRepair">-</div><div class="label">수리중</div></div>
+    <div class="summary-card sc-retired"><div class="num" id="cntRetired">-</div><div class="label">사용X</div></div>
+</div>
+
+<!-- 검색 -->
+<div class="search-wrap">
+    <input type="text" class="search-box" id="searchInput" placeholder="사번 또는 금형번호로 검색 (예: 502264, M502264A)">
+</div>
+
+<!-- 범례 -->
+<div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#dcfce7;border:1px solid #86efac;"></div>보관중</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fee2e2;border:1px solid #fca5a5;"></div>사용중</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fef3c7;border:1px solid #fcd34d;"></div>수리중</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f1f5f9;border:1px solid #cbd5e1;"></div>사용X</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fafafa;border:1px dashed #d1d5db;"></div>빈 칸</div>
+</div>
+
+<!-- 구역 탭 -->
+<div class="zone-tabs" id="zoneTabs"></div>
+
+<!-- 동 선택 -->
+<div class="building-selector" id="buildingSelector"></div>
+
+<!-- 동 정보 -->
+<div class="building-info" id="buildingInfo"></div>
+
+<!-- 그리드 -->
+<div class="grid-container" id="gridContainer">
+    <div class="loading"><div class="spinner"></div><br>데이터 불러오는 중...</div>
+</div>
+
+<!-- 금형 상세 팝업 -->
+<div class="modal-overlay" id="moldModal">
+    <div class="modal-content" id="moldModalContent"></div>
+</div>
+
+<script>
+// =============================================
+// Supabase 설정 (Project_Moon과 동일)
+// =============================================
+var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ2MDcxNTMsImV4cCI6MjA2MDE4MzE1M30.dGXJScNB9bnyqfvBBNnsfNrgBDNjORG7yqBkSTDiEMg';
+
+var buildings = [];
+var slots = [];
+var molds = [];
+var currentZone = '1구역';
+var currentBuildingId = null;
+
+// =============================================
+// 데이터 로드
+// =============================================
+async function supaFetch(table, query) {
+    var url = SUPABASE_URL + '/rest/v1/' + table;
+    if (query) url += '?' + query;
+    var res = await fetch(url, {
+        headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': 'Bearer ' + SUPABASE_KEY
+        }
+    });
+    return await res.json();
+}
+
+async function loadData() {
+    try {
+        buildings = await supaFetch('mold_buildings', 'order=sort_order.asc');
+        molds = await supaFetch('molds', 'select=*,mold_slots(address,building_id,floor_num,row_num)&order=created_at.asc');
+
+        updateSummary();
+        renderZoneTabs();
+        selectZone('1구역');
+    } catch(e) {
+        document.getElementById('gridContainer').innerHTML =
+            '<div class="loading" style="color:#dc2626;">데이터 로드 실패: ' + e.message + '</div>';
+    }
+}
+
+// =============================================
+// 요약 카드
+// =============================================
+function updateSummary() {
+    var total = molds.length;
+    var stored = 0, inuse = 0, repair = 0, retired = 0;
+    for (var i = 0; i < molds.length; i++) {
+        var m = molds[i];
+        if (!m.is_active) { retired++; continue; }
+        if (m.status === 'stored') stored++;
+        else if (m.status === 'in_use') inuse++;
+        else if (m.status === 'repairing') repair++;
+    }
+    document.getElementById('cntTotal').textContent = total;
+    document.getElementById('cntStored').textContent = stored;
+    document.getElementById('cntInuse').textContent = inuse;
+    document.getElementById('cntRepair').textContent = repair;
+    document.getElementById('cntRetired').textContent = retired;
+}
+
+// =============================================
+// 구역 탭
+// =============================================
+function renderZoneTabs() {
+    var zones = [];
+    for (var i = 0; i < buildings.length; i++) {
+        var z = buildings[i].zone;
+        if (zones.indexOf(z) === -1) zones.push(z);
+    }
+    var html = '';
+    for (var i = 0; i < zones.length; i++) {
+        html += '<div class="zone-tab' + (zones[i] === currentZone ? ' active' : '') + '" onclick="selectZone(\'' + zones[i] + '\')">' + zones[i] + '</div>';
+    }
+    document.getElementById('zoneTabs').innerHTML = html;
+}
+
+function selectZone(zone) {
+    currentZone = zone;
+    renderZoneTabs();
+    renderBuildingSelector();
+    // 해당 구역의 첫 번째 동 자동 선택
+    var zoneBuildings = buildings.filter(function(b) { return b.zone === zone; });
+    if (zoneBuildings.length > 0) {
+        selectBuilding(zoneBuildings[0].id);
+    }
+}
+
+// =============================================
+// 동 선택 버튼
+// =============================================
+function renderBuildingSelector() {
+    var zoneBuildings = buildings.filter(function(b) { return b.zone === currentZone; });
+    var html = '';
+    for (var i = 0; i < zoneBuildings.length; i++) {
+        var b = zoneBuildings[i];
+        var cls = b.id === currentBuildingId ? ' active' : '';
+        html += '<button class="building-btn' + cls + '" onclick="selectBuilding(' + b.id + ')">' + b.building_name + '</button>';
+    }
+    document.getElementById('buildingSelector').innerHTML = html;
+}
+
+function selectBuilding(buildingId) {
+    currentBuildingId = buildingId;
+    renderBuildingSelector();
+    renderGrid();
+}
+
+// =============================================
+// 그리드 렌더링 (핵심!)
+// =============================================
+function renderGrid() {
+    var b = buildings.find(function(x) { return x.id === currentBuildingId; });
+    if (!b) return;
+
+    // 동 정보 표시
+    document.getElementById('buildingInfo').innerHTML =
+        '<strong>' + b.building_name + '</strong>' +
+        '<span>' + b.total_rows + '호 × ' + b.total_floors + '층</span>' +
+        '<span>' + (b.description || '') + '</span>';
+
+    // 해당 동의 금형 수집 (slot의 building_id로 필터)
+    var buildingMolds = {};
+    for (var i = 0; i < molds.length; i++) {
+        var m = molds[i];
+        if (m.mold_slots && m.mold_slots.building_id === currentBuildingId) {
+            var addr = m.mold_slots.address;
+            if (!buildingMolds[addr]) buildingMolds[addr] = [];
+            buildingMolds[addr].push(m);
+        }
+    }
+
+    // 테이블 생성 (세로=층, 가로=호)
+    var html = '<table class="grid-table">';
+
+    // 헤더 (호 번호)
+    html += '<tr><th></th>';
+    for (var r = 1; r <= b.total_rows; r++) {
+        html += '<th>' + r + '호</th>';
+    }
+    html += '</tr>';
+
+    // 각 층 (위에서 아래 = 높은 층부터)
+    for (var f = b.total_floors; f >= 1; f--) {
+        html += '<tr>';
+        html += '<td class="floor-label">' + f + '층</td>';
+
+        for (var r = 1; r <= b.total_rows; r++) {
+            // 주소 생성
+            var addr = makeAddress(b.building_name, f, r);
+            var cellMolds = buildingMolds[addr] || [];
+
+            if (cellMolds.length === 0) {
+                // 빈 칸
+                html += '<td><div class="slot-cell slot-empty" title="' + addr + ' (빈칸)">-</div></td>';
+            } else {
+                // 첫 번째 금형 기준으로 표시 (여러 개면 * 표시)
+                var first = cellMolds[0];
+                var statusClass = 'slot-stored';
+                if (!first.is_active) statusClass = 'slot-retired';
+                else if (first.status === 'in_use') statusClass = 'slot-inuse';
+                else if (first.status === 'repairing') statusClass = 'slot-repair';
+
+                var extraClass = '';
+                if (first.is_spare) extraClass += ' slot-spare';
+                if (first.shared_with) extraClass += ' slot-shared';
+
+                // 표시할 텍스트 (사번 축약)
+                var displayCode = first.product_code || '';
+                if (displayCode.length > 6) displayCode = displayCode.substring(0, 6);
+
+                var multi = cellMolds.length > 1 ? '<span style="font-size:7px;color:#7c3aed;">+' + (cellMolds.length - 1) + '</span>' : '';
+
+                html += '<td><div class="slot-cell ' + statusClass + extraClass + '" '
+                    + 'data-address="' + addr + '" '
+                    + 'data-product="' + first.product_code + '" '
+                    + 'data-moldcode="' + first.mold_code + '" '
+                    + 'onclick="showMoldDetail(\'' + addr + '\')" '
+                    + 'title="' + addr + ' | ' + first.mold_code + '">'
+                    + displayCode + multi
+                    + '</div></td>';
+            }
+        }
+        html += '</tr>';
+    }
+    html += '</table>';
+
+    document.getElementById('gridContainer').innerHTML = html;
+}
+
+// 주소 생성 함수
+function makeAddress(buildingName, floor, row) {
+    if (buildingName === '약칠실') {
+        return '약칠' + floor + (row < 10 ? '0' : '') + row + '호';
+    } else if (buildingName === '약칠실안쪽') {
+        return '약칠안' + floor + (row < 10 ? '0' : '') + row + '호';
+    } else {
+        return buildingName + floor + (row < 10 ? '0' : '') + row + '호';
+    }
+}
+
+// =============================================
+// 금형 상세 팝업
+// =============================================
+function showMoldDetail(address) {
+    var cellMolds = molds.filter(function(m) {
+        return m.mold_slots && m.mold_slots.address === address;
+    });
+    if (cellMolds.length === 0) return;
+
+    var html = '';
+    for (var i = 0; i < cellMolds.length; i++) {
+        var m = cellMolds[i];
+        var statusText = '보관중';
+        var badgeClass = 'badge-stored';
+        if (!m.is_active) { statusText = '사용X'; badgeClass = 'badge-retired'; }
+        else if (m.status === 'in_use') { statusText = '사용중'; badgeClass = 'badge-inuse'; }
+        else if (m.status === 'repairing') { statusText = '수리중'; badgeClass = 'badge-repair'; }
+
+        if (i > 0) html += '<hr style="margin:16px 0;border:none;border-top:1px solid #e2e8f0;">';
+
+        html += '<h3>'
+            + '<span>' + m.mold_code + '</span>'
+            + (i === 0 ? '<button class="modal-close" onclick="closeMoldModal()">✕</button>' : '')
+            + '</h3>';
+
+        html += '<div class="modal-row"><span class="label">금형주소</span><span class="value">' + address + '</span></div>';
+        html += '<div class="modal-row"><span class="label">사번</span><span class="value">' + (m.product_code || '-') + '</span></div>';
+        html += '<div class="modal-row"><span class="label">금형품명코드</span><span class="value">' + (m.mold_code || '-') + '</span></div>';
+        html += '<div class="modal-row"><span class="label">금형차수</span><span class="value">' + (m.mold_suffix || '-') + '</span></div>';
+        html += '<div class="modal-row"><span class="label">상태</span><span class="value"><span class="status-badge ' + badgeClass + '">' + statusText + '</span></span></div>';
+        html += '<div class="modal-row"><span class="label">누적 타발수</span><span class="value">' + (m.total_shots || 0).toLocaleString() + '</span></div>';
+
+        if (m.maintenance_threshold) {
+            var pct = Math.round((m.total_shots / m.maintenance_threshold) * 100);
+            var barColor = pct >= 100 ? '#dc2626' : pct >= 80 ? '#f59e0b' : '#22c55e';
+            html += '<div class="modal-row"><span class="label">유지보수 기준</span><span class="value">' + m.maintenance_threshold.toLocaleString() + ' (' + pct + '%)</span></div>';
+            html += '<div style="background:#f1f5f9;border-radius:4px;height:8px;margin-top:4px;overflow:hidden;">'
+                + '<div style="width:' + Math.min(pct, 100) + '%;height:100%;background:' + barColor + ';border-radius:4px;transition:width 0.5s;"></div></div>';
+        }
+
+        if (m.is_spare) html += '<div class="modal-row"><span class="label">구분</span><span class="value" style="color:#3b82f6;">스페어 금형</span></div>';
+        if (m.shared_with) html += '<div class="modal-row"><span class="label">공용금형</span><span class="value" style="color:#7c3aed;">' + m.shared_with + ' 과 공용</span></div>';
+        if (m.note) html += '<div class="modal-row"><span class="label">비고</span><span class="value">' + m.note + '</span></div>';
+        if (m.maker) html += '<div class="modal-row"><span class="label">제작사</span><span class="value">' + m.maker + '</span></div>';
+        if (m.made_date) html += '<div class="modal-row"><span class="label">제작일</span><span class="value">' + m.made_date + '</span></div>';
+    }
+
+    document.getElementById('moldModalContent').innerHTML = html;
+    document.getElementById('moldModal').classList.add('show');
+}
+
+function closeMoldModal() {
+    document.getElementById('moldModal').classList.remove('show');
+}
+
+// 모달 바깥 클릭 시 닫기
+document.getElementById('moldModal').addEventListener('click', function(e) {
+    if (e.target === this) closeMoldModal();
+});
+
+// =============================================
+// 검색 기능
+// =============================================
+document.getElementById('searchInput').addEventListener('keyup', function(e) {
+    if (e.key === 'Enter') {
+        doSearch(this.value.trim());
+    }
+});
+
+document.getElementById('searchInput').addEventListener('input', function() {
+    // 입력 중 하이라이트 제거
+    var highlighted = document.querySelectorAll('.slot-highlight');
+    for (var i = 0; i < highlighted.length; i++) {
+        highlighted[i].classList.remove('slot-highlight');
+    }
+});
+
+function doSearch(keyword) {
+    if (!keyword) return;
+    keyword = keyword.toUpperCase();
+
+    // 금형 찾기
+    var found = molds.filter(function(m) {
+        var pc = (m.product_code || '').toUpperCase();
+        var mc = (m.mold_code || '').toUpperCase();
+        return pc.indexOf(keyword) !== -1 || mc.indexOf(keyword) !== -1;
+    });
+
+    if (found.length === 0) {
+        alert('검색 결과가 없습니다: ' + keyword);
+        return;
+    }
+
+    // 첫 번째 결과의 동으로 이동
+    var firstMold = found[0];
+    if (!firstMold.mold_slots) {
+        alert('해당 금형의 위치 정보가 없습니다.');
+        return;
+    }
+
+    var targetBuildingId = firstMold.mold_slots.building_id;
+    var targetBuilding = buildings.find(function(b) { return b.id === targetBuildingId; });
+
+    if (targetBuilding) {
+        // 해당 구역 + 동으로 이동
+        if (currentZone !== targetBuilding.zone) {
+            currentZone = targetBuilding.zone;
+            renderZoneTabs();
+            renderBuildingSelector();
+        }
+        selectBuilding(targetBuildingId);
+
+        // 약간의 딜레이 후 하이라이트
+        setTimeout(function() {
+            // 검색된 모든 금형 하이라이트
+            for (var i = 0; i < found.length; i++) {
+                var m = found[i];
+                if (m.mold_slots && m.mold_slots.building_id === currentBuildingId) {
+                    var cells = document.querySelectorAll('[data-address="' + m.mold_slots.address + '"]');
+                    for (var j = 0; j < cells.length; j++) {
+                        cells[j].classList.add('slot-highlight');
+                    }
+                }
+            }
+
+            // 첫 번째 결과로 스크롤
+            var firstCell = document.querySelector('.slot-highlight');
+            if (firstCell) {
+                firstCell.scrollIntoView({ behavior:'smooth', block:'center' });
+            }
+        }, 200);
+    }
+
+    // 여러 건이면 알림
+    if (found.length > 1) {
+        var locations = [];
+        for (var i = 0; i < Math.min(found.length, 5); i++) {
+            if (found[i].mold_slots) {
+                locations.push(found[i].mold_slots.address + ' (' + found[i].mold_code + ')');
+            }
+        }
+        var msg = '검색 결과 ' + found.length + '건:\n' + locations.join('\n');
+        if (found.length > 5) msg += '\n... 외 ' + (found.length - 5) + '건';
+    }
+}
+
+// =============================================
+// 초기화
+// =============================================
+loadData();
+</script>
+</body>
+</html>
