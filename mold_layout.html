@@ -899,7 +899,7 @@ async function doRepairRequest(moldId) {
                 repair_status: 'in_progress'
             });
         } catch(e2) {
-            console.log('수리 이력 자동등록 실패:', e2);
+            alert('⚠️ 수리 이력 자동등록 실패:\n' + e2.message);
         }
         closeMoldModal();
         alert('✅ 수리의뢰 처리 완료\n\n금형 상태: 수리중\n이력관리 > 수리이력에서 확인 가능');
