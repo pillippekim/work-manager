@@ -311,13 +311,23 @@ async function supaFetch(table, query) {
 }
 
 async function loadData() {
+    // 현재 선택된 구역/동 기억
+    var prevZone = currentZone;
+    var prevBuilding = currentBuildingId;
     try {
         buildings = await supaFetch('mold_buildings', 'order=sort_order.asc');
         molds = await supaFetch('molds', 'select=*,mold_slots(address,building_id,floor_num,row_num)&order=created_at.asc');
 
         updateSummary();
         renderZoneTabs();
-        selectZone('1구역');
+
+        // 이전 구역/동이 있으면 유지, 없으면 1구역
+        if (prevZone && prevBuilding) {
+            selectZone(prevZone);
+            selectBuilding(prevBuilding);
+        } else {
+            selectZone('1구역');
+        }
     } catch(e) {
         document.getElementById('gridContainer').innerHTML =
             '<div class="loading" style="color:#dc2626;">데이터 로드 실패: ' + e.message + '</div>';
