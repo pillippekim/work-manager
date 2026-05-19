@@ -120,7 +120,7 @@ table.data-table tr.row-danger { background:#fee2e2; }
     </div>
     <div class="header-right">
         <button class="btn-head" onclick="location.href='mold_layout.html'">📊 적치대 현황</button>
-        <button class="btn-head" onclick="history.back()">← 돌아가기</button>
+        <button class="btn-head" onclick="location.href='mold_dashboard.html'">← 대시보드</button>
     </div>
 </div>
 
@@ -143,11 +143,13 @@ table.data-table tr.row-danger { background:#fee2e2; }
         <option value="in_use">사용중</option>
         <option value="repairing">수리중</option>
         <option value="retired">사용X</option>
+        <option value="alert">⚠ 유지보수 필요</option>
     </select>
     <select class="filter-select" id="filterBuilding">
         <option value="">전체 동</option>
     </select>
     <button class="btn-primary" onclick="openAddModal()">+ 금형 등록</button>
+    <button class="btn-primary" onclick="openUploadModal()" style="background:#7c3aed;">📤 타발수 일괄등록</button>
     <button class="btn-success" onclick="downloadExcel()">📥 엑셀</button>
 </div>
 
@@ -308,6 +310,36 @@ table.data-table tr.row-danger { background:#fee2e2; }
             <input type="date" id="shotDate">
         </div>
         <button class="btn-modal-submit" onclick="submitShot()">타발수 기록</button>
+    </div>
+</div>
+
+<!-- 타발수 일괄 업로드 모달 -->
+<div class="modal-overlay" id="uploadModal">
+    <div class="modal-content" style="max-width:560px;">
+        <h3>
+            <span>📤 타발수 일괄 등록</span>
+            <button class="modal-close" onclick="closeUploadModal()">✕</button>
+        </h3>
+        <div style="background:#f0f4ff;padding:14px;border-radius:8px;margin-bottom:16px;font-size:13px;color:#475569;line-height:1.6;">
+            <strong>사용 방법:</strong><br>
+            1. 아래 <strong>양식 다운로드</strong> 버튼으로 엑셀 양식을 받으세요<br>
+            2. 엑셀에 사번, 누적타발수, 기준타발수를 입력하세요<br>
+            3. 완성된 엑셀을 아래에서 업로드하면 일괄 반영됩니다
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+            <button class="btn-primary" onclick="downloadTemplate()" style="background:#0ea5e9;">📥 양식 다운로드</button>
+            <button class="btn-primary" onclick="downloadCurrentShots()" style="background:#16a34a;">📥 현재 타발수 내보내기</button>
+        </div>
+        <div class="form-group">
+            <label>엑셀 파일 업로드 (.xlsx)</label>
+            <input type="file" id="uploadFile" accept=".xlsx,.xls" style="padding:8px;">
+        </div>
+        <div id="uploadPreview" style="display:none;margin-bottom:12px;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">미리보기 (상위 10건)</div>
+            <div style="overflow-x:auto;" id="uploadPreviewTable"></div>
+            <div style="margin-top:8px;font-size:13px;color:#475569;" id="uploadSummary"></div>
+        </div>
+        <button class="btn-submit" id="btnUploadSubmit" onclick="submitUpload()" style="display:none;">일괄 반영</button>
     </div>
 </div>
 
@@ -479,8 +511,13 @@ function applyFilters() {
         }
         // 상태 필터
         if (statusFilter) {
-            if (statusFilter === 'retired' && m.is_active) return false;
-            if (statusFilter !== 'retired' && (!m.is_active || m.status !== statusFilter)) return false;
+            if (statusFilter === 'alert') {
+                // 유지보수 필요: 타발수 80% 이상
+                if (!m.is_active || !m.maintenance_threshold || m.maintenance_threshold <= 0) return false;
+                var pct = (m.total_shots || 0) / m.maintenance_threshold * 100;
+                if (pct < 80) return false;
+            } else if (statusFilter === 'retired' && m.is_active) return false;
+            else if (statusFilter !== 'retired' && statusFilter !== 'alert' && (!m.is_active || m.status !== statusFilter)) return false;
         }
         // 동 필터
         if (buildingFilter) {
@@ -881,6 +918,149 @@ function showToast(msg, type) {
 document.getElementById('formModal').addEventListener('click', function(e) { if (e.target === this) closeFormModal(); });
 document.getElementById('deleteModal').addEventListener('click', function(e) { if (e.target === this) closeDeleteModal(); });
 document.getElementById('shotModal').addEventListener('click', function(e) { if (e.target === this) closeShotModal(); });
+document.getElementById('uploadModal').addEventListener('click', function(e) { if (e.target === this) closeUploadModal(); });
+
+// =============================================
+// 타발수 일괄 업로드
+// =============================================
+var uploadRows = [];
+
+function openUploadModal() {
+    document.getElementById('uploadFile').value = '';
+    document.getElementById('uploadPreview').style.display = 'none';
+    document.getElementById('btnUploadSubmit').style.display = 'none';
+    uploadRows = [];
+    document.getElementById('uploadModal').classList.add('show');
+}
+
+function closeUploadModal() {
+    document.getElementById('uploadModal').classList.remove('show');
+}
+
+// 양식 다운로드
+function downloadTemplate() {
+    var data = [
+        {'사번': '502264', '누적타발수': 15000, '기준타발수': 50000},
+        {'사번': '502270', '누적타발수': 48000, '기준타발수': 50000},
+        {'사번': '', '누적타발수': '', '기준타발수': ''}
+    ];
+    var ws = XLSX.utils.json_to_sheet(data);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '타발수입력');
+    XLSX.writeFile(wb, '타발수_일괄등록_양식.xlsx');
+    showToast('양식 다운로드 완료 — 사번/누적타발수/기준타발수를 입력하세요', 'success');
+}
+
+// 현재 타발수 내보내기
+function downloadCurrentShots() {
+    var data = allMolds.filter(function(m) { return m.is_active; }).map(function(m) {
+        return {
+            '사번': m.product_code || '',
+            '금형코드': m.mold_code || '',
+            '누적타발수': m.total_shots || 0,
+            '기준타발수': m.maintenance_threshold || ''
+        };
+    });
+    var ws = XLSX.utils.json_to_sheet(data);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '현재타발수');
+    XLSX.writeFile(wb, '현재_타발수_현황.xlsx');
+    showToast('현재 타발수 내보내기 완료', 'success');
+}
+
+// 파일 선택 시 미리보기
+document.getElementById('uploadFile').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+        try {
+            var wb = XLSX.read(ev.target.result, {type:'binary'});
+            var ws = wb.Sheets[wb.SheetNames[0]];
+            var json = XLSX.utils.sheet_to_json(ws);
+
+            uploadRows = [];
+            for (var i = 0; i < json.length; i++) {
+                var row = json[i];
+                var sabun = String(row['사번'] || '').trim();
+                if (!sabun) continue;
+                var shots = parseInt(row['누적타발수']) || 0;
+                var threshold = parseInt(row['기준타발수']) || null;
+                // 해당 사번의 금형 찾기
+                var mold = allMolds.find(function(m) { return m.product_code === sabun; });
+                uploadRows.push({
+                    sabun: sabun,
+                    shots: shots,
+                    threshold: threshold,
+                    moldId: mold ? mold.id : null,
+                    moldCode: mold ? mold.mold_code : '(미발견)',
+                    currentShots: mold ? (mold.total_shots || 0) : 0
+                });
+            }
+
+            // 미리보기 테이블
+            var html = '<table class="dt" style="font-size:12px;"><thead><tr><th>사번</th><th>금형코드</th><th>현재타발</th><th>→ 변경</th><th>기준타발</th><th>상태</th></tr></thead><tbody>';
+            var matched = 0, notFound = 0;
+            for (var i = 0; i < Math.min(uploadRows.length, 10); i++) {
+                var r = uploadRows[i];
+                var status = r.moldId ? '✅ 매칭' : '❌ 미발견';
+                if (r.moldId) matched++; else notFound++;
+                html += '<tr>'
+                    + '<td>' + r.sabun + '</td>'
+                    + '<td>' + r.moldCode + '</td>'
+                    + '<td>' + r.currentShots.toLocaleString() + '</td>'
+                    + '<td style="color:#243bb2;font-weight:700;">' + r.shots.toLocaleString() + '</td>'
+                    + '<td>' + (r.threshold ? r.threshold.toLocaleString() : '-') + '</td>'
+                    + '<td>' + status + '</td>'
+                    + '</tr>';
+            }
+            // 나머지 카운트
+            for (var i = 10; i < uploadRows.length; i++) {
+                if (uploadRows[i].moldId) matched++; else notFound++;
+            }
+            html += '</tbody></table>';
+
+            document.getElementById('uploadPreviewTable').innerHTML = html;
+            document.getElementById('uploadSummary').innerHTML =
+                '총 <strong>' + uploadRows.length + '</strong>건 | '
+                + '매칭 <strong style="color:#16a34a;">' + matched + '</strong>건 | '
+                + '미발견 <strong style="color:#dc2626;">' + notFound + '</strong>건';
+            document.getElementById('uploadPreview').style.display = 'block';
+            document.getElementById('btnUploadSubmit').style.display = 'block';
+        } catch(err) {
+            showToast('엑셀 파일 읽기 실패: ' + err.message, 'error');
+        }
+    };
+    reader.readAsBinaryString(file);
+});
+
+// 일괄 반영
+async function submitUpload() {
+    var matched = uploadRows.filter(function(r) { return r.moldId; });
+    if (matched.length === 0) {
+        showToast('매칭된 금형이 없습니다', 'error');
+        return;
+    }
+    if (!confirm(matched.length + '건의 금형 타발수를 일괄 반영하시겠습니까?')) return;
+
+    var success = 0, fail = 0;
+    for (var i = 0; i < matched.length; i++) {
+        var r = matched[i];
+        try {
+            var updateData = { total_shots: r.shots };
+            if (r.threshold) updateData.maintenance_threshold = r.threshold;
+            await supaUpdate('molds', r.moldId, updateData);
+            success++;
+        } catch(e) {
+            fail++;
+        }
+    }
+
+    showToast('일괄 반영 완료: 성공 ' + success + '건' + (fail > 0 ? ', 실패 ' + fail + '건' : ''), success > 0 ? 'success' : 'error');
+    closeUploadModal();
+    await loadData();
+}
 
 // =============================================
 // 초기화
