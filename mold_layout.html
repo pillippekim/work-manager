@@ -31,21 +31,28 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
 .search-box { width:100%; padding:10px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none; }
 .search-box:focus { border-color:#243bb2; box-shadow:0 0 0 3px rgba(36,59,178,0.15); }
 
-/* 구역 탭 */
-.zone-tabs { display:flex; gap:0; padding:0 16px; border-bottom:2px solid #e2e8f0; overflow-x:auto; position:sticky; top:50px; z-index:90; background:#f1f3f9; }
+/* 구역 탭 + 범례 같은 줄 */
+.zone-legend-row { display:flex; align-items:center; justify-content:space-between; padding:0 16px; border-bottom:2px solid #e2e8f0; }
+.zone-tabs { display:flex; gap:0; overflow-x:auto; flex-shrink:0; }
 .zone-tab { padding:10px 18px; font-size:14px; font-weight:600; color:#64748b; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; white-space:nowrap; transition:all 0.2s; }
 .zone-tab.active { color:#243bb2; border-bottom-color:#243bb2; }
 .zone-tab:hover { color:#243bb2; }
 
+/* 범례 (구역탭 옆) */
+.legend { display:flex; gap:10px; flex-shrink:0; }
+
 /* 동 선택 버튼 */
-.building-selector { display:flex; gap:6px; padding:12px 16px; flex-wrap:wrap; position:sticky; top:92px; z-index:89; background:#f1f3f9; }
+.building-selector { display:flex; gap:6px; padding:10px 16px; flex-wrap:wrap; }
 .building-btn { padding:8px 16px; border:1px solid #d1d5db; border-radius:8px; background:#fff; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; }
 .building-btn.active { background:#243bb2; color:#fff; border-color:#243bb2; }
 .building-btn:hover:not(.active) { background:#eef0ff; border-color:#243bb2; }
 
 /* 동 정보 바 */
-.building-info { padding:8px 16px; display:flex; align-items:center; gap:12px; font-size:13px; color:#475569; position:sticky; top:136px; z-index:88; background:#f1f3f9; }
+.building-info { padding:6px 16px; display:flex; align-items:center; gap:12px; font-size:13px; color:#475569; }
 .building-info span { background:#f1f5f9; padding:3px 10px; border-radius:4px; }
+
+/* 전체 고정 영역 */
+.sticky-top { position:sticky; top:50px; z-index:90; background:#f1f3f9; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
 
 /* 그리드 컨테이너 */
 .grid-container { padding:8px 16px 80px; overflow-x:auto; }
@@ -155,6 +162,9 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
     </div>
 </div>
 
+<!-- 고정 영역 시작 -->
+<div class="sticky-top">
+
 <!-- 요약 카드 -->
 <div class="summary-bar" id="summaryBar">
     <div class="summary-card sc-total"><div class="num" id="cntTotal">-</div><div class="label">전체</div></div>
@@ -180,23 +190,26 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
     <input type="text" class="search-box" id="searchInput" placeholder="사번 또는 금형번호로 검색 (예: 502264, M502264A)">
 </div>
 
-<!-- 범례 -->
-<div class="legend">
-    <div class="legend-item"><div class="legend-dot" style="background:#dcfce7;border:1px solid #86efac;"></div>보관중</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#fee2e2;border:1px solid #fca5a5;"></div>사용중</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#fef3c7;border:1px solid #fcd34d;"></div>수리중</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#f1f5f9;border:1px solid #cbd5e1;"></div>사용X</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#fafafa;border:1px dashed #d1d5db;"></div>빈 칸</div>
+<!-- 구역 탭 + 범례 (같은 줄) -->
+<div class="zone-legend-row">
+    <div class="zone-tabs" id="zoneTabs"></div>
+    <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#dcfce7;border:1px solid #86efac;"></div>보관중</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#fee2e2;border:1px solid #fca5a5;"></div>사용중</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#fef3c7;border:1px solid #fcd34d;"></div>수리중</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f1f5f9;border:1px solid #cbd5e1;"></div>사용X</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#fafafa;border:1px dashed #d1d5db;"></div>빈칸</div>
+    </div>
 </div>
-
-<!-- 구역 탭 -->
-<div class="zone-tabs" id="zoneTabs"></div>
 
 <!-- 동 선택 -->
 <div class="building-selector" id="buildingSelector"></div>
 
 <!-- 동 정보 -->
 <div class="building-info" id="buildingInfo"></div>
+
+</div>
+<!-- 고정 영역 끝 -->
 
 <!-- 그리드 -->
 <div class="grid-container" id="gridContainer">
