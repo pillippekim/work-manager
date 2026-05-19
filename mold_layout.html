@@ -70,8 +70,29 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
 .slot-inuse { background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
 .slot-repair { background:#fef3c7; color:#92400e; border-color:#fcd34d; }
 .slot-retired { background:#f1f5f9; color:#94a3b8; border-color:#cbd5e1; }
-.slot-empty { background:#fafafa; color:#d1d5db; border:1px dashed #e2e8f0; cursor:default; }
-.slot-empty:hover { transform:none; box-shadow:none; }
+.slot-empty { background:#fafafa; color:#d1d5db; border:1px dashed #e2e8f0; }
+.slot-empty-click { cursor:pointer !important; }
+.slot-empty-click:hover { transform:scale(1.08) !important; box-shadow:0 2px 8px rgba(36,59,178,0.2) !important; border-color:#243bb2 !important; background:#eef0ff !important; color:#243bb2 !important; }
+.slot-empty:not(.slot-empty-click):hover { transform:none; box-shadow:none; }
+
+/* 입출고 버튼 */
+.action-btns { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+.btn-action { flex:1; padding:10px 12px; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.15s; min-width:80px; }
+.btn-action:hover { transform:translateY(-1px); box-shadow:0 2px 8px rgba(0,0,0,0.15); }
+.btn-stockout { background:#ef4444; color:#fff; }
+.btn-repair { background:#f59e0b; color:#fff; }
+.btn-return { background:#22c55e; color:#fff; }
+.btn-stockin { background:#243bb2; color:#fff; }
+.btn-cancel { background:#f1f5f9; color:#64748b; }
+
+/* 입고 폼 */
+.stockin-form .form-group { margin-bottom:14px; }
+.stockin-form .form-label { display:block; font-size:13px; color:#64748b; margin-bottom:4px; font-weight:600; }
+.stockin-form .form-input { width:100%; padding:10px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none; }
+.stockin-form .form-input:focus { border-color:#243bb2; box-shadow:0 0 0 3px rgba(36,59,178,0.15); }
+.stockin-search-result { margin-top:8px; padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0; font-size:13px; }
+.stockin-search-result.found { border-color:#86efac; background:#f0fdf4; }
+.stockin-search-result.not-found { border-color:#fca5a5; background:#fef2f2; color:#991b1b; }
 .slot-spare { position:relative; }
 .slot-spare::after { content:'S'; position:absolute; top:3px; right:4px; font-size:9px; background:#3b82f6; color:#fff; border-radius:3px; padding:0 3px; line-height:1.4; }
 .slot-shared::before { content:'*'; position:absolute; top:3px; left:4px; font-size:11px; color:#7c3aed; font-weight:800; }
@@ -236,6 +257,28 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
             <span class="alert-tab tab-warning" id="tabWarning" onclick="filterAlerts('warning')">🟡 주의 (80%↑)</span>
         </div>
         <div class="alert-list" id="alertList"></div>
+    </div>
+</div>
+
+<!-- 입고 모달 -->
+<div class="modal-overlay" id="stockInModal">
+    <div class="modal-content" style="max-width:420px;">
+        <h3>
+            <span>📥 금형 입고</span>
+            <button class="modal-close" onclick="closeStockInModal()">✕</button>
+        </h3>
+        <div class="modal-row"><span class="label">입고 위치</span><span class="value" id="stockInAddress">-</span></div>
+        <div class="stockin-form" style="margin-top:16px;">
+            <div class="form-group">
+                <label class="form-label">사번 (제품코드) 입력</label>
+                <input type="text" class="form-input" id="stockInProductCode" placeholder="예: 502264" oninput="searchMoldForStockIn()">
+            </div>
+            <div id="stockInSearchResult"></div>
+        </div>
+        <div class="action-btns">
+            <button class="btn-action btn-cancel" onclick="closeStockInModal()">취소</button>
+            <button class="btn-action btn-stockin" id="btnStockInSubmit" onclick="submitStockIn()" disabled>입고 처리</button>
+        </div>
     </div>
 </div>
 
@@ -417,8 +460,8 @@ function renderGrid() {
             var cellMolds = buildingMolds[addr] || [];
 
             if (cellMolds.length === 0) {
-                // 빈 칸
-                html += '<td><div class="slot-cell slot-empty" title="' + addr + ' (빈칸)">-</div></td>';
+                // 빈 칸 - 클릭하면 입고 팝업
+                html += '<td><div class="slot-cell slot-empty slot-empty-click" title="' + addr + ' (빈칸 - 클릭하여 입고)" onclick="showStockInModal(\'' + addr + '\')">-</div></td>';
             } else {
                 // 첫 번째 금형 기준으로 표시 (여러 개면 * 표시)
                 var first = cellMolds[0];
@@ -510,6 +553,24 @@ function showMoldDetail(address) {
         if (m.note) html += '<div class="modal-row"><span class="label">비고</span><span class="value">' + m.note + '</span></div>';
         if (m.maker) html += '<div class="modal-row"><span class="label">제작사</span><span class="value">' + m.maker + '</span></div>';
         if (m.made_date) html += '<div class="modal-row"><span class="label">제작일</span><span class="value">' + m.made_date + '</span></div>';
+
+        // 입출고 액션 버튼 (상태별로 다르게 표시)
+        html += '<div class="action-btns">';
+        if (m.is_active) {
+            if (m.status === 'stored') {
+                // 보관중 → 출고(사용중) 또는 수리의뢰
+                html += '<button class="btn-action btn-stockout" onclick="doStockOut(' + m.id + ')">📤 출고 (사용)</button>';
+                html += '<button class="btn-action btn-repair" onclick="doRepairRequest(' + m.id + ')">🔧 수리의뢰</button>';
+            } else if (m.status === 'in_use') {
+                // 사용중 → 반납(보관중) 또는 수리의뢰
+                html += '<button class="btn-action btn-return" onclick="doReturn(' + m.id + ')">📥 반납 (보관)</button>';
+                html += '<button class="btn-action btn-repair" onclick="doRepairRequest(' + m.id + ')">🔧 수리의뢰</button>';
+            } else if (m.status === 'repairing') {
+                // 수리중 → 수리완료(보관중)
+                html += '<button class="btn-action btn-return" onclick="doRepairComplete(' + m.id + ')">✅ 수리완료</button>';
+            }
+        }
+        html += '</div>';
     }
 
     document.getElementById('moldModalContent').innerHTML = html;
@@ -702,6 +763,255 @@ function goToMoldFromAlert(productCode) {
 document.getElementById('alertModal').addEventListener('click', function(e) {
     if (e.target === this) closeAlertModal();
 });
+
+// =============================================
+// Supabase 업데이트 함수
+// =============================================
+function supaHeaders() {
+    return {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+    };
+}
+
+async function supaUpdate(table, id, data) {
+    var url = SUPABASE_URL + '/rest/v1/' + table + '?id=eq.' + id;
+    var res = await fetch(url, {
+        method: 'PATCH',
+        headers: supaHeaders(),
+        body: JSON.stringify(data)
+    });
+    return await res.json();
+}
+
+async function supaInsert(table, data) {
+    var url = SUPABASE_URL + '/rest/v1/' + table;
+    var res = await fetch(url, {
+        method: 'POST',
+        headers: supaHeaders(),
+        body: JSON.stringify(data)
+    });
+    return await res.json();
+}
+
+// 토스트 메시지
+function showToast(msg, type) {
+    // 간단한 토스트 (기존 없으면 생성)
+    var el = document.getElementById('toast');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'toast';
+        el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;z-index:999;transition:opacity 0.3s;opacity:0;pointer-events:none;';
+        document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    if (type === 'error') { el.style.background = '#fef2f2'; el.style.color = '#dc2626'; el.style.border = '1px solid #fca5a5'; }
+    else { el.style.background = '#f0fdf4'; el.style.color = '#16a34a'; el.style.border = '1px solid #86efac'; }
+    el.style.opacity = '1';
+    setTimeout(function() { el.style.opacity = '0'; }, 3000);
+}
+
+// 상태 변경 로그 기록
+async function logStatusChange(moldId, fromStatus, toStatus, reason) {
+    try {
+        await supaInsert('mold_status_logs', {
+            mold_id: moldId,
+            from_status: fromStatus,
+            to_status: toStatus,
+            reason: reason || '',
+            changed_at: new Date().toISOString()
+        });
+    } catch(e) {
+        console.log('상태 로그 기록 실패:', e);
+    }
+}
+
+// =============================================
+// 출고 처리 (보관중 → 사용중)
+// =============================================
+async function doStockOut(moldId) {
+    if (!confirm('이 금형을 출고(사용중) 처리하시겠습니까?')) return;
+    try {
+        await supaUpdate('molds', moldId, { status: 'in_use' });
+        await logStatusChange(moldId, 'stored', 'in_use', '적치대에서 출고');
+        closeMoldModal();
+        showToast('출고 처리 완료', 'success');
+        await loadData();
+    } catch(e) {
+        showToast('출고 처리 실패: ' + e.message, 'error');
+    }
+}
+
+// =============================================
+// 반납 처리 (사용중 → 보관중)
+// =============================================
+async function doReturn(moldId) {
+    if (!confirm('이 금형을 반납(보관중) 처리하시겠습니까?')) return;
+    try {
+        await supaUpdate('molds', moldId, { status: 'stored' });
+        await logStatusChange(moldId, 'in_use', 'stored', '적치대로 반납');
+        closeMoldModal();
+        showToast('반납 처리 완료', 'success');
+        await loadData();
+    } catch(e) {
+        showToast('반납 처리 실패: ' + e.message, 'error');
+    }
+}
+
+// =============================================
+// 수리의뢰 (보관중/사용중 → 수리중)
+// =============================================
+async function doRepairRequest(moldId) {
+    if (!confirm('이 금형을 수리의뢰 처리하시겠습니까?')) return;
+    var mold = molds.find(function(m) { return m.id === moldId; });
+    var fromStatus = mold ? mold.status : 'stored';
+    try {
+        await supaUpdate('molds', moldId, { status: 'repairing' });
+        await logStatusChange(moldId, fromStatus, 'repairing', '수리의뢰');
+        closeMoldModal();
+        showToast('수리의뢰 처리 완료', 'success');
+        await loadData();
+    } catch(e) {
+        showToast('수리의뢰 실패: ' + e.message, 'error');
+    }
+}
+
+// =============================================
+// 수리완료 (수리중 → 보관중)
+// =============================================
+async function doRepairComplete(moldId) {
+    if (!confirm('수리 완료 처리하시겠습니까? (보관중으로 변경)')) return;
+    try {
+        await supaUpdate('molds', moldId, { status: 'stored' });
+        await logStatusChange(moldId, 'repairing', 'stored', '수리완료 반납');
+        closeMoldModal();
+        showToast('수리완료 처리 완료', 'success');
+        await loadData();
+    } catch(e) {
+        showToast('수리완료 처리 실패: ' + e.message, 'error');
+    }
+}
+
+// =============================================
+// 입고 기능 (빈 칸 → 금형 배치)
+// =============================================
+var stockInTargetAddress = '';
+var stockInTargetMold = null;
+
+function showStockInModal(address) {
+    stockInTargetAddress = address;
+    stockInTargetMold = null;
+    document.getElementById('stockInAddress').textContent = address;
+    document.getElementById('stockInProductCode').value = '';
+    document.getElementById('stockInSearchResult').innerHTML = '';
+    document.getElementById('btnStockInSubmit').disabled = true;
+    document.getElementById('stockInModal').classList.add('show');
+    setTimeout(function() { document.getElementById('stockInProductCode').focus(); }, 200);
+}
+
+function closeStockInModal() {
+    document.getElementById('stockInModal').classList.remove('show');
+}
+
+// 입고 모달 바깥 클릭 닫기
+document.getElementById('stockInModal').addEventListener('click', function(e) {
+    if (e.target === this) closeStockInModal();
+});
+
+// 사번으로 금형 검색 (입고용)
+function searchMoldForStockIn() {
+    var keyword = document.getElementById('stockInProductCode').value.trim();
+    var resultDiv = document.getElementById('stockInSearchResult');
+    var btn = document.getElementById('btnStockInSubmit');
+
+    if (keyword.length < 3) {
+        resultDiv.innerHTML = '';
+        btn.disabled = true;
+        stockInTargetMold = null;
+        return;
+    }
+
+    keyword = keyword.toUpperCase();
+
+    // 현재 위치가 없거나 사용중/수리중인 금형 중에서 검색
+    var found = molds.filter(function(m) {
+        var pc = (m.product_code || '').toUpperCase();
+        var mc = (m.mold_code || '').toUpperCase();
+        return (pc.indexOf(keyword) !== -1 || mc.indexOf(keyword) !== -1);
+    });
+
+    if (found.length === 0) {
+        resultDiv.innerHTML = '<div class="stockin-search-result not-found">해당 금형을 찾을 수 없습니다</div>';
+        btn.disabled = true;
+        stockInTargetMold = null;
+        return;
+    }
+
+    var html = '';
+    for (var i = 0; i < Math.min(found.length, 5); i++) {
+        var m = found[i];
+        var statusText = '보관중';
+        if (!m.is_active) statusText = '사용X';
+        else if (m.status === 'in_use') statusText = '사용중';
+        else if (m.status === 'repairing') statusText = '수리중';
+
+        var currentAddr = m.mold_slots ? m.mold_slots.address : '위치 미지정';
+
+        html += '<div class="stockin-search-result found" style="cursor:pointer;margin-bottom:4px;" onclick="selectStockInMold(' + m.id + ')">'
+            + '<strong>' + m.mold_code + '</strong> (사번: ' + m.product_code + ')<br>'
+            + '<span style="font-size:12px;color:#64748b;">현재: ' + currentAddr + ' | 상태: ' + statusText + '</span>'
+            + '</div>';
+    }
+    if (found.length > 5) {
+        html += '<div style="font-size:12px;color:#64748b;margin-top:4px;">... 외 ' + (found.length - 5) + '건</div>';
+    }
+
+    resultDiv.innerHTML = html;
+}
+
+function selectStockInMold(moldId) {
+    stockInTargetMold = molds.find(function(m) { return m.id === moldId; });
+    if (!stockInTargetMold) return;
+
+    var resultDiv = document.getElementById('stockInSearchResult');
+    resultDiv.innerHTML = '<div class="stockin-search-result found" style="border-color:#243bb2;background:#eef0ff;">'
+        + '<strong>✅ ' + stockInTargetMold.mold_code + '</strong> (사번: ' + stockInTargetMold.product_code + ')<br>'
+        + '<span style="font-size:12px;color:#243bb2;">이 금형을 <strong>' + stockInTargetAddress + '</strong>에 입고합니다</span>'
+        + '</div>';
+
+    document.getElementById('btnStockInSubmit').disabled = false;
+}
+
+async function submitStockIn() {
+    if (!stockInTargetMold || !stockInTargetAddress) return;
+
+    // 주소로 slot_id 찾기
+    try {
+        var slotData = await supaFetch('mold_slots', 'address=eq.' + encodeURIComponent(stockInTargetAddress) + '&limit=1');
+        if (!slotData || slotData.length === 0) {
+            showToast('해당 위치의 슬롯 정보를 찾을 수 없습니다', 'error');
+            return;
+        }
+
+        var slotId = slotData[0].id;
+        var prevStatus = stockInTargetMold.status;
+
+        await supaUpdate('molds', stockInTargetMold.id, {
+            slot_id: slotId,
+            status: 'stored'
+        });
+
+        await logStatusChange(stockInTargetMold.id, prevStatus, 'stored', stockInTargetAddress + '에 입고');
+
+        closeStockInModal();
+        showToast(stockInTargetMold.mold_code + ' → ' + stockInTargetAddress + ' 입고 완료', 'success');
+        await loadData();
+    } catch(e) {
+        showToast('입고 처리 실패: ' + e.message, 'error');
+    }
+}
 
 // =============================================
 // 초기화
