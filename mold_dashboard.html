@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>금형관리 대시보드 - HKHT</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif; background:#f1f3f9; color:#1e293b; }
+
+/* 헤더 */
+.header { background:#243bb2; color:#fff; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+.header h1 { font-size:20px; font-weight:700; }
+.header .sub { font-size:12px; opacity:0.8; margin-top:2px; }
+.btn-back { background:none; border:1px solid rgba(255,255,255,0.4); color:#fff; padding:6px 14px; border-radius:6px; font-size:13px; cursor:pointer; }
+.btn-back:hover { background:rgba(255,255,255,0.15); }
+
+/* 컨테이너 */
+.container { max-width:1200px; margin:0 auto; padding:16px; }
+
+/* 메뉴 카드 */
+.menu-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:20px; }
+.menu-card { background:#fff; border-radius:14px; padding:20px; box-shadow:0 1px 4px rgba(0,0,0,0.08); cursor:pointer; transition:all 0.2s; border:2px solid transparent; text-decoration:none; color:#1e293b; }
+.menu-card:hover { transform:translateY(-3px); box-shadow:0 6px 20px rgba(0,0,0,0.12); border-color:#243bb2; }
+.menu-card-icon { font-size:32px; margin-bottom:10px; }
+.menu-card-title { font-size:16px; font-weight:700; margin-bottom:4px; }
+.menu-card-desc { font-size:12px; color:#64748b; line-height:1.5; }
+
+/* 요약 섹션 */
+.section-title { font-size:16px; font-weight:700; color:#1e293b; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.section-title .icon { font-size:18px; }
+
+/* 현황 카드 그리드 */
+.stat-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin-bottom:20px; }
+.stat-card { background:#fff; border-radius:12px; padding:16px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+.stat-num { font-size:28px; font-weight:800; }
+.stat-label { font-size:12px; color:#64748b; margin-top:4px; }
+.stat-sub { font-size:11px; margin-top:6px; }
+
+/* 차트 영역 */
+.chart-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
+.chart-card { background:#fff; border-radius:14px; padding:20px; box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+.chart-card h4 { font-size:14px; font-weight:700; color:#475569; margin-bottom:16px; }
+
+/* 도넛 차트 (CSS로 구현) */
+.donut-wrap { display:flex; align-items:center; justify-content:center; gap:24px; }
+.donut { width:140px; height:140px; border-radius:50%; position:relative; }
+.donut-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; }
+.donut-center .big { font-size:24px; font-weight:800; color:#243bb2; }
+.donut-center .small { font-size:11px; color:#64748b; }
+.donut-legend { display:flex; flex-direction:column; gap:8px; }
+.donut-legend-item { display:flex; align-items:center; gap:6px; font-size:13px; }
+.donut-legend-dot { width:12px; height:12px; border-radius:3px; flex-shrink:0; }
+
+/* 바 차트 */
+.bar-chart { display:flex; flex-direction:column; gap:8px; }
+.bar-row { display:flex; align-items:center; gap:8px; }
+.bar-label { width:50px; font-size:12px; font-weight:600; color:#475569; text-align:right; flex-shrink:0; }
+.bar-track { flex:1; height:24px; background:#f1f5f9; border-radius:6px; overflow:hidden; position:relative; }
+.bar-fill { height:100%; border-radius:6px; transition:width 0.8s ease; display:flex; align-items:center; padding-left:8px; }
+.bar-fill span { font-size:11px; font-weight:600; color:#fff; }
+.bar-count { width:40px; font-size:12px; font-weight:600; color:#64748b; text-align:right; flex-shrink:0; }
+
+/* 알람 리스트 */
+.alert-section { margin-bottom:20px; }
+.alert-card { background:#fff; border-radius:14px; padding:20px; box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+.alert-empty { text-align:center; padding:30px; color:#94a3b8; font-size:14px; }
+.alert-item { display:flex; align-items:center; padding:10px 0; border-bottom:1px solid #f1f5f9; }
+.alert-item:last-child { border-bottom:none; }
+.alert-item-icon { font-size:18px; margin-right:12px; flex-shrink:0; }
+.alert-item-info { flex:1; }
+.alert-item-title { font-size:14px; font-weight:600; }
+.alert-item-sub { font-size:12px; color:#64748b; margin-top:2px; }
+.alert-item-pct { font-size:14px; font-weight:700; min-width:50px; text-align:right; }
+
+/* 최근 이력 */
+.history-card { background:#fff; border-radius:14px; padding:20px; box-shadow:0 1px 4px rgba(0,0,0,0.08); margin-bottom:20px; }
+.history-item { display:flex; align-items:flex-start; padding:10px 0; border-bottom:1px solid #f1f5f9; gap:12px; }
+.history-item:last-child { border-bottom:none; }
+.history-dot { width:10px; height:10px; border-radius:50%; margin-top:4px; flex-shrink:0; }
+.history-text { flex:1; }
+.history-title { font-size:13px; font-weight:600; }
+.history-sub { font-size:12px; color:#64748b; margin-top:2px; }
+.history-time { font-size:11px; color:#94a3b8; flex-shrink:0; }
+
+/* 로딩 */
+.loading { text-align:center; padding:60px 20px; color:#64748b; }
+.spinner { display:inline-block; width:32px; height:32px; border:3px solid #e2e8f0; border-top-color:#243bb2; border-radius:50%; animation:spin 0.8s linear infinite; margin-bottom:12px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* 반응형 */
+@media(max-width:768px) {
+    .chart-row { grid-template-columns:1fr; }
+    .stat-grid { grid-template-columns:repeat(3, 1fr); }
+    .donut-wrap { flex-direction:column; }
+}
+@media(max-width:480px) {
+    .stat-grid { grid-template-columns:repeat(2, 1fr); }
+    .menu-cards { grid-template-columns:1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <h1>금형관리</h1>
+        <div class="sub">Mold Management Dashboard</div>
+    </div>
+    <button class="btn-back" onclick="history.back()">← 돌아가기</button>
+</div>
+
+<div class="container">
+
+    <!-- 메뉴 카드 -->
+    <div class="menu-cards">
+        <a class="menu-card" href="mold_layout.html">
+            <div class="menu-card-icon">🏗️</div>
+            <div class="menu-card-title">적치대 현황</div>
+            <div class="menu-card-desc">금형 적치대 레이아웃 시각화<br>위치/상태 한눈에 파악</div>
+        </a>
+        <a class="menu-card" href="mold_admin.html">
+            <div class="menu-card-icon">⚙️</div>
+            <div class="menu-card-title">금형 상세관리</div>
+            <div class="menu-card-desc">금형 등록/수정/삭제<br>타발수 관리 및 엑셀 다운로드</div>
+        </a>
+        <a class="menu-card" href="mold_admin.html" onclick="localStorage.setItem('moldAdminFilter','alert')">
+            <div class="menu-card-icon">🔔</div>
+            <div class="menu-card-title">유지보수 알람</div>
+            <div class="menu-card-desc">타발수 초과 금형 경고<br>정비 이력 관리</div>
+        </a>
+    </div>
+
+    <!-- 현황 요약 -->
+    <div class="section-title"><span class="icon">📊</span> 금형 현황 요약</div>
+    <div class="stat-grid" id="statGrid">
+        <div class="stat-card"><div class="stat-num" id="sTotal" style="color:#243bb2;">-</div><div class="stat-label">전체 금형</div></div>
+        <div class="stat-card"><div class="stat-num" id="sActive" style="color:#0ea5e9;">-</div><div class="stat-label">활성 금형</div></div>
+        <div class="stat-card"><div class="stat-num" id="sStored" style="color:#16a34a;">-</div><div class="stat-label">보관중</div></div>
+        <div class="stat-card"><div class="stat-num" id="sInuse" style="color:#dc2626;">-</div><div class="stat-label">사용중</div></div>
+        <div class="stat-card"><div class="stat-num" id="sRepair" style="color:#f59e0b;">-</div><div class="stat-label">수리중</div></div>
+        <div class="stat-card"><div class="stat-num" id="sRetired" style="color:#94a3b8;">-</div><div class="stat-label">사용X</div></div>
+    </div>
+
+    <!-- 차트 영역 -->
+    <div class="chart-row">
+        <!-- 상태 분포 도넛 -->
+        <div class="chart-card">
+            <h4>상태 분포</h4>
+            <div class="donut-wrap">
+                <div class="donut" id="donutChart">
+                    <div class="donut-center">
+                        <div class="big" id="donutTotal">-</div>
+                        <div class="small">활성 금형</div>
+                    </div>
+                </div>
+                <div class="donut-legend" id="donutLegend"></div>
+            </div>
+        </div>
+
+        <!-- 동별 금형 수 바 차트 -->
+        <div class="chart-card">
+            <h4>동별 금형 수</h4>
+            <div class="bar-chart" id="barChart">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 유지보수 알람 -->
+    <div class="alert-section">
+        <div class="section-title"><span class="icon">⚠️</span> 유지보수 알람</div>
+        <div class="alert-card" id="alertCard">
+            <div class="loading"><div class="spinner"></div></div>
+        </div>
+    </div>
+
+    <!-- 최근 상태 변경 이력 -->
+    <div>
+        <div class="section-title"><span class="icon">📋</span> 최근 상태 변경 이력</div>
+        <div class="history-card" id="historyCard">
+            <div class="loading"><div class="spinner"></div></div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// =============================================
+// Supabase 설정
+// =============================================
+var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+
+var allMolds = [];
+var buildings = [];
+
+async function supaFetch(table, query) {
+    var url = SUPABASE_URL + '/rest/v1/' + table;
+    if (query) url += '?' + query;
+    var res = await fetch(url, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    });
+    return await res.json();
+}
+
+// =============================================
+// 데이터 로드
+// =============================================
+async function loadData() {
+    try {
+        buildings = await supaFetch('mold_buildings', 'order=sort_order.asc');
+        allMolds = await supaFetch('molds', 'select=*,mold_slots(address,building_id,floor_num,row_num)&order=mold_code.asc');
+
+        renderStats();
+        renderDonut();
+        renderBarChart();
+        renderAlerts();
+        loadHistory();
+    } catch(e) {
+        document.getElementById('alertCard').innerHTML =
+            '<div style="color:#dc2626;text-align:center;padding:20px;">데이터 로드 실패: ' + e.message + '</div>';
+    }
+}
+
+// =============================================
+// 현황 요약 숫자
+// =============================================
+function renderStats() {
+    var total = allMolds.length;
+    var stored = 0, inuse = 0, repair = 0, retired = 0;
+    for (var i = 0; i < allMolds.length; i++) {
+        var m = allMolds[i];
+        if (!m.is_active) { retired++; continue; }
+        if (m.status === 'stored') stored++;
+        else if (m.status === 'in_use') inuse++;
+        else if (m.status === 'repairing') repair++;
+    }
+    var active = total - retired;
+    document.getElementById('sTotal').textContent = total;
+    document.getElementById('sActive').textContent = active;
+    document.getElementById('sStored').textContent = stored;
+    document.getElementById('sInuse').textContent = inuse;
+    document.getElementById('sRepair').textContent = repair;
+    document.getElementById('sRetired').textContent = retired;
+}
+
+// =============================================
+// 도넛 차트 (CSS conic-gradient)
+// =============================================
+function renderDonut() {
+    var stored = 0, inuse = 0, repair = 0;
+    for (var i = 0; i < allMolds.length; i++) {
+        var m = allMolds[i];
+        if (!m.is_active) continue;
+        if (m.status === 'stored') stored++;
+        else if (m.status === 'in_use') inuse++;
+        else if (m.status === 'repairing') repair++;
+    }
+    var active = stored + inuse + repair;
+    document.getElementById('donutTotal').textContent = active;
+
+    if (active === 0) return;
+
+    var pStored = (stored / active * 100);
+    var pInuse = (inuse / active * 100);
+    var pRepair = (repair / active * 100);
+
+    var s1 = pStored;
+    var s2 = s1 + pInuse;
+
+    var donut = document.getElementById('donutChart');
+    donut.style.background = 'conic-gradient('
+        + '#22c55e 0% ' + s1 + '%, '
+        + '#ef4444 ' + s1 + '% ' + s2 + '%, '
+        + '#f59e0b ' + s2 + '% 100%)';
+
+    // 가운데 원 (도넛 구멍)
+    donut.style.position = 'relative';
+    var center = donut.querySelector('.donut-center');
+    center.style.background = '#fff';
+    center.style.width = '90px';
+    center.style.height = '90px';
+    center.style.borderRadius = '50%';
+    center.style.display = 'flex';
+    center.style.flexDirection = 'column';
+    center.style.alignItems = 'center';
+    center.style.justifyContent = 'center';
+
+    // 범례
+    var legend = document.getElementById('donutLegend');
+    legend.innerHTML =
+        '<div class="donut-legend-item"><div class="donut-legend-dot" style="background:#22c55e;"></div>보관중 ' + stored + '개 (' + pStored.toFixed(1) + '%)</div>'
+        + '<div class="donut-legend-item"><div class="donut-legend-dot" style="background:#ef4444;"></div>사용중 ' + inuse + '개 (' + pInuse.toFixed(1) + '%)</div>'
+        + '<div class="donut-legend-item"><div class="donut-legend-dot" style="background:#f59e0b;"></div>수리중 ' + repair + '개 (' + pRepair.toFixed(1) + '%)</div>';
+}
+
+// =============================================
+// 동별 바 차트
+// =============================================
+function renderBarChart() {
+    // 동별 금형 수 집계
+    var buildingCounts = {};
+    var maxCount = 0;
+    for (var i = 0; i < buildings.length; i++) {
+        buildingCounts[buildings[i].id] = { name: buildings[i].building_name, count: 0 };
+    }
+    for (var i = 0; i < allMolds.length; i++) {
+        var m = allMolds[i];
+        if (m.mold_slots && buildingCounts[m.mold_slots.building_id]) {
+            buildingCounts[m.mold_slots.building_id].count++;
+        }
+    }
+
+    // 최대값 계산
+    for (var key in buildingCounts) {
+        if (buildingCounts[key].count > maxCount) maxCount = buildingCounts[key].count;
+    }
+
+    var html = '';
+    var colors = ['#243bb2','#2563eb','#3b82f6','#60a5fa','#93c5fd','#243bb2','#2563eb','#3b82f6','#60a5fa','#93c5fd','#243bb2','#2563eb','#3b82f6','#60a5fa','#93c5fd','#243bb2'];
+    var ci = 0;
+
+    for (var i = 0; i < buildings.length; i++) {
+        var b = buildings[i];
+        var bc = buildingCounts[b.id];
+        if (!bc) continue;
+        var pct = maxCount > 0 ? (bc.count / maxCount * 100) : 0;
+
+        html += '<div class="bar-row">'
+            + '<div class="bar-label">' + bc.name + '</div>'
+            + '<div class="bar-track">'
+            + '<div class="bar-fill" style="width:' + pct + '%;background:' + colors[ci % colors.length] + ';"><span>' + (bc.count > 0 ? bc.count : '') + '</span></div>'
+            + '</div>'
+            + '<div class="bar-count">' + bc.count + '</div>'
+            + '</div>';
+        ci++;
+    }
+
+    document.getElementById('barChart').innerHTML = html;
+}
+
+// =============================================
+// 유지보수 알람
+// =============================================
+function renderAlerts() {
+    var alerts = [];
+    for (var i = 0; i < allMolds.length; i++) {
+        var m = allMolds[i];
+        if (!m.is_active || !m.maintenance_threshold || m.maintenance_threshold <= 0) continue;
+        var pct = Math.round((m.total_shots || 0) / m.maintenance_threshold * 100);
+        if (pct >= 80) {
+            alerts.push({ mold: m, pct: pct, level: pct >= 100 ? 'danger' : 'warning' });
+        }
+    }
+    alerts.sort(function(a, b) { return b.pct - a.pct; });
+
+    var html = '';
+    if (alerts.length === 0) {
+        html = '<div class="alert-empty">✅ 유지보수가 필요한 금형이 없습니다</div>';
+    } else {
+        for (var i = 0; i < Math.min(alerts.length, 10); i++) {
+            var a = alerts[i];
+            var m = a.mold;
+            var addr = m.mold_slots ? m.mold_slots.address : '위치 미지정';
+            var icon = a.level === 'danger' ? '🔴' : '🟡';
+            var color = a.level === 'danger' ? '#dc2626' : '#f59e0b';
+
+            html += '<div class="alert-item">'
+                + '<div class="alert-item-icon">' + icon + '</div>'
+                + '<div class="alert-item-info">'
+                + '<div class="alert-item-title">' + m.mold_code + ' (' + m.product_code + ')</div>'
+                + '<div class="alert-item-sub">' + addr + ' · ' + (m.total_shots || 0).toLocaleString() + ' / ' + m.maintenance_threshold.toLocaleString() + '타</div>'
+                + '</div>'
+                + '<div class="alert-item-pct" style="color:' + color + ';">' + a.pct + '%</div>'
+                + '</div>';
+        }
+        if (alerts.length > 10) {
+            html += '<div style="text-align:center;padding:10px;color:#64748b;font-size:13px;">외 ' + (alerts.length - 10) + '건 더 있음</div>';
+        }
+    }
+
+    document.getElementById('alertCard').innerHTML = html;
+}
+
+// =============================================
+// 최근 상태 변경 이력
+// =============================================
+async function loadHistory() {
+    try {
+        var logs = await supaFetch('mold_status_logs', 'order=created_at.desc&limit=10');
+
+        if (!logs || logs.length === 0) {
+            document.getElementById('historyCard').innerHTML =
+                '<div class="alert-empty">아직 상태 변경 이력이 없습니다</div>';
+            return;
+        }
+
+        var html = '';
+        for (var i = 0; i < logs.length; i++) {
+            var log = logs[i];
+            var dotColor = '#22c55e';
+            if (log.new_status === 'in_use') dotColor = '#ef4444';
+            else if (log.new_status === 'repairing') dotColor = '#f59e0b';
+            else if (log.new_status === 'retired') dotColor = '#94a3b8';
+
+            var statusKo = { 'stored':'보관중', 'in_use':'사용중', 'repairing':'수리중', 'retired':'사용X' };
+            var prevText = statusKo[log.prev_status] || log.prev_status || '(없음)';
+            var newText = statusKo[log.new_status] || log.new_status;
+
+            var timeText = '';
+            if (log.created_at) {
+                var d = new Date(log.created_at);
+                timeText = (d.getMonth()+1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2,'0');
+            }
+
+            html += '<div class="history-item">'
+                + '<div class="history-dot" style="background:' + dotColor + ';"></div>'
+                + '<div class="history-text">'
+                + '<div class="history-title">' + prevText + ' → ' + newText + '</div>'
+                + '<div class="history-sub">' + (log.reason || '') + '</div>'
+                + '</div>'
+                + '<div class="history-time">' + timeText + '</div>'
+                + '</div>';
+        }
+
+        document.getElementById('historyCard').innerHTML = html;
+    } catch(e) {
+        document.getElementById('historyCard').innerHTML =
+            '<div class="alert-empty">이력 로드 실패</div>';
+    }
+}
+
+// =============================================
+// 초기화
+// =============================================
+loadData();
+</script>
+</body>
+</html>
