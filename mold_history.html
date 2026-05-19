@@ -700,10 +700,18 @@ document.getElementById('repairModal').addEventListener('click',function(e){if(e
 loadAll();
 
 // URL 해시로 탭 자동 전환 (#damage, #cleaning, #repair)
-var hash = window.location.hash.replace('#','');
-if(hash === 'damage') switchTab('damage');
-else if(hash === 'cleaning') switchTab('cleaning');
-else if(hash === 'repair') switchTab('repair');
+function handleHash() {
+    var h = window.location.hash.replace('#','');
+    if(h === 'damage') switchTab('damage');
+    else if(h === 'cleaning') switchTab('cleaning');
+    else if(h === 'repair') switchTab('repair');
+}
+handleHash();
+// 같은 페이지에서 해시만 바뀔 때도 탭 전환
+window.addEventListener('hashchange', function() {
+    handleHash();
+    if(typeof initSidebar === 'function') initSidebar();
+});
 </script>
 </div><!-- main -->
 <script src="sidebar.js"></script>
