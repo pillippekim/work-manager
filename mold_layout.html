@@ -146,9 +146,45 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
 .alert-tab.tab-warning.active { background:#f59e0b; color:#fff; border-color:#f59e0b; }
 .sc-alert .num { color:#dc2626; }
 
+/* 좌측 메뉴바 */
+.sidebar { position:fixed; top:0; left:0; width:220px; height:100vh; background:#1e2a4a; color:#fff; z-index:200; display:flex; flex-direction:column; overflow-y:auto; }
+.sidebar-logo { padding:20px 16px 16px; border-bottom:1px solid rgba(255,255,255,0.1); }
+.sidebar-logo h2 { font-size:16px; font-weight:700; }
+.sidebar-logo .sub { font-size:11px; color:#94a3b8; margin-top:4px; }
+.sidebar-section { padding:12px 0 4px; }
+.sidebar-section-title { font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px; padding:0 16px 8px; }
+.sidebar-item { display:flex; align-items:center; gap:10px; padding:10px 16px; font-size:14px; color:#cbd5e1; cursor:pointer; transition:all 0.15s; text-decoration:none; border-left:3px solid transparent; }
+.sidebar-item:hover { background:rgba(255,255,255,0.08); color:#fff; }
+.sidebar-item.active { background:rgba(36,59,178,0.3); color:#fff; border-left-color:#60a5fa; }
+.sidebar-item .icon { font-size:18px; width:24px; text-align:center; flex-shrink:0; }
+.sidebar-bottom { margin-top:auto; padding:12px 16px; border-top:1px solid rgba(255,255,255,0.1); }
+.sidebar-bottom a { color:#94a3b8; font-size:12px; text-decoration:none; }
+.main { margin-left:220px; min-height:100vh; }
+@media(max-width:768px) {
+    .sidebar { width:60px; }
+    .sidebar-logo h2,.sidebar-logo .sub,.sidebar-section-title,.sidebar-item span:not(.icon) { display:none; }
+    .sidebar-item { padding:12px 0; justify-content:center; }
+    .main { margin-left:60px; }
+}
+
 </style>
 </head>
 <body>
+
+<!-- 좌측 메뉴바 -->
+<nav class="sidebar">
+    <div class="sidebar-logo"><h2>금형관리</h2><div class="sub">Mold Management</div></div>
+    <div class="sidebar-section">
+        <div class="sidebar-section-title">메뉴</div>
+        <a class="sidebar-item" href="mold_dashboard.html"><span class="icon">📊</span><span>대시보드</span></a>
+        <a class="sidebar-item active" href="mold_layout.html"><span class="icon">🗄️</span><span>적치대 현황</span></a>
+        <a class="sidebar-item" href="mold_admin.html"><span class="icon">📋</span><span>금형 상세관리</span></a>
+        <a class="sidebar-item" href="mold_history.html"><span class="icon">🔧</span><span>이력 관리</span></a>
+    </div>
+    <div class="sidebar-bottom"><a href="#">㈜한국하이테크</a></div>
+</nav>
+
+<div class="main">
 
 <!-- 헤더 -->
 <div class="header">
@@ -156,9 +192,6 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
         <h1>금형 적치대 현황</h1>
         <div class="sub">Mold Storage Layout</div>
     </div>
-    <div style="display:flex;gap:8px;">
-        <button class="btn-back" onclick="location.href='mold_admin.html'">⚙ 금형 상세관리</button>
-        <button class="btn-back" onclick="location.href='mold_dashboard.html'">← 대시보드</button>
     </div>
 </div>
 
@@ -706,5 +739,6 @@ document.getElementById('alertModal').addEventListener('click', function(e) {
 // =============================================
 loadData();
 </script>
+</div><!-- main -->
 </body>
 </html>
