@@ -102,12 +102,14 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
         <a class="sidebar-item active" href="mold_dashboard.html"><span class="icon">📊</span><span>대시보드</span></a>
         <a class="sidebar-item" href="mold_layout.html"><span class="icon">🗄️</span><span>적치대 현황</span></a>
         <a class="sidebar-item" href="mold_admin.html"><span class="icon">📋</span><span>금형 상세관리</span></a>
-        <a class="sidebar-item" href="mold_history.html"><span class="icon">🔧</span><span>이력 관리</span></a>
-    </div>
-    <div class="sidebar-section">
-        <div class="sidebar-section-title">바로가기</div>
-        <a class="sidebar-item" href="mold_history.html"><span class="icon">🔴</span><span>손상 등록</span></a>
-        <a class="sidebar-item" href="mold_history.html"><span class="icon">🧹</span><span>세척 등록</span></a>
+        <div class="sidebar-group">
+            <div class="sidebar-item sidebar-toggle" onclick="toggleSubMenu(this)"><span class="icon">🔧</span><span>이력 관리</span><span class="arrow">›</span></div>
+            <div class="sidebar-sub">
+                <a class="sidebar-sub-item" href="mold_history.html#damage"><span class="icon">🔴</span><span>손상 이력</span></a>
+                <a class="sidebar-sub-item" href="mold_history.html#cleaning"><span class="icon">🧹</span><span>세척 이력</span></a>
+                <a class="sidebar-sub-item" href="mold_history.html#repair"><span class="icon">🛠️</span><span>수리 이력</span></a>
+            </div>
+        </div>
     </div>
     <div class="sidebar-bottom"><a href="#">㈜한국하이테크</a></div>
 </nav>
