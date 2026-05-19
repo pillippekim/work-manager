@@ -783,11 +783,10 @@ async function supaUpdate(table, id, data) {
         headers: supaHeaders(),
         body: JSON.stringify(data)
     });
-    if (!res.ok) {
-        var errText = await res.text();
-        throw new Error('업데이트 실패: ' + errText);
-    }
     var text = await res.text();
+    if (!res.ok) {
+        throw new Error('업데이트 실패: ' + text);
+    }
     return text ? JSON.parse(text) : [];
 }
 
@@ -798,11 +797,10 @@ async function supaInsert(table, data) {
         headers: supaHeaders(),
         body: JSON.stringify(data)
     });
-    if (!res.ok) {
-        var errText = await res.text();
-        throw new Error('등록 실패: ' + errText);
-    }
     var text = await res.text();
+    if (!res.ok) {
+        throw new Error('등록 실패: ' + text);
+    }
     return text ? JSON.parse(text) : [];
 }
 
@@ -846,10 +844,10 @@ async function doStockOut(moldId) {
         await supaUpdate('molds', moldId, { status: 'in_use' });
         await logStatusChange(moldId, 'stored', 'in_use', '적치대에서 출고');
         closeMoldModal();
-        showToast('출고 처리 완료', 'success');
+        alert('✅ 출고 처리 완료');
         await loadData();
     } catch(e) {
-        showToast('출고 처리 실패: ' + e.message, 'error');
+        alert('❌ 출고 처리 실패:\n' + e.message);
     }
 }
 
@@ -862,10 +860,10 @@ async function doReturn(moldId) {
         await supaUpdate('molds', moldId, { status: 'stored' });
         await logStatusChange(moldId, 'in_use', 'stored', '적치대로 반납');
         closeMoldModal();
-        showToast('반납 처리 완료', 'success');
+        alert('✅ 반납 처리 완료');
         await loadData();
     } catch(e) {
-        showToast('반납 처리 실패: ' + e.message, 'error');
+        alert('❌ 반납 처리 실패:\n' + e.message);
     }
 }
 
@@ -880,10 +878,10 @@ async function doRepairRequest(moldId) {
         await supaUpdate('molds', moldId, { status: 'repairing' });
         await logStatusChange(moldId, fromStatus, 'repairing', '수리의뢰');
         closeMoldModal();
-        showToast('수리의뢰 처리 완료', 'success');
+        alert('✅ 수리의뢰 처리 완료');
         await loadData();
     } catch(e) {
-        showToast('수리의뢰 실패: ' + e.message, 'error');
+        alert('❌ 수리의뢰 실패:\n' + e.message);
     }
 }
 
@@ -896,10 +894,10 @@ async function doRepairComplete(moldId) {
         await supaUpdate('molds', moldId, { status: 'stored' });
         await logStatusChange(moldId, 'repairing', 'stored', '수리완료 반납');
         closeMoldModal();
-        showToast('수리완료 처리 완료', 'success');
+        alert('✅ 수리완료 처리 완료');
         await loadData();
     } catch(e) {
-        showToast('수리완료 처리 실패: ' + e.message, 'error');
+        alert('❌ 수리완료 처리 실패:\n' + e.message);
     }
 }
 
