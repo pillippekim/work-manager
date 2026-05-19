@@ -559,15 +559,15 @@ function showMoldDetail(address) {
         if (m.is_active) {
             if (m.status === 'stored') {
                 // 보관중 → 출고(사용중) 또는 수리의뢰
-                html += '<button class="btn-action btn-stockout" onclick="doStockOut(' + m.id + ')">📤 출고 (사용)</button>';
-                html += '<button class="btn-action btn-repair" onclick="doRepairRequest(' + m.id + ')">🔧 수리의뢰</button>';
+                html += '<button class="btn-action btn-stockout" onclick="doStockOut(\'' + m.id + '\')">📤 출고 (사용)</button>';
+                html += '<button class="btn-action btn-repair" onclick="doRepairRequest(\'' + m.id + '\')">🔧 수리의뢰</button>';
             } else if (m.status === 'in_use') {
                 // 사용중 → 반납(보관중) 또는 수리의뢰
-                html += '<button class="btn-action btn-return" onclick="doReturn(' + m.id + ')">📥 반납 (보관)</button>';
-                html += '<button class="btn-action btn-repair" onclick="doRepairRequest(' + m.id + ')">🔧 수리의뢰</button>';
+                html += '<button class="btn-action btn-return" onclick="doReturn(\'' + m.id + '\')">📥 반납 (보관)</button>';
+                html += '<button class="btn-action btn-repair" onclick="doRepairRequest(\'' + m.id + '\')">🔧 수리의뢰</button>';
             } else if (m.status === 'repairing') {
                 // 수리중 → 수리완료(보관중)
-                html += '<button class="btn-action btn-return" onclick="doRepairComplete(' + m.id + ')">✅ 수리완료</button>';
+                html += '<button class="btn-action btn-return" onclick="doRepairComplete(\'' + m.id + '\')">✅ 수리완료</button>';
             }
         }
         html += '</div>';
@@ -783,7 +783,12 @@ async function supaUpdate(table, id, data) {
         headers: supaHeaders(),
         body: JSON.stringify(data)
     });
-    return await res.json();
+    if (!res.ok) {
+        var errText = await res.text();
+        throw new Error('업데이트 실패: ' + errText);
+    }
+    var text = await res.text();
+    return text ? JSON.parse(text) : [];
 }
 
 async function supaInsert(table, data) {
@@ -793,7 +798,12 @@ async function supaInsert(table, data) {
         headers: supaHeaders(),
         body: JSON.stringify(data)
     });
-    return await res.json();
+    if (!res.ok) {
+        var errText = await res.text();
+        throw new Error('등록 실패: ' + errText);
+    }
+    var text = await res.text();
+    return text ? JSON.parse(text) : [];
 }
 
 // 토스트 메시지
@@ -818,10 +828,9 @@ async function logStatusChange(moldId, fromStatus, toStatus, reason) {
     try {
         await supaInsert('mold_status_logs', {
             mold_id: moldId,
-            from_status: fromStatus,
-            to_status: toStatus,
-            reason: reason || '',
-            changed_at: new Date().toISOString()
+            prev_status: fromStatus,
+            new_status: toStatus,
+            reason: reason || ''
         });
     } catch(e) {
         console.log('상태 로그 기록 실패:', e);
@@ -959,7 +968,7 @@ function searchMoldForStockIn() {
 
         var currentAddr = m.mold_slots ? m.mold_slots.address : '위치 미지정';
 
-        html += '<div class="stockin-search-result found" style="cursor:pointer;margin-bottom:4px;" onclick="selectStockInMold(' + m.id + ')">'
+        html += '<div class="stockin-search-result found" style="cursor:pointer;margin-bottom:4px;" onclick="selectStockInMold(\'' + m.id + '\')">'
             + '<strong>' + m.mold_code + '</strong> (사번: ' + m.product_code + ')<br>'
             + '<span style="font-size:12px;color:#64748b;">현재: ' + currentAddr + ' | 상태: ' + statusText + '</span>'
             + '</div>';
