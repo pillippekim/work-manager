@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>금형 이력 관리 - HKHT</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif; background:#f1f3f9; color:#1e293b; }
+.header { background:#243bb2; color:#fff; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+.header h1 { font-size:18px; font-weight:700; }
+.header .sub { font-size:12px; opacity:0.8; }
+.header-right { display:flex; gap:8px; }
+.btn-head { background:none; border:1px solid rgba(255,255,255,0.4); color:#fff; padding:6px 14px; border-radius:6px; font-size:13px; cursor:pointer; }
+.btn-head:hover { background:rgba(255,255,255,0.15); }
+
+/* 탭 */
+.tabs { display:flex; gap:0; padding:0 16px; border-bottom:2px solid #e2e8f0; background:#fff; position:sticky; top:50px; z-index:90; }
+.tab { padding:12px 24px; font-size:14px; font-weight:600; color:#64748b; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; white-space:nowrap; transition:all 0.2s; }
+.tab.active { color:#243bb2; border-bottom-color:#243bb2; }
+.tab:hover { color:#243bb2; }
+.tab .badge-count { display:inline-block; background:#ef4444; color:#fff; font-size:10px; padding:1px 6px; border-radius:10px; margin-left:4px; vertical-align:top; }
+
+/* 컨테이너 */
+.container { max-width:1200px; margin:0 auto; padding:16px; }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+
+/* 요약 카드 */
+.stat-row { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+.stat-card { background:#fff; border-radius:10px; padding:12px 16px; min-width:100px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+.stat-card .num { font-size:22px; font-weight:700; }
+.stat-card .label { font-size:11px; color:#64748b; margin-top:2px; }
+
+/* 도구 모음 */
+.toolbar { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; align-items:center; }
+.search-input { flex:1; min-width:180px; padding:9px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none; }
+.search-input:focus { border-color:#243bb2; box-shadow:0 0 0 3px rgba(36,59,178,0.15); }
+.btn-primary { background:#243bb2; color:#fff; border:none; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.btn-primary:hover { background:#1e32a0; }
+.btn-success { background:#16a34a; color:#fff; border:none; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.btn-success:hover { background:#15803d; }
+.filter-select { padding:9px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; outline:none; background:#fff; }
+
+/* 테이블 */
+table.dt { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.08); font-size:13px; }
+table.dt thead { background:#f8fafc; }
+table.dt th { padding:10px 8px; text-align:left; font-weight:600; color:#475569; font-size:12px; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+table.dt td { padding:9px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+table.dt tr:hover { background:#f8fafc; }
+
+/* 상태 배지 */
+.badge { padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+.badge-pending { background:#fee2e2; color:#991b1b; }
+.badge-progress { background:#fef3c7; color:#92400e; }
+.badge-completed { background:#dcfce7; color:#166534; }
+
+/* 행 버튼 */
+.btn-sm { padding:4px 10px; border:none; border-radius:5px; font-size:11px; cursor:pointer; font-weight:600; }
+.btn-complete { background:#16a34a; color:#fff; }
+.btn-complete:hover { background:#15803d; }
+.btn-edit { background:#d97706; color:#fff; }
+.btn-edit:hover { background:#b45309; }
+.btn-del { background:#dc2626; color:#fff; }
+.btn-del:hover { background:#b91c1c; }
+
+/* 모달 */
+.modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; }
+.modal-overlay.show { display:flex; }
+.modal-content { background:#fff; border-radius:14px; padding:24px; max-width:520px; width:92%; max-height:85vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
+.modal-content h3 { font-size:18px; color:#243bb2; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; }
+.modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:#94a3b8; }
+.modal-close:hover { color:#1e293b; }
+.form-group { margin-bottom:12px; }
+.form-group label { display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:4px; }
+.form-group input, .form-group select, .form-group textarea { width:100%; padding:9px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color:#243bb2; box-shadow:0 0 0 3px rgba(36,59,178,0.15); }
+.form-row { display:flex; gap:12px; }
+.form-row .form-group { flex:1; }
+.btn-submit { width:100%; padding:12px; background:#243bb2; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; margin-top:8px; }
+.btn-submit:hover { background:#1e32a0; }
+
+/* 토스트 */
+.toast { position:fixed; top:70px; right:16px; padding:12px 20px; border-radius:8px; color:#fff; font-size:14px; font-weight:600; z-index:300; opacity:0; transform:translateY(-10px); transition:all 0.3s; }
+.toast.show { opacity:1; transform:translateY(0); }
+.toast-success { background:#16a34a; }
+.toast-error { background:#dc2626; }
+
+.empty-msg { text-align:center; padding:40px; color:#94a3b8; font-size:14px; }
+
+@media(max-width:640px) {
+    .form-row { flex-direction:column; gap:0; }
+    table.dt { font-size:11px; }
+    .tab { padding:10px 14px; font-size:13px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <h1>금형 이력 관리</h1>
+        <div class="sub">Mold History Management</div>
+    </div>
+    <div class="header-right">
+        <button class="btn-head" onclick="location.href='mold_dashboard.html'">← 대시보드</button>
+    </div>
+</div>
+
+<!-- 탭 -->
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('damage')">🔴 손상 이력 <span class="badge-count" id="damagePendingCount" style="display:none;">0</span></div>
+    <div class="tab" onclick="switchTab('cleaning')">🧹 세척 이력</div>
+    <div class="tab" onclick="switchTab('repair')">🔧 수리 이력</div>
+</div>
+
+<div class="container">
+
+<!-- ==================== 손상 이력 탭 ==================== -->
+<div class="tab-content active" id="tab-damage">
+    <div class="stat-row">
+        <div class="stat-card"><div class="num" id="dmgTotal" style="color:#243bb2;">-</div><div class="label">전체</div></div>
+        <div class="stat-card"><div class="num" id="dmgPending" style="color:#dc2626;">-</div><div class="label">미조치</div></div>
+        <div class="stat-card"><div class="num" id="dmgProgress" style="color:#f59e0b;">-</div><div class="label">조치중</div></div>
+        <div class="stat-card"><div class="num" id="dmgDone" style="color:#16a34a;">-</div><div class="label">완료</div></div>
+    </div>
+    <div class="toolbar">
+        <input type="text" class="search-input" id="dmgSearch" placeholder="사번, 작업자, 손상내용 검색...">
+        <select class="filter-select" id="dmgFilter">
+            <option value="">전체 상태</option>
+            <option value="pending">미조치</option>
+            <option value="in_progress">조치중</option>
+            <option value="completed">완료</option>
+        </select>
+        <button class="btn-primary" onclick="openDamageModal()">+ 손상 등록</button>
+        <button class="btn-success" onclick="downloadDamageExcel()">📥 엑셀</button>
+    </div>
+    <table class="dt">
+        <thead><tr>
+            <th>날짜</th><th>사번</th><th>설비</th><th>작업자</th><th>손상내용</th><th>조치내용</th><th>상태</th><th>관리</th>
+        </tr></thead>
+        <tbody id="dmgBody"><tr><td colspan="8" class="empty-msg">로딩 중...</td></tr></tbody>
+    </table>
+</div>
+
+<!-- ==================== 세척 이력 탭 ==================== -->
+<div class="tab-content" id="tab-cleaning">
+    <div class="stat-row">
+        <div class="stat-card"><div class="num" id="clnTotal" style="color:#243bb2;">-</div><div class="label">전체</div></div>
+        <div class="stat-card"><div class="num" id="clnMonth" style="color:#0ea5e9;">-</div><div class="label">이번 달</div></div>
+    </div>
+    <div class="toolbar">
+        <input type="text" class="search-input" id="clnSearch" placeholder="사번, 접수자, 세척내용 검색...">
+        <button class="btn-primary" onclick="openCleanModal()">+ 세척 등록</button>
+        <button class="btn-success" onclick="downloadCleanExcel()">📥 엑셀</button>
+    </div>
+    <table class="dt">
+        <thead><tr>
+            <th>접수일</th><th>사번</th><th>접수자</th><th>세척기준</th><th>세척내용</th><th>완료일</th><th>완료자</th><th>비고</th>
+        </tr></thead>
+        <tbody id="clnBody"><tr><td colspan="8" class="empty-msg">로딩 중...</td></tr></tbody>
+    </table>
+</div>
+
+<!-- ==================== 수리 이력 탭 ==================== -->
+<div class="tab-content" id="tab-repair">
+    <div class="stat-row">
+        <div class="stat-card"><div class="num" id="repTotal" style="color:#243bb2;">-</div><div class="label">전체</div></div>
+        <div class="stat-card"><div class="num" id="repProgress" style="color:#f59e0b;">-</div><div class="label">수리중</div></div>
+        <div class="stat-card"><div class="num" id="repDone" style="color:#16a34a;">-</div><div class="label">완료</div></div>
+    </div>
+    <div class="toolbar">
+        <input type="text" class="search-input" id="repSearch" placeholder="사번, 수리업체, 수리내용 검색...">
+        <button class="btn-primary" onclick="openRepairModal()">+ 수리 등록</button>
+        <button class="btn-success" onclick="downloadRepairExcel()">📥 엑셀</button>
+    </div>
+    <table class="dt">
+        <thead><tr>
+            <th>시작일</th><th>사번</th><th>금형코드</th><th>수리유형</th><th>수리내용</th><th>수리업체</th><th>완료일</th><th>상태</th><th>관리</th>
+        </tr></thead>
+        <tbody id="repBody"><tr><td colspan="9" class="empty-msg">로딩 중...</td></tr></tbody>
+    </table>
+</div>
+
+</div>
+
+<!-- 손상 등록 모달 -->
+<div class="modal-overlay" id="damageModal">
+    <div class="modal-content">
+        <h3><span id="dmgModalTitle">손상 등록</span><button class="modal-close" onclick="closeDamageModal()">✕</button></h3>
+        <div class="form-row">
+            <div class="form-group"><label>사번 *</label><input type="text" id="dProductCode" placeholder="502264"></div>
+            <div class="form-group"><label>발생일 *</label><input type="date" id="dDate"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>설비명</label><input type="text" id="dEquipment" placeholder="A4-다"></div>
+            <div class="form-group"><label>작업자</label><input type="text" id="dWorker" placeholder="작업자명"></div>
+        </div>
+        <div class="form-group"><label>손상 내용 *</label><textarea id="dDamageDesc" rows="2" placeholder="하금형 손상 발생"></textarea></div>
+        <div class="form-group"><label>조치 내용</label><textarea id="dActionDesc" rows="2" placeholder="금형 수정"></textarea></div>
+        <div class="form-row">
+            <div class="form-group"><label>조치 상태</label>
+                <select id="dStatus"><option value="pending">미조치</option><option value="in_progress">조치중</option><option value="completed">완료</option></select>
+            </div>
+            <div class="form-group"><label>확인자</label><input type="text" id="dConfirmed" placeholder="확인자명"></div>
+        </div>
+        <div class="form-group"><label>비고</label><input type="text" id="dNote"></div>
+        <input type="hidden" id="dEditId" value="">
+        <button class="btn-submit" onclick="submitDamage()">등록</button>
+    </div>
+</div>
+
+<!-- 세척 등록 모달 -->
+<div class="modal-overlay" id="cleanModal">
+    <div class="modal-content">
+        <h3><span>세척 등록</span><button class="modal-close" onclick="closeCleanModal()">✕</button></h3>
+        <div class="form-row">
+            <div class="form-group"><label>사번 *</label><input type="text" id="cProductCode" placeholder="502264"></div>
+            <div class="form-group"><label>접수일 *</label><input type="date" id="cDate"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>접수자</label><input type="text" id="cRequester" placeholder="접수자명"></div>
+            <div class="form-group"><label>세척기준</label>
+                <select id="cReason"><option value="공정순회검사">공정순회검사</option><option value="금형 교체">금형 교체</option><option value="정기세척">정기세척</option><option value="기타">기타</option></select>
+            </div>
+        </div>
+        <div class="form-group"><label>세척내용</label>
+            <select id="cMethod"><option value="금형 세척제 사용 세척">금형 세척제 사용 세척</option><option value="샌드 브라스트 세척">샌드 브라스트 세척</option><option value="샌드브라스트 세척">샌드브라스트 세척</option><option value="기타">기타</option></select>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>완료일</label><input type="date" id="cCompleteDate"></div>
+            <div class="form-group"><label>완료자</label><input type="text" id="cCompletedBy" placeholder="완료자명"></div>
+        </div>
+        <div class="form-group"><label>비고</label><input type="text" id="cNote"></div>
+        <button class="btn-submit" onclick="submitClean()">등록</button>
+    </div>
+</div>
+
+<!-- 수리 등록 모달 -->
+<div class="modal-overlay" id="repairModal">
+    <div class="modal-content">
+        <h3><span>수리 등록</span><button class="modal-close" onclick="closeRepairModal()">✕</button></h3>
+        <div class="form-row">
+            <div class="form-group"><label>사번 *</label><input type="text" id="rProductCode" placeholder="502264"></div>
+            <div class="form-group"><label>수리 시작일 *</label><input type="date" id="rStartDate"></div>
+        </div>
+        <div class="form-group"><label>수리 유형</label>
+            <select id="rType"><option value="repair">수리</option><option value="overhaul">오버홀</option><option value="part_replace">부품 교체</option><option value="other">기타</option></select>
+        </div>
+        <div class="form-group"><label>수리 내용 *</label><textarea id="rDesc" rows="2" placeholder="수리 내용 입력"></textarea></div>
+        <div class="form-row">
+            <div class="form-group"><label>수리 업체</label><input type="text" id="rVendor" placeholder="수리 업체명"></div>
+            <div class="form-group"><label>비용 (원)</label><input type="number" id="rCost" min="0"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>완료일</label><input type="date" id="rEndDate"></div>
+            <div class="form-group"><label>수리 상태</label>
+                <select id="rStatus"><option value="in_progress">수리중</option><option value="completed">완료</option></select>
+            </div>
+        </div>
+        <input type="hidden" id="rEditId" value="">
+        <button class="btn-submit" onclick="submitRepair()">등록</button>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+
+var damageData=[], cleanData=[], repairData=[], moldsData=[];
+
+function supaHeaders() { return {'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=representation'}; }
+
+async function supaFetch(t,q) {
+    var u=SUPABASE_URL+'/rest/v1/'+t; if(q) u+='?'+q;
+    var r=await fetch(u,{headers:supaHeaders()}); return await r.json();
+}
+async function supaInsert(t,d) {
+    var r=await fetch(SUPABASE_URL+'/rest/v1/'+t,{method:'POST',headers:supaHeaders(),body:JSON.stringify(d)});
+    return await r.json();
+}
+async function supaUpdate(t,id,d) {
+    var r=await fetch(SUPABASE_URL+'/rest/v1/'+t+'?id=eq.'+id,{method:'PATCH',headers:supaHeaders(),body:JSON.stringify(d)});
+    return await r.json();
+}
+async function supaDelete(t,id) {
+    var r=await fetch(SUPABASE_URL+'/rest/v1/'+t+'?id=eq.'+id,{method:'DELETE',headers:supaHeaders()}); return r.ok;
+}
+
+// =============================================
+// 탭 전환
+// =============================================
+function switchTab(name) {
+    var tabs = document.querySelectorAll('.tab');
+    var contents = document.querySelectorAll('.tab-content');
+    for(var i=0;i<tabs.length;i++) tabs[i].classList.remove('active');
+    for(var i=0;i<contents.length;i++) contents[i].classList.remove('active');
+    if(name==='damage') { tabs[0].classList.add('active'); document.getElementById('tab-damage').classList.add('active'); }
+    if(name==='cleaning') { tabs[1].classList.add('active'); document.getElementById('tab-cleaning').classList.add('active'); }
+    if(name==='repair') { tabs[2].classList.add('active'); document.getElementById('tab-repair').classList.add('active'); }
+}
+
+// =============================================
+// 데이터 로드
+// =============================================
+async function loadAll() {
+    try {
+        damageData = await supaFetch('mold_damage_logs','order=damage_date.desc');
+        cleanData = await supaFetch('mold_cleaning_logs','order=request_date.desc');
+        repairData = await supaFetch('mold_maintenance','order=start_date.desc');
+        moldsData = await supaFetch('molds','select=id,mold_code,product_code&limit=1000');
+        renderDamage(); renderClean(); renderRepair();
+    } catch(e) { showToast('데이터 로드 실패: '+e.message,'error'); }
+}
+
+// =============================================
+// 손상 이력
+// =============================================
+function renderDamage() {
+    var keyword = (document.getElementById('dmgSearch').value||'').toUpperCase();
+    var filter = document.getElementById('dmgFilter').value;
+    var filtered = damageData.filter(function(d) {
+        if(filter && d.action_status !== filter) return false;
+        if(keyword) {
+            var s = ((d.product_code||'')+(d.worker_name||'')+(d.damage_desc||'')+(d.equipment_name||'')).toUpperCase();
+            if(s.indexOf(keyword)===-1) return false;
+        }
+        return true;
+    });
+    var pending=0, progress=0, done=0;
+    for(var i=0;i<damageData.length;i++) {
+        if(damageData[i].action_status==='pending') pending++;
+        else if(damageData[i].action_status==='in_progress') progress++;
+        else done++;
+    }
+    document.getElementById('dmgTotal').textContent = damageData.length;
+    document.getElementById('dmgPending').textContent = pending;
+    document.getElementById('dmgProgress').textContent = progress;
+    document.getElementById('dmgDone').textContent = done;
+    var badge = document.getElementById('damagePendingCount');
+    if(pending>0) { badge.textContent=pending; badge.style.display='inline-block'; }
+    else { badge.style.display='none'; }
+
+    var html='';
+    if(filtered.length===0) { html='<tr><td colspan="8" class="empty-msg">데이터가 없습니다</td></tr>'; }
+    else {
+        for(var i=0;i<filtered.length;i++) {
+            var d=filtered[i];
+            var statusText='미조치', badgeCls='badge-pending';
+            if(d.action_status==='in_progress') { statusText='조치중'; badgeCls='badge-progress'; }
+            if(d.action_status==='completed') { statusText='완료'; badgeCls='badge-completed'; }
+            html+='<tr>'
+                +'<td>'+(d.damage_date||'-')+'</td>'
+                +'<td><strong>'+(d.product_code||'-')+'</strong></td>'
+                +'<td>'+(d.equipment_name||'-')+'</td>'
+                +'<td>'+(d.worker_name||'-')+'</td>'
+                +'<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(d.damage_desc||'')+'">'+(d.damage_desc||'-')+'</td>'
+                +'<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(d.action_desc||'-')+'</td>'
+                +'<td><span class="badge '+badgeCls+'">'+statusText+'</span></td>'
+                +'<td>';
+            if(d.action_status!=='completed') {
+                html+='<button class="btn-sm btn-complete" onclick="completeDamage('+d.id+')">✅ 완료</button> ';
+            }
+            html+='<button class="btn-sm btn-edit" onclick="editDamage('+d.id+')">✏️</button>';
+            html+='</td></tr>';
+        }
+    }
+    document.getElementById('dmgBody').innerHTML=html;
+}
+
+document.getElementById('dmgSearch').addEventListener('input', renderDamage);
+document.getElementById('dmgFilter').addEventListener('change', renderDamage);
+
+function openDamageModal() {
+    document.getElementById('dmgModalTitle').textContent='손상 등록';
+    document.getElementById('dEditId').value='';
+    document.getElementById('dProductCode').value='';
+    document.getElementById('dDate').value=new Date().toISOString().split('T')[0];
+    document.getElementById('dEquipment').value='';
+    document.getElementById('dWorker').value='';
+    document.getElementById('dDamageDesc').value='';
+    document.getElementById('dActionDesc').value='';
+    document.getElementById('dStatus').value='pending';
+    document.getElementById('dConfirmed').value='';
+    document.getElementById('dNote').value='';
+    document.getElementById('damageModal').classList.add('show');
+}
+function closeDamageModal() { document.getElementById('damageModal').classList.remove('show'); }
+
+function editDamage(id) {
+    var d = damageData.find(function(x){return x.id===id;});
+    if(!d) return;
+    document.getElementById('dmgModalTitle').textContent='손상 수정';
+    document.getElementById('dEditId').value=d.id;
+    document.getElementById('dProductCode').value=d.product_code||'';
+    document.getElementById('dDate').value=d.damage_date||'';
+    document.getElementById('dEquipment').value=d.equipment_name||'';
+    document.getElementById('dWorker').value=d.worker_name||'';
+    document.getElementById('dDamageDesc').value=d.damage_desc||'';
+    document.getElementById('dActionDesc').value=d.action_desc||'';
+    document.getElementById('dStatus').value=d.action_status||'pending';
+    document.getElementById('dConfirmed').value=d.confirmed_by||'';
+    document.getElementById('dNote').value=d.note||'';
+    document.getElementById('damageModal').classList.add('show');
+}
+
+async function submitDamage() {
+    var pc=document.getElementById('dProductCode').value.trim();
+    var dd=document.getElementById('dDate').value;
+    var desc=document.getElementById('dDamageDesc').value.trim();
+    if(!pc||!dd||!desc) { showToast('사번, 발생일, 손상내용은 필수입니다','error'); return; }
+    var mold = moldsData.find(function(m){return m.product_code===pc;});
+    var data = {
+        product_code:pc, damage_date:dd,
+        mold_id: mold ? mold.id : null,
+        equipment_name:document.getElementById('dEquipment').value.trim()||null,
+        worker_name:document.getElementById('dWorker').value.trim()||null,
+        damage_desc:desc,
+        action_desc:document.getElementById('dActionDesc').value.trim()||null,
+        action_status:document.getElementById('dStatus').value,
+        confirmed_by:document.getElementById('dConfirmed').value.trim()||null,
+        note:document.getElementById('dNote').value.trim()
+    };
+    var editId=document.getElementById('dEditId').value;
+    try {
+        if(editId) { await supaUpdate('mold_damage_logs',editId,data); showToast('손상 이력 수정 완료','success'); }
+        else { await supaInsert('mold_damage_logs',data); showToast('손상 등록 완료 — 금형 상태가 자동으로 수리중으로 변경됩니다','success'); }
+        closeDamageModal(); await loadAll();
+    } catch(e) { showToast('저장 실패: '+e.message,'error'); }
+}
+
+async function completeDamage(id) {
+    if(!confirm('이 손상건을 조치 완료 처리하시겠습니까?\n금형 상태가 보관중으로 자동 복귀됩니다.')) return;
+    try {
+        await supaUpdate('mold_damage_logs',id,{action_status:'completed'});
+        showToast('조치 완료 처리됨 — 금형 상태가 보관중으로 복귀합니다','success');
+        await loadAll();
+    } catch(e) { showToast('처리 실패','error'); }
+}
+
+// =============================================
+// 세척 이력
+// =============================================
+function renderClean() {
+    var keyword = (document.getElementById('clnSearch').value||'').toUpperCase();
+    var filtered = cleanData.filter(function(c) {
+        if(!keyword) return true;
+        var s = ((c.product_code||'')+(c.requester||'')+(c.cleaning_method||'')).toUpperCase();
+        return s.indexOf(keyword)!==-1;
+    });
+    var now = new Date(); var thisMonth = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+    var monthCount = cleanData.filter(function(c){ return (c.request_date||'').substring(0,7)===thisMonth; }).length;
+    document.getElementById('clnTotal').textContent = cleanData.length;
+    document.getElementById('clnMonth').textContent = monthCount;
+
+    var html='';
+    if(filtered.length===0) { html='<tr><td colspan="8" class="empty-msg">데이터가 없습니다</td></tr>'; }
+    else {
+        for(var i=0;i<filtered.length;i++) {
+            var c=filtered[i];
+            html+='<tr>'
+                +'<td>'+(c.request_date||'-')+'</td>'
+                +'<td><strong>'+(c.product_code||'-')+'</strong></td>'
+                +'<td>'+(c.requester||'-')+'</td>'
+                +'<td>'+(c.cleaning_reason||'-')+'</td>'
+                +'<td>'+(c.cleaning_method||'-')+'</td>'
+                +'<td>'+(c.complete_date||'-')+'</td>'
+                +'<td>'+(c.completed_by||'-')+'</td>'
+                +'<td>'+(c.note||'')+'</td>'
+                +'</tr>';
+        }
+    }
+    document.getElementById('clnBody').innerHTML=html;
+}
+document.getElementById('clnSearch').addEventListener('input', renderClean);
+
+function openCleanModal() {
+    document.getElementById('cProductCode').value='';
+    document.getElementById('cDate').value=new Date().toISOString().split('T')[0];
+    document.getElementById('cRequester').value='';
+    document.getElementById('cReason').value='공정순회검사';
+    document.getElementById('cMethod').value='금형 세척제 사용 세척';
+    document.getElementById('cCompleteDate').value=new Date().toISOString().split('T')[0];
+    document.getElementById('cCompletedBy').value='';
+    document.getElementById('cNote').value='';
+    document.getElementById('cleanModal').classList.add('show');
+}
+function closeCleanModal() { document.getElementById('cleanModal').classList.remove('show'); }
+
+async function submitClean() {
+    var pc=document.getElementById('cProductCode').value.trim();
+    var rd=document.getElementById('cDate').value;
+    if(!pc||!rd) { showToast('사번과 접수일은 필수입니다','error'); return; }
+    var mold = moldsData.find(function(m){return m.product_code===pc;});
+    var data = {
+        product_code:pc, request_date:rd,
+        mold_id: mold ? mold.id : null,
+        requester:document.getElementById('cRequester').value.trim()||null,
+        cleaning_reason:document.getElementById('cReason').value,
+        cleaning_method:document.getElementById('cMethod').value,
+        complete_date:document.getElementById('cCompleteDate').value||null,
+        completed_by:document.getElementById('cCompletedBy').value.trim()||null,
+        note:document.getElementById('cNote').value.trim()
+    };
+    try {
+        await supaInsert('mold_cleaning_logs',data);
+        showToast('세척 이력 등록 완료','success');
+        closeCleanModal(); await loadAll();
+    } catch(e) { showToast('저장 실패: '+e.message,'error'); }
+}
+
+// =============================================
+// 수리 이력
+// =============================================
+function renderRepair() {
+    var keyword = (document.getElementById('repSearch').value||'').toUpperCase();
+    var filtered = repairData.filter(function(r) {
+        if(!keyword) return true;
+        var s = ((r.description||'')+(r.vendor||'')).toUpperCase();
+        return s.indexOf(keyword)!==-1;
+    });
+    var prog=0, done=0;
+    for(var i=0;i<repairData.length;i++) {
+        if(repairData[i].repair_status==='completed') done++; else prog++;
+    }
+    document.getElementById('repTotal').textContent = repairData.length;
+    document.getElementById('repProgress').textContent = prog;
+    document.getElementById('repDone').textContent = done;
+
+    var html='';
+    if(filtered.length===0) { html='<tr><td colspan="9" class="empty-msg">데이터가 없습니다</td></tr>'; }
+    else {
+        for(var i=0;i<filtered.length;i++) {
+            var r=filtered[i];
+            // mold_id로 금형 정보 찾기
+            var mold = moldsData.find(function(m){return m.id===r.mold_id;});
+            var typeKo = {'repair':'수리','overhaul':'오버홀','part_replace':'부품교체','other':'기타'};
+            var statusText = r.repair_status==='completed' ? '완료' : '수리중';
+            var badgeCls = r.repair_status==='completed' ? 'badge-completed' : 'badge-progress';
+            html+='<tr>'
+                +'<td>'+(r.start_date||'-')+'</td>'
+                +'<td><strong>'+(mold?mold.product_code:'-')+'</strong></td>'
+                +'<td>'+(mold?mold.mold_code:'-')+'</td>'
+                +'<td>'+(typeKo[r.maintenance_type]||r.maintenance_type||'-')+'</td>'
+                +'<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(r.description||'-')+'</td>'
+                +'<td>'+(r.vendor||'-')+'</td>'
+                +'<td>'+(r.end_date||'-')+'</td>'
+                +'<td><span class="badge '+badgeCls+'">'+statusText+'</span></td>'
+                +'<td>';
+            if(r.repair_status!=='completed') {
+                html+='<button class="btn-sm btn-complete" onclick="completeRepair('+r.id+')">✅ 완료</button>';
+            }
+            html+='</td></tr>';
+        }
+    }
+    document.getElementById('repBody').innerHTML=html;
+}
+document.getElementById('repSearch').addEventListener('input', renderRepair);
+
+function openRepairModal() {
+    document.getElementById('rEditId').value='';
+    document.getElementById('rProductCode').value='';
+    document.getElementById('rStartDate').value=new Date().toISOString().split('T')[0];
+    document.getElementById('rType').value='repair';
+    document.getElementById('rDesc').value='';
+    document.getElementById('rVendor').value='';
+    document.getElementById('rCost').value='';
+    document.getElementById('rEndDate').value='';
+    document.getElementById('rStatus').value='in_progress';
+    document.getElementById('repairModal').classList.add('show');
+}
+function closeRepairModal() { document.getElementById('repairModal').classList.remove('show'); }
+
+async function submitRepair() {
+    var pc=document.getElementById('rProductCode').value.trim();
+    var sd=document.getElementById('rStartDate').value;
+    var desc=document.getElementById('rDesc').value.trim();
+    if(!pc||!sd||!desc) { showToast('사번, 시작일, 수리내용은 필수입니다','error'); return; }
+    var mold = moldsData.find(function(m){return m.product_code===pc;});
+    var data = {
+        mold_id: mold ? mold.id : null,
+        maintenance_type:document.getElementById('rType').value,
+        description:desc,
+        vendor:document.getElementById('rVendor').value.trim()||null,
+        cost:parseFloat(document.getElementById('rCost').value)||null,
+        start_date:sd,
+        end_date:document.getElementById('rEndDate').value||null,
+        repair_status:document.getElementById('rStatus').value
+    };
+    try {
+        await supaInsert('mold_maintenance',data);
+        showToast('수리 이력 등록 완료','success');
+        closeRepairModal(); await loadAll();
+    } catch(e) { showToast('저장 실패: '+e.message,'error'); }
+}
+
+async function completeRepair(id) {
+    if(!confirm('이 수리건을 완료 처리하시겠습니까?')) return;
+    try {
+        await supaUpdate('mold_maintenance',id,{repair_status:'completed',end_date:new Date().toISOString().split('T')[0]});
+        showToast('수리 완료 처리됨','success');
+        await loadAll();
+    } catch(e) { showToast('처리 실패','error'); }
+}
+
+// =============================================
+// 엑셀 다운로드
+// =============================================
+function downloadDamageExcel() {
+    var data = damageData.map(function(d) {
+        var st = {'pending':'미조치','in_progress':'조치중','completed':'완료'};
+        return {'발생일':d.damage_date,'사번':d.product_code,'설비명':d.equipment_name||'','작업자':d.worker_name||'','손상내용':d.damage_desc||'','조치내용':d.action_desc||'','상태':st[d.action_status]||'','확인':d.confirmed_by||'','비고':d.note||''};
+    });
+    var ws=XLSX.utils.json_to_sheet(data); var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'손상이력');
+    XLSX.writeFile(wb,'금형손상이력_'+new Date().toISOString().split('T')[0].replace(/-/g,'')+'.xlsx');
+}
+function downloadCleanExcel() {
+    var data = cleanData.map(function(c) {
+        return {'접수일':c.request_date,'사번':c.product_code,'접수자':c.requester||'','세척기준':c.cleaning_reason||'','세척내용':c.cleaning_method||'','완료일':c.complete_date||'','완료자':c.completed_by||'','비고':c.note||''};
+    });
+    var ws=XLSX.utils.json_to_sheet(data); var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'세척이력');
+    XLSX.writeFile(wb,'금형세척이력_'+new Date().toISOString().split('T')[0].replace(/-/g,'')+'.xlsx');
+}
+function downloadRepairExcel() {
+    var data = repairData.map(function(r) {
+        var mold = moldsData.find(function(m){return m.id===r.mold_id;});
+        var typeKo = {'repair':'수리','overhaul':'오버홀','part_replace':'부품교체','other':'기타'};
+        return {'시작일':r.start_date,'사번':mold?mold.product_code:'','금형코드':mold?mold.mold_code:'','수리유형':typeKo[r.maintenance_type]||'','수리내용':r.description||'','수리업체':r.vendor||'','비용':r.cost||'','완료일':r.end_date||'','상태':r.repair_status==='completed'?'완료':'수리중'};
+    });
+    var ws=XLSX.utils.json_to_sheet(data); var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'수리이력');
+    XLSX.writeFile(wb,'금형수리이력_'+new Date().toISOString().split('T')[0].replace(/-/g,'')+'.xlsx');
+}
+
+// =============================================
+// 토스트 + 모달 닫기
+// =============================================
+function showToast(msg,type) { var el=document.getElementById('toast'); el.textContent=msg; el.className='toast toast-'+type+' show'; setTimeout(function(){el.classList.remove('show');},3000); }
+document.getElementById('damageModal').addEventListener('click',function(e){if(e.target===this)closeDamageModal();});
+document.getElementById('cleanModal').addEventListener('click',function(e){if(e.target===this)closeCleanModal();});
+document.getElementById('repairModal').addEventListener('click',function(e){if(e.target===this)closeRepairModal();});
+
+loadAll();
+</script>
+</body>
+</html>
