@@ -885,10 +885,24 @@ async function doRepairRequest(moldId) {
     var mold = molds.find(function(m) { return m.id === moldId; });
     var fromStatus = mold ? mold.status : 'stored';
     try {
+        // 1. 금형 상태 변경
         await supaUpdate('molds', moldId, { status: 'repairing' });
+        // 2. 상태 변경 로그
         await logStatusChange(moldId, fromStatus, 'repairing', '수리의뢰');
+        // 3. 수리 이력(mold_maintenance)에도 자동 등록
+        try {
+            await supaInsert('mold_maintenance', {
+                mold_id: moldId,
+                maintenance_type: 'repair',
+                description: '적치대에서 수리의뢰',
+                start_date: new Date().toISOString().split('T')[0],
+                repair_status: 'in_progress'
+            });
+        } catch(e2) {
+            console.log('수리 이력 자동등록 실패:', e2);
+        }
         closeMoldModal();
-        alert('✅ 수리의뢰 처리 완료');
+        alert('✅ 수리의뢰 처리 완료\n\n금형 상태: 수리중\n이력관리 > 수리이력에서 확인 가능');
         await loadData();
     } catch(e) {
         alert('❌ 수리의뢰 실패:\n' + e.message);
@@ -901,10 +915,24 @@ async function doRepairRequest(moldId) {
 async function doRepairComplete(moldId) {
     if (!confirm('수리 완료 처리하시겠습니까? (보관중으로 변경)')) return;
     try {
+        // 1. 금형 상태 변경
         await supaUpdate('molds', moldId, { status: 'stored' });
+        // 2. 상태 변경 로그
         await logStatusChange(moldId, 'repairing', 'stored', '수리완료 반납');
+        // 3. mold_maintenance에서 해당 금형의 진행중 수리건 완료 처리
+        try {
+            var repairs = await supaFetch('mold_maintenance', 'mold_id=eq.' + moldId + '&repair_status=eq.in_progress&order=start_date.desc&limit=1');
+            if (repairs && repairs.length > 0) {
+                await supaUpdate('mold_maintenance', repairs[0].id, {
+                    repair_status: 'completed',
+                    end_date: new Date().toISOString().split('T')[0]
+                });
+            }
+        } catch(e2) {
+            console.log('수리 이력 완료 처리 실패:', e2);
+        }
         closeMoldModal();
-        alert('✅ 수리완료 처리 완료');
+        alert('✅ 수리완료 처리 완료\n\n금형 상태: 보관중');
         await loadData();
     } catch(e) {
         alert('❌ 수리완료 처리 실패:\n' + e.message);
