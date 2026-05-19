@@ -146,10 +146,11 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
 .alert-tab.tab-warning.active { background:#f59e0b; color:#fff; border-color:#f59e0b; }
 .sc-alert .num { color:#dc2626; }
 
-/* 좌측 메뉴바 */
+
+/* ===== 좌측 메뉴바 (공통) ===== */
 .sidebar { position:fixed; top:0; left:0; width:220px; height:100vh; background:#1e2a4a; color:#fff; z-index:200; display:flex; flex-direction:column; overflow-y:auto; }
 .sidebar-logo { padding:20px 16px 16px; border-bottom:1px solid rgba(255,255,255,0.1); }
-.sidebar-logo h2 { font-size:16px; font-weight:700; }
+.sidebar-logo h2 { font-size:16px; font-weight:700; color:#fff; }
 .sidebar-logo .sub { font-size:11px; color:#94a3b8; margin-top:4px; }
 .sidebar-section { padding:12px 0 4px; }
 .sidebar-section-title { font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px; padding:0 16px 8px; }
@@ -157,13 +158,23 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
 .sidebar-item:hover { background:rgba(255,255,255,0.08); color:#fff; }
 .sidebar-item.active { background:rgba(36,59,178,0.3); color:#fff; border-left-color:#60a5fa; }
 .sidebar-item .icon { font-size:18px; width:24px; text-align:center; flex-shrink:0; }
+.sidebar-toggle { cursor:pointer; }
+.sidebar-toggle .arrow { margin-left:auto; font-size:14px; transition:transform 0.2s; color:#64748b; }
+.sidebar-group.open .sidebar-toggle .arrow { transform:rotate(90deg); }
+.sidebar-sub { max-height:0; overflow:hidden; transition:max-height 0.3s ease; }
+.sidebar-group.open .sidebar-sub { max-height:200px; }
+.sidebar-sub-item { display:flex; align-items:center; gap:10px; padding:8px 16px 8px 44px; font-size:13px; color:#94a3b8; cursor:pointer; transition:all 0.15s; text-decoration:none; border-left:3px solid transparent; }
+.sidebar-sub-item:hover { color:#fff; background:rgba(255,255,255,0.05); }
+.sidebar-sub-item .icon { font-size:14px; width:20px; text-align:center; flex-shrink:0; }
 .sidebar-bottom { margin-top:auto; padding:12px 16px; border-top:1px solid rgba(255,255,255,0.1); }
 .sidebar-bottom a { color:#94a3b8; font-size:12px; text-decoration:none; }
+.sidebar-bottom a:hover { color:#fff; }
 .main { margin-left:220px; min-height:100vh; }
 @media(max-width:768px) {
     .sidebar { width:60px; }
-    .sidebar-logo h2,.sidebar-logo .sub,.sidebar-section-title,.sidebar-item span:not(.icon) { display:none; }
-    .sidebar-item { padding:12px 0; justify-content:center; }
+    .sidebar-logo h2,.sidebar-logo .sub,.sidebar-section-title,.sidebar-item span:not(.icon):not(.arrow),.sidebar-sub-item span:not(.icon),.sidebar-toggle .arrow { display:none; }
+    .sidebar-item,.sidebar-toggle { padding:12px 0; justify-content:center; }
+    .sidebar-sub-item { padding:8px 0; justify-content:center; }
     .main { margin-left:60px; }
 }
 
