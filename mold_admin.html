@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>금형 상세관리 - HKHT</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="sidebar.css">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif; background:#f1f3f9; color:#1e293b; }
@@ -110,60 +111,11 @@ table.data-table tr.row-danger { background:#fee2e2; }
     table.data-table th, table.data-table td { padding:7px 4px; }
 }
 
-
-/* ===== 좌측 메뉴바 (공통) ===== */
-.sidebar { position:fixed; top:0; left:0; width:220px; height:100vh; background:#1e2a4a; color:#fff; z-index:200; display:flex; flex-direction:column; overflow-y:auto; }
-.sidebar-logo { padding:20px 16px 16px; border-bottom:1px solid rgba(255,255,255,0.1); }
-.sidebar-logo h2 { font-size:16px; font-weight:700; color:#fff; }
-.sidebar-logo .sub { font-size:11px; color:#94a3b8; margin-top:4px; }
-.sidebar-section { padding:12px 0 4px; }
-.sidebar-section-title { font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px; padding:0 16px 8px; }
-.sidebar-item { display:flex; align-items:center; gap:10px; padding:10px 16px; font-size:14px; color:#cbd5e1; cursor:pointer; transition:all 0.15s; text-decoration:none; border-left:3px solid transparent; }
-.sidebar-item:hover { background:rgba(255,255,255,0.08); color:#fff; }
-.sidebar-item.active { background:rgba(36,59,178,0.3); color:#fff; border-left-color:#60a5fa; }
-.sidebar-item .icon { font-size:18px; width:24px; text-align:center; flex-shrink:0; }
-.sidebar-toggle { cursor:pointer; }
-.sidebar-toggle .arrow { margin-left:auto; font-size:14px; transition:transform 0.2s; color:#64748b; }
-.sidebar-group.open .sidebar-toggle .arrow { transform:rotate(90deg); }
-.sidebar-sub { max-height:0; overflow:hidden; transition:max-height 0.3s ease; }
-.sidebar-group.open .sidebar-sub { max-height:200px; }
-.sidebar-sub-item { display:flex; align-items:center; gap:10px; padding:8px 16px 8px 44px; font-size:13px; color:#94a3b8; cursor:pointer; transition:all 0.15s; text-decoration:none; border-left:3px solid transparent; }
-.sidebar-sub-item:hover { color:#fff; background:rgba(255,255,255,0.05); }
-.sidebar-sub-item .icon { font-size:14px; width:20px; text-align:center; flex-shrink:0; }
-.sidebar-bottom { margin-top:auto; padding:12px 16px; border-top:1px solid rgba(255,255,255,0.1); }
-.sidebar-bottom a { color:#94a3b8; font-size:12px; text-decoration:none; }
-.sidebar-bottom a:hover { color:#fff; }
-.main { margin-left:220px; min-height:100vh; }
-@media(max-width:768px) {
-    .sidebar { width:60px; }
-    .sidebar-logo h2,.sidebar-logo .sub,.sidebar-section-title,.sidebar-item span:not(.icon):not(.arrow),.sidebar-sub-item span:not(.icon),.sidebar-toggle .arrow { display:none; }
-    .sidebar-item,.sidebar-toggle { padding:12px 0; justify-content:center; }
-    .sidebar-sub-item { padding:8px 0; justify-content:center; }
-    .main { margin-left:60px; }
-}
-
 </style>
 </head>
 <body>
 
-<nav class="sidebar">
-    <div class="sidebar-logo"><h2>금형관리</h2><div class="sub">Mold Management</div></div>
-    <div class="sidebar-section">
-        <div class="sidebar-section-title">메뉴</div>
-        <a class="sidebar-item" href="mold_dashboard.html"><span class="icon">📊</span><span>대시보드</span></a>
-        <a class="sidebar-item" href="mold_layout.html"><span class="icon">🗄️</span><span>적치대 현황</span></a>
-        <a class="sidebar-item active" href="mold_admin.html"><span class="icon">📋</span><span>금형 상세관리</span></a>
-        <div class="sidebar-group">
-            <div class="sidebar-item sidebar-toggle" onclick="toggleSubMenu(this)"><span class="icon">🔧</span><span>이력 관리</span><span class="arrow">›</span></div>
-            <div class="sidebar-sub">
-                <a class="sidebar-sub-item" href="mold_history.html#damage"><span class="icon">🔴</span><span>손상 이력</span></a>
-                <a class="sidebar-sub-item" href="mold_history.html#cleaning"><span class="icon">🧹</span><span>세척 이력</span></a>
-                <a class="sidebar-sub-item" href="mold_history.html#repair"><span class="icon">🛠️</span><span>수리 이력</span></a>
-            </div>
-        </div>
-    </div>
-    <div class="sidebar-bottom"><a href="#">㈜한국하이테크</a></div>
-</nav>
+<nav id="sidebar-nav" class="sidebar"></nav>
 
 <div class="main">
 
@@ -1117,6 +1069,7 @@ async function submitUpload() {
 // =============================================
 loadData();
 </script>
+<script src="sidebar.js"></script>
 </div><!-- main -->
 </body>
 </html>
