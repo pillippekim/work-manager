@@ -20,7 +20,8 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
 
 /* 요약 카드 */
 .summary-bar { display:flex; gap:8px; padding:12px 16px; overflow-x:auto; }
-.summary-card { flex-shrink:0; background:#fff; border-radius:10px; padding:10px 14px; min-width:80px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+.summary-card { flex-shrink:0; background:#fff; border-radius:10px; padding:10px 14px; min-width:80px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); transition:all 0.15s; }
+.summary-card:hover { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.15); }
 .summary-card .num { font-size:20px; font-weight:700; }
 .summary-card .label { font-size:11px; color:#64748b; margin-top:2px; }
 
@@ -128,12 +129,12 @@ table.data-table tr.row-danger { background:#fee2e2; }
 
 <!-- 요약 -->
 <div class="summary-bar" id="summaryBar">
-    <div class="summary-card"><div class="num" id="cntTotal" style="color:#243bb2;">-</div><div class="label">전체</div></div>
-    <div class="summary-card"><div class="num" id="cntStored" style="color:#16a34a;">-</div><div class="label">보관중</div></div>
-    <div class="summary-card"><div class="num" id="cntInuse" style="color:#dc2626;">-</div><div class="label">사용중</div></div>
-    <div class="summary-card"><div class="num" id="cntRepair" style="color:#f59e0b;">-</div><div class="label">수리중</div></div>
-    <div class="summary-card"><div class="num" id="cntRetired" style="color:#9ca3af;">-</div><div class="label">사용X</div></div>
-    <div class="summary-card"><div class="num" id="cntAlert" style="color:#dc2626;">-</div><div class="label">⚠ 유지보수</div></div>
+    <div class="summary-card" style="cursor:pointer;" onclick="filterByCard('')"><div class="num" id="cntTotal" style="color:#243bb2;">-</div><div class="label">전체</div></div>
+    <div class="summary-card" style="cursor:pointer;" onclick="filterByCard('stored')"><div class="num" id="cntStored" style="color:#16a34a;">-</div><div class="label">보관중</div></div>
+    <div class="summary-card" style="cursor:pointer;" onclick="filterByCard('in_use')"><div class="num" id="cntInuse" style="color:#dc2626;">-</div><div class="label">사용중</div></div>
+    <div class="summary-card" style="cursor:pointer;" onclick="filterByCard('repairing')"><div class="num" id="cntRepair" style="color:#f59e0b;">-</div><div class="label">수리중</div></div>
+    <div class="summary-card" style="cursor:pointer;" onclick="filterByCard('retired')"><div class="num" id="cntRetired" style="color:#9ca3af;">-</div><div class="label">사용X</div></div>
+    <div class="summary-card" style="cursor:pointer;" onclick="filterByCard('alert')"><div class="num" id="cntAlert" style="color:#dc2626;">-</div><div class="label">⚠ 유지보수</div></div>
 </div>
 
 <!-- 도구 모음 -->
@@ -493,6 +494,12 @@ function updateSummary() {
 document.getElementById('searchInput').addEventListener('input', function() { currentPage = 1; applyFilters(); });
 document.getElementById('filterStatus').addEventListener('change', function() { currentPage = 1; applyFilters(); });
 document.getElementById('filterBuilding').addEventListener('change', function() { currentPage = 1; applyFilters(); });
+
+function filterByCard(status) {
+    document.getElementById('filterStatus').value = status;
+    currentPage = 1;
+    applyFilters();
+}
 
 function applyFilters() {
     var keyword = document.getElementById('searchInput').value.trim().toUpperCase();
