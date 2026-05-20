@@ -31,6 +31,7 @@ function initSidebar() {
 
     nav.innerHTML =
         '<div class="sidebar-logo"><h2>금형관리</h2><div class="sub">Mold Management</div></div>' +
+        '<a class="sidebar-item" href="index.html" style="margin:0 12px 8px;padding:8px 14px;background:#eef0ff;border-radius:8px;border:1px solid #c7ceff;color:#243bb2;font-weight:600;font-size:13px;text-decoration:none;display:flex;align-items:center;gap:8px;transition:all 0.15s;"><span class="icon">🏠</span><span>업무관리 포탈</span></a>' +
         '<div class="sidebar-section">' +
         '<div class="sidebar-section-title">메뉴</div>' +
         '<a class="sidebar-item' + dashActive + '" href="mold_dashboard.html"><span class="icon">📊</span><span>대시보드</span></a>' +
