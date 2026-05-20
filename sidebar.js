@@ -31,7 +31,7 @@ function initSidebar() {
 
         headerEl.innerHTML =
             '<div class="top-header-left">' +
-                '<img class="top-header-logo" src="hkht_logo_white.png" alt="HKHT" style="height:28px;background:linear-gradient(135deg,#1e2a4a,#243bb2);padding:4px 10px;border-radius:6px;">' +
+                '<img class="top-header-logo" src="hkht_logo.png" alt="HKHT">' +
                 '<div class="top-header-divider"></div>' +
                 '<div class="top-header-title">㈜한국하이테크</div>' +
             '</div>' +
