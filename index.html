@@ -9,31 +9,25 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 
-/* ═══ 좌측 메뉴 (fixed, 화면 최좌측 고정) ═══ */
+/* ═══ 좌측 메뉴 (fixed) ═══ */
 .left-menu{
     position:fixed;top:0;left:0;
     width:260px;height:100vh;
     background:#fff;border-right:1px solid #e2e8f0;
-    padding:0;overflow-y:auto;
     z-index:200;display:flex;flex-direction:column;
 }
 
-/* 메뉴 헤더 (로고 영역) */
+/* 로고 헤더 (컴팩트) */
 .menu-header{
-    padding:22px 20px 18px;
-    border-bottom:1px solid rgba(255,255,255,0.1);
+    padding:14px 18px 12px;
     background:linear-gradient(135deg,#1e2a4a 0%,#243bb2 100%);
     color:#fff;flex-shrink:0;
-    display:flex;flex-direction:column;align-items:center;gap:10px;
+    display:flex;flex-direction:column;align-items:center;gap:4px;
 }
-.menu-header-logo{
-    width:160px;height:auto;object-fit:contain;
-    flex-shrink:0;
-}
-.menu-header-text{text-align:center;}
-.menu-header-text .portal-title{font-size:13px;font-weight:600;color:rgba(255,255,255,0.7);letter-spacing:0.5px;}
+.menu-header-logo{width:140px;height:auto;object-fit:contain;}
+.menu-header-title{font-size:15px;font-weight:700;color:rgba(255,255,255,0.85);letter-spacing:1.5px;}
 
-/* 메뉴 스크롤 영역 */
+/* 메뉴 스크롤 */
 .menu-scroll{flex:1;overflow-y:auto;padding:12px 0 4px;}
 
 .menu-group{padding:0 12px;margin-bottom:6px;}
@@ -65,15 +59,12 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 .sub-body{display:none;padding:2px 0 4px;}
 .sub-item.open>.sub-body{display:block;}
 
-/* 소분류 (최종 링크) */
+/* 소분류 */
 .nav-link{display:flex;align-items:center;gap:9px;padding:7px 12px 7px 40px;font-size:12.5px;color:#64748b;text-decoration:none;border-radius:7px;margin:1px 6px;transition:all 0.12s;}
 .nav-link:hover{background:#e8ecff;color:#243bb2;}
 .nav-link .n-icon{font-size:14px;width:18px;text-align:center;}
 
-/* 비활성 */
 .disabled{opacity:0.4;pointer-events:none;}
-
-/* 구분선 */
 .menu-divider{height:1px;background:#e8ecf3;margin:8px 12px;}
 
 /* 메뉴 하단 */
@@ -81,15 +72,26 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 .menu-bottom a{color:#94a3b8;font-size:11px;text-decoration:none;}
 .menu-bottom a:hover{color:#243bb2;}
 
-/* ═══ 메인 영역 (사이드바 오른쪽) ═══ */
-.main{margin-left:260px;min-height:100vh;}
+/* ═══ 메인 영역 ═══ */
+.main{margin-left:260px;min-height:100vh;display:flex;flex-direction:column;}
+
+/* 상단 바 (향후 로그인 영역) */
+.top-bar{
+    display:flex;align-items:center;justify-content:flex-end;
+    padding:10px 28px;border-bottom:1px solid #e8ecf3;
+    background:#fff;flex-shrink:0;gap:16px;
+}
+.top-bar-date{font-size:12px;color:#94a3b8;font-weight:500;}
+/* 향후 로그인 시 추가될 영역 */
+.top-bar-user{display:flex;align-items:center;gap:10px;}
+.top-bar-avatar{width:32px;height:32px;border-radius:50%;background:#e8ecff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#243bb2;}
+.top-bar-name{font-size:13px;font-weight:600;color:#334155;}
+.top-bar-role{font-size:10px;color:#94a3b8;}
+.top-bar-logout{font-size:12px;color:#94a3b8;cursor:pointer;padding:6px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;font-family:inherit;transition:all 0.12s;}
+.top-bar-logout:hover{background:#f1f5f9;color:#ef4444;border-color:#fca5a5;}
 
 /* 콘텐츠 */
-.right-content{padding:24px 28px;}
-
-/* 콘텐츠 상단 (날짜 표시) */
-.content-top{display:flex;justify-content:flex-end;align-items:center;margin-bottom:20px;}
-.today-date{font-size:12px;color:#94a3b8;font-weight:500;}
+.right-content{flex:1;padding:24px 28px;}
 
 /* 즐겨찾기 */
 .fav-section{margin-bottom:24px;}
@@ -101,21 +103,19 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 .fav-card:hover{transform:translateY(-4px);box-shadow:0 10px 28px rgba(0,0,0,0.08);border-color:#c7ceff;color:#243bb2;}
 .fav-card .fi{font-size:30px;margin-bottom:10px;}
 .fav-card .fn{font-size:13px;font-weight:600;}
-/* 즐겨찾기 삭제 버튼 (편집 모드) */
 .fav-card .fav-del{display:none;position:absolute;top:6px;right:8px;width:22px;height:22px;border-radius:50%;background:#ef4444;color:#fff;border:none;cursor:pointer;font-size:13px;line-height:22px;text-align:center;font-weight:700;}
 .fav-card .fav-del:hover{background:#dc2626;}
 .fav-grid.editing .fav-card{animation:shake 0.3s ease-in-out infinite alternate;}
 .fav-grid.editing .fav-card .fav-del{display:block;}
 .fav-grid.editing .fav-card:hover{transform:none;box-shadow:none;}
 @keyframes shake{0%{transform:rotate(-0.5deg);}100%{transform:rotate(0.5deg);}}
-/* 즐겨찾기 추가 카드 (편집 모드) */
 .fav-add-card{background:#f8fafc;border:2px dashed #cbd5e1;border-radius:14px;padding:20px 14px;text-align:center;cursor:pointer;transition:all 0.15s;display:none;color:#94a3b8;}
 .fav-add-card:hover{border-color:#243bb2;color:#243bb2;background:#f0f4ff;}
 .fav-add-card .fi{font-size:28px;margin-bottom:8px;}
 .fav-add-card .fn{font-size:12px;font-weight:600;}
 .fav-grid.editing .fav-add-card{display:block;}
 
-/* 즐겨찾기 추가 모달 */
+/* 즐겨찾기 모달 */
 .fav-modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:500;align-items:center;justify-content:center;}
 .fav-modal-overlay.show{display:flex;}
 .fav-modal{background:#fff;border-radius:16px;padding:24px;width:90%;max-width:480px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);}
@@ -147,7 +147,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 .a-unit{font-size:10px;font-weight:400;color:#94a3b8;margin-left:2px;}
 
 /* 공지사항 */
-.notice-section{}
 .notice-w{background:#fff;border-radius:14px;border:1px solid #e8ecf3;overflow:hidden;}
 .notice-wh{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #f1f5f9;}
 .notice-wt{font-size:14px;font-weight:700;color:#1e293b;display:flex;align-items:center;gap:7px;}
@@ -160,59 +159,44 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 .nb{font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;background:#fef2f2;color:#dc2626;flex-shrink:0;}
 .ndate{font-size:11px;color:#94a3b8;flex-shrink:0;}
 
-/* ═══ 모바일 반응형 ═══ */
+/* 모바일 */
 @media(max-width:768px){
-    .left-menu{
-        width:100%;height:auto;position:relative;
-        border-right:none;border-bottom:1px solid #e8ecf3;
-        max-height:50vh;
-    }
+    .left-menu{width:100%;height:auto;position:relative;border-right:none;border-bottom:1px solid #e8ecf3;max-height:50vh;}
     .main{margin-left:0;}
     .right-content{padding:16px;}
     .fav-grid{grid-template-columns:repeat(3,1fr);}
     .alarm-grid{grid-template-columns:1fr;}
+    .top-bar{padding:10px 16px;}
 }
 @media(max-width:480px){
     .fav-grid{grid-template-columns:repeat(2,1fr);}
-    .menu-header-text .portal-title{font-size:11px;}
-    .menu-header-logo{width:120px;}
+    .menu-header-logo{width:100px;}
+    .menu-header-title{font-size:12px;}
 }
 </style>
 </head>
 <body>
 
-<!-- ═══ 좌측 메뉴 (fixed, 화면 최좌측 고정) ═══ -->
+<!-- ═══ 좌측 메뉴 ═══ -->
 <div class="left-menu">
-
-    <!-- 메뉴 상단 로고 -->
     <div class="menu-header">
         <img class="menu-header-logo" src="hkht_logo_white.png" alt="HKHT">
-        <div class="menu-header-text">
-            <div class="portal-title">업무관리 포탈</div>
-        </div>
+        <div class="menu-header-title">업무관리 포탈</div>
     </div>
 
-    <!-- 메뉴 스크롤 영역 -->
     <div class="menu-scroll">
-
         <div class="menu-group">
             <div class="menu-group-title">업무관리</div>
-
-            <!-- 생산관리 -->
             <div class="cat-item" id="c-prod">
                 <button class="cat-btn" onclick="tC('c-prod')">
-                    <span class="c-icon">🏭</span>
-                    <span class="c-label">생산관리</span>
-                    <span class="c-badge on">운영</span>
-                    <span class="c-arrow">▼</span>
+                    <span class="c-icon">🏭</span><span class="c-label">생산관리</span>
+                    <span class="c-badge on">운영</span><span class="c-arrow">▼</span>
                 </button>
                 <div class="cat-body">
                     <div class="sub-item" id="s-mold">
                         <button class="sub-btn" onclick="tS('s-mold')">
-                            <span class="s-icon">🔧</span>
-                            <span class="s-label">금형관리</span>
-                            <span class="s-badge c-badge on">1차</span>
-                            <span class="s-arrow">▼</span>
+                            <span class="s-icon">🔧</span><span class="s-label">금형관리</span>
+                            <span class="s-badge c-badge on">1차</span><span class="s-arrow">▼</span>
                         </button>
                         <div class="sub-body">
                             <a class="nav-link" href="mold_dashboard.html"><span class="n-icon">📊</span>대시보드</a>
@@ -222,45 +206,30 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
                         </div>
                     </div>
                     <div class="sub-item disabled">
-                        <button class="sub-btn">
-                            <span class="s-icon">📦</span>
-                            <span class="s-label">재고관리</span>
-                            <span class="s-badge c-badge off">2차</span>
-                        </button>
+                        <button class="sub-btn"><span class="s-icon">📦</span><span class="s-label">재고관리</span><span class="s-badge c-badge off">2차</span></button>
                     </div>
                 </div>
             </div>
-
-            <!-- 품질/물류/R&D/경영 -->
             <div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">✅</span><span class="c-label">품질관리</span><span class="c-badge off">향후</span></button></div>
             <div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">🚚</span><span class="c-label">물류관리</span><span class="c-badge off">향후</span></button></div>
             <div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">🔬</span><span class="c-label">R&D</span><span class="c-badge off">향후</span></button></div>
             <div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">💼</span><span class="c-label">경영지원</span><span class="c-badge off">향후</span></button></div>
         </div>
-
         <div class="menu-divider"></div>
-
         <div class="menu-group">
             <div class="menu-group-title">현장관리</div>
             <div class="cat-item">
                 <a class="cat-btn" href="https://pillippekim.github.io/project-moon/index.html" style="text-decoration:none;color:inherit;">
-                    <span class="c-icon">📝</span>
-                    <span class="c-label">작업일지 프로그램</span>
-                    <span class="c-badge on">바로가기</span>
+                    <span class="c-icon">📝</span><span class="c-label">작업일지 프로그램</span><span class="c-badge on">바로가기</span>
                 </a>
             </div>
         </div>
-
         <div class="menu-divider"></div>
-
-        <!-- 시스템 (확장) -->
         <div class="menu-group">
             <div class="menu-group-title">시스템</div>
             <div class="cat-item" id="c-system">
                 <button class="cat-btn" onclick="tC('c-system')">
-                    <span class="c-icon">⚙️</span>
-                    <span class="c-label">시스템 관리</span>
-                    <span class="c-arrow">▼</span>
+                    <span class="c-icon">⚙️</span><span class="c-label">시스템 관리</span><span class="c-arrow">▼</span>
                 </button>
                 <div class="cat-body">
                     <a class="nav-link" href="https://pillippekim.github.io/project-moon/users.html"><span class="n-icon">👥</span>사용자 관리</a>
@@ -272,30 +241,33 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
                 </div>
             </div>
         </div>
-
     </div>
 
-    <!-- 메뉴 하단 -->
-    <div class="menu-bottom">
-        <a href="#">㈜한국하이테크</a>
-    </div>
+    <div class="menu-bottom"><a href="#">㈜한국하이테크</a></div>
 </div>
 
 <!-- ═══ 메인 영역 ═══ -->
 <div class="main">
-    <div class="right-content">
 
-        <!-- 상단 날짜 -->
-        <div class="content-top">
-            <div class="today-date" id="todayDate"></div>
+    <!-- 상단 바 (향후 로그인/사용자 영역) -->
+    <div class="top-bar">
+        <div class="top-bar-date" id="todayDate"></div>
+        <!-- 향후 로그인 구현 시 아래 주석 해제
+        <div class="top-bar-user">
+            <div class="top-bar-avatar">김</div>
+            <div>
+                <div class="top-bar-name">김정혁</div>
+                <div class="top-bar-role">대표이사</div>
+            </div>
         </div>
+        <button class="top-bar-logout">로그아웃</button>
+        -->
+    </div>
 
+    <div class="right-content">
         <!-- 즐겨찾기 -->
         <div class="fav-section">
-            <div class="sec-label">
-                ⭐ 즐겨찾기
-                <button class="fav-edit-btn" id="favEditBtn" onclick="toggleFavEdit()">편집</button>
-            </div>
+            <div class="sec-label">⭐ 즐겨찾기 <button class="fav-edit-btn" id="favEditBtn" onclick="toggleFavEdit()">편집</button></div>
             <div class="fav-grid" id="favGrid"></div>
         </div>
 
@@ -304,17 +276,11 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
             <div class="sec-label">🔔 주요 현황</div>
             <div class="alarm-grid">
                 <div class="alarm-widget">
-                    <div class="alarm-wh">
-                        <div class="alarm-wt">🔧 금형 현황</div>
-                        <a class="alarm-wmore" href="mold_dashboard.html">자세히 →</a>
-                    </div>
+                    <div class="alarm-wh"><div class="alarm-wt">🔧 금형 현황</div><a class="alarm-wmore" href="mold_dashboard.html">자세히 →</a></div>
                     <div class="alarm-wb" id="moldAlarm"><div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">불러오는 중...</div></div>
                 </div>
                 <div class="alarm-widget">
-                    <div class="alarm-wh">
-                        <div class="alarm-wt">📝 오늘 작업일지</div>
-                        <a class="alarm-wmore" href="https://pillippekim.github.io/project-moon/index.html">자세히 →</a>
-                    </div>
+                    <div class="alarm-wh"><div class="alarm-wt">📝 오늘 작업일지</div><a class="alarm-wmore" href="https://pillippekim.github.io/project-moon/index.html">자세히 →</a></div>
                     <div class="alarm-wb" id="reportAlarm"><div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">불러오는 중...</div></div>
                 </div>
             </div>
@@ -332,7 +298,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
                 </div>
             </div>
         </div>
-
     </div>
 </div>
 
@@ -345,7 +310,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 </div>
 
 <script>
-/* ═══ 기본 설정 ═══ */
 var now=new Date(),days=['일','월','화','수','목','금','토'];
 document.getElementById('todayDate').textContent=now.getFullYear()+'년 '+(now.getMonth()+1)+'월 '+now.getDate()+'일 ('+days[now.getDay()]+')';
 
@@ -353,8 +317,6 @@ function tC(id){document.getElementById(id).classList.toggle('open');}
 function tS(id){document.getElementById(id).classList.toggle('open');}
 
 /* ═══ 즐겨찾기 시스템 ═══ */
-
-// 전체 메뉴 목록 (즐겨찾기에 추가 가능한 항목들)
 var ALL_MENU=[
     {icon:'📊',name:'대시보드',url:'mold_dashboard.html'},
     {icon:'🗄️',name:'적치대 현황',url:'mold_layout.html'},
@@ -377,8 +339,6 @@ var ALL_MENU=[
     {icon:'👥',name:'사용자 관리',url:'https://pillippekim.github.io/project-moon/users.html'},
     {icon:'📋',name:'변경 이력',url:'https://pillippekim.github.io/project-moon/audit.html'},
 ];
-
-// 기본 즐겨찾기 (처음 접속 시)
 var DEFAULT_FAVS=[
     {icon:'📊',name:'대시보드',url:'mold_dashboard.html'},
     {icon:'🗄️',name:'적치대 현황',url:'mold_layout.html'},
@@ -387,140 +347,55 @@ var DEFAULT_FAVS=[
     {icon:'🔍',name:'검사 작업일지',url:'https://pillippekim.github.io/project-moon/inspection.html'},
     {icon:'🔩',name:'조립 작업일지',url:'https://pillippekim.github.io/project-moon/assembly.html'},
 ];
-
 var favEditing=false;
-
-function loadFavs(){
-    try{
-        var saved=localStorage.getItem('hkht_portal_favs');
-        if(saved) return JSON.parse(saved);
-    }catch(e){}
-    return DEFAULT_FAVS.slice();
-}
-
-function saveFavs(favs){
-    try{localStorage.setItem('hkht_portal_favs',JSON.stringify(favs));}catch(e){}
-}
-
+function loadFavs(){try{var s=localStorage.getItem('hkht_portal_favs');if(s)return JSON.parse(s);}catch(e){}return DEFAULT_FAVS.slice();}
+function saveFavs(f){try{localStorage.setItem('hkht_portal_favs',JSON.stringify(f));}catch(e){}}
 function renderFavs(){
-    var favs=loadFavs();
-    var grid=document.getElementById('favGrid');
-    var h='';
-    for(var i=0;i<favs.length;i++){
-        h+='<a class="fav-card" href="'+favs[i].url+'">';
-        h+='<button class="fav-del" onclick="removeFav(event,'+i+')">&times;</button>';
-        h+='<div class="fi">'+favs[i].icon+'</div>';
-        h+='<div class="fn">'+favs[i].name+'</div>';
-        h+='</a>';
-    }
-    // 추가 카드 (편집 모드에서만 보임)
-    h+='<div class="fav-add-card" onclick="openFavModal()">';
-    h+='<div class="fi">➕</div>';
-    h+='<div class="fn">추가하기</div>';
-    h+='</div>';
+    var favs=loadFavs(),grid=document.getElementById('favGrid'),h='';
+    for(var i=0;i<favs.length;i++){h+='<a class="fav-card" href="'+favs[i].url+'"><button class="fav-del" onclick="removeFav(event,'+i+')">&times;</button><div class="fi">'+favs[i].icon+'</div><div class="fn">'+favs[i].name+'</div></a>';}
+    h+='<div class="fav-add-card" onclick="openFavModal()"><div class="fi">➕</div><div class="fn">추가하기</div></div>';
     grid.innerHTML=h;
-    // 편집 모드 유지
-    if(favEditing) grid.classList.add('editing');
-    else grid.classList.remove('editing');
+    if(favEditing)grid.classList.add('editing');else grid.classList.remove('editing');
 }
-
 function toggleFavEdit(){
-    favEditing=!favEditing;
-    var btn=document.getElementById('favEditBtn');
-    var grid=document.getElementById('favGrid');
-    if(favEditing){
-        btn.textContent='완료';
-        btn.style.background='#243bb2';btn.style.color='#fff';btn.style.borderColor='#243bb2';
-        grid.classList.add('editing');
-    }else{
-        btn.textContent='편집';
-        btn.style.background='';btn.style.color='';btn.style.borderColor='';
-        grid.classList.remove('editing');
-    }
+    favEditing=!favEditing;var btn=document.getElementById('favEditBtn'),grid=document.getElementById('favGrid');
+    if(favEditing){btn.textContent='완료';btn.style.background='#243bb2';btn.style.color='#fff';btn.style.borderColor='#243bb2';grid.classList.add('editing');}
+    else{btn.textContent='편집';btn.style.background='';btn.style.color='';btn.style.borderColor='';grid.classList.remove('editing');}
 }
-
-function removeFav(e,idx){
-    e.preventDefault();e.stopPropagation();
-    var favs=loadFavs();
-    if(favs.length<=1){alert('최소 1개의 즐겨찾기가 필요합니다.');return;}
-    favs.splice(idx,1);
-    saveFavs(favs);
-    renderFavs();
-}
-
+function removeFav(e,idx){e.preventDefault();e.stopPropagation();var f=loadFavs();if(f.length<=1){alert('최소 1개의 즐겨찾기가 필요합니다.');return;}f.splice(idx,1);saveFavs(f);renderFavs();}
 function openFavModal(){
-    var favs=loadFavs();
-    var favUrls=favs.map(function(f){return f.url;});
-    var list=document.getElementById('favModalList');
-    var h='';
-    for(var i=0;i<ALL_MENU.length;i++){
-        var already=favUrls.indexOf(ALL_MENU[i].url)!==-1;
-        h+='<div class="fav-modal-item'+(already?' already':'')+'" onclick="addFav('+i+')">';
-        h+='<span class="fmi-icon">'+ALL_MENU[i].icon+'</span>';
-        h+='<span class="fmi-name">'+ALL_MENU[i].name+'</span>';
-        if(already) h+='<span class="fmi-added">추가됨</span>';
-        h+='</div>';
-    }
-    list.innerHTML=h;
-    document.getElementById('favModal').classList.add('show');
+    var favs=loadFavs(),urls=favs.map(function(f){return f.url;}),list=document.getElementById('favModalList'),h='';
+    for(var i=0;i<ALL_MENU.length;i++){var al=urls.indexOf(ALL_MENU[i].url)!==-1;h+='<div class="fav-modal-item'+(al?' already':'')+'" onclick="addFav('+i+')"><span class="fmi-icon">'+ALL_MENU[i].icon+'</span><span class="fmi-name">'+ALL_MENU[i].name+'</span>'+(al?'<span class="fmi-added">추가됨</span>':'')+'</div>';}
+    list.innerHTML=h;document.getElementById('favModal').classList.add('show');
 }
-
-function closeFavModal(){
-    document.getElementById('favModal').classList.remove('show');
-}
-
-function addFav(menuIdx){
-    var favs=loadFavs();
-    var item=ALL_MENU[menuIdx];
-    // 중복 확인
-    for(var i=0;i<favs.length;i++){if(favs[i].url===item.url) return;}
-    favs.push({icon:item.icon,name:item.name,url:item.url});
-    saveFavs(favs);
-    renderFavs();
-    closeFavModal();
-}
-
-// 초기 렌더링
+function closeFavModal(){document.getElementById('favModal').classList.remove('show');}
+function addFav(idx){var f=loadFavs(),item=ALL_MENU[idx];for(var i=0;i<f.length;i++){if(f[i].url===item.url)return;}f.push({icon:item.icon,name:item.name,url:item.url});saveFavs(f);renderFavs();closeFavModal();}
 renderFavs();
+document.getElementById('favModal').addEventListener('click',function(e){if(e.target===this)closeFavModal();});
 
-// 모달 바깥 클릭으로 닫기
-document.getElementById('favModal').addEventListener('click',function(e){
-    if(e.target===this) closeFavModal();
-});
-
-/* ═══ Supabase 데이터 ═══ */
+/* ═══ Supabase ═══ */
 var SB='https://vpaixxlhzkwtgcllimvn.supabase.co',SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
 var H={'apikey':SK,'Authorization':'Bearer '+SK};
 
 async function loadMoldAlarm(){
-    try{
-        var r=await fetch(SB+'/rest/v1/molds?select=status,is_active,total_shots,maintenance_threshold&is_active=eq.true',{headers:H});
-        var m=await r.json();var st=0,iu=0,rp=0,al=0;
-        for(var i=0;i<m.length;i++){if(m[i].status==='stored')st++;else if(m[i].status==='in_use')iu++;else if(m[i].status==='repairing')rp++;if(m[i].maintenance_threshold&&m[i].total_shots>=m[i].maintenance_threshold)al++;}
-        var h='';
-        h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#22c55e"></span>보관중</span><span class="a-val" style="color:#22c55e">'+st+'</span></div>';
-        h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#ef4444"></span>사용중</span><span class="a-val" style="color:#ef4444">'+iu+'</span></div>';
-        h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#f59e0b"></span>수리중</span><span class="a-val" style="color:#f59e0b">'+rp+'</span></div>';
-        if(al>0)h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#dc2626"></span>⚠️ 유지보수</span><span class="a-val" style="color:#dc2626">'+al+'</span></div>';
-        document.getElementById('moldAlarm').innerHTML=h;
-    }catch(e){document.getElementById('moldAlarm').innerHTML='<div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">데이터를 불러올 수 없습니다</div>';}
+    try{var r=await fetch(SB+'/rest/v1/molds?select=status,is_active,total_shots,maintenance_threshold&is_active=eq.true',{headers:H});var m=await r.json();var st=0,iu=0,rp=0,al=0;
+    for(var i=0;i<m.length;i++){if(m[i].status==='stored')st++;else if(m[i].status==='in_use')iu++;else if(m[i].status==='repairing')rp++;if(m[i].maintenance_threshold&&m[i].total_shots>=m[i].maintenance_threshold)al++;}
+    var h='';h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#22c55e"></span>보관중</span><span class="a-val" style="color:#22c55e">'+st+'</span></div>';
+    h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#ef4444"></span>사용중</span><span class="a-val" style="color:#ef4444">'+iu+'</span></div>';
+    h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#f59e0b"></span>수리중</span><span class="a-val" style="color:#f59e0b">'+rp+'</span></div>';
+    if(al>0)h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#dc2626"></span>⚠️ 유지보수</span><span class="a-val" style="color:#dc2626">'+al+'</span></div>';
+    document.getElementById('moldAlarm').innerHTML=h;}catch(e){document.getElementById('moldAlarm').innerHTML='<div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">데이터를 불러올 수 없습니다</div>';}
 }
-
 async function loadReportAlarm(){
     var today=(function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
     var tables=[{n:'성형',t:'molding_reports'},{n:'검사',t:'inspection_reports'},{n:'조립',t:'assembly_reports'},{n:'절단',t:'cutting_reports'},{n:'CMB',t:'cmb_reports'},{n:'코팅',t:'coating_reports'},{n:'후경화',t:'postcure_reports'},{n:'사출',t:'shot_reports'},{n:'포장',t:'packaging_reports'}];
     var h='',tot=0;
-    try{
-        for(var i=0;i<tables.length;i++){
-            try{var r=await fetch(SB+'/rest/v1/'+tables[i].t+'?select=id&work_date=eq.'+today,{headers:H});var d=await r.json();var c=Array.isArray(d)?d.length:0;tot+=c;
-            if(c>0)h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#3b82f6"></span>'+tables[i].n+'</span><span class="a-val" style="color:#243bb2">'+c+'<span class="a-unit">건</span></span></div>';}catch(e2){}
-        }
-        if(!h)h='<div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">오늘 제출된 작업일지가 없습니다</div>';
-        else h='<div class="a-row" style="border-bottom:2px solid #e8ecf3;padding-bottom:8px;margin-bottom:4px;"><span class="a-label" style="font-weight:700;color:#1e293b;">오늘 총 제출</span><span class="a-val" style="color:#243bb2">'+tot+'<span class="a-unit">건</span></span></div>'+h;
-        document.getElementById('reportAlarm').innerHTML=h;
-    }catch(e){document.getElementById('reportAlarm').innerHTML='<div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">데이터를 불러올 수 없습니다</div>';}
+    try{for(var i=0;i<tables.length;i++){try{var r=await fetch(SB+'/rest/v1/'+tables[i].t+'?select=id&work_date=eq.'+today,{headers:H});var d=await r.json();var c=Array.isArray(d)?d.length:0;tot+=c;
+    if(c>0)h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#3b82f6"></span>'+tables[i].n+'</span><span class="a-val" style="color:#243bb2">'+c+'<span class="a-unit">건</span></span></div>';}catch(e2){}}
+    if(!h)h='<div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">오늘 제출된 작업일지가 없습니다</div>';
+    else h='<div class="a-row" style="border-bottom:2px solid #e8ecf3;padding-bottom:8px;margin-bottom:4px;"><span class="a-label" style="font-weight:700;color:#1e293b;">오늘 총 제출</span><span class="a-val" style="color:#243bb2">'+tot+'<span class="a-unit">건</span></span></div>'+h;
+    document.getElementById('reportAlarm').innerHTML=h;}catch(e){document.getElementById('reportAlarm').innerHTML='<div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">데이터를 불러올 수 없습니다</div>';}
 }
-
 loadMoldAlarm();loadReportAlarm();
 </script>
 </body>

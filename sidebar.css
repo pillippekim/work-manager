@@ -1,77 +1,121 @@
 /* ===== 좌측 메뉴바 (공통 CSS) ===== */
-/* 4개 페이지에서 공유: dashboard, layout, admin, history */
+/* 금형관리 4개 페이지 공유: dashboard, layout, admin, history */
+/* 업무관리 포탈(index.html)과 디자인 통일 */
 
 .sidebar {
     position: fixed;
     top: 0;
     left: 0;
-    width: 220px;
+    width: 260px;
     height: 100vh;
-    background: #1e2a4a;
-    color: #fff;
+    background: #fff;
+    border-right: 1px solid #e2e8f0;
     z-index: 200;
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
 }
+
+/* 로고 헤더 (포탈과 동일) */
 .sidebar-logo {
-    padding: 20px 16px 16px;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-.sidebar-logo h2 {
-    font-size: 16px;
-    font-weight: 700;
+    padding: 14px 18px 12px;
+    background: linear-gradient(135deg, #1e2a4a 0%, #243bb2 100%);
     color: #fff;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+.sidebar-logo-img {
+    width: 140px;
+    height: auto;
+    object-fit: contain;
 }
 .sidebar-logo .sub {
-    font-size: 11px;
-    color: #94a3b8;
-    margin-top: 4px;
+    font-size: 15px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.85);
+    letter-spacing: 1.5px;
+    text-align: center;
 }
+
+/* 포탈 바로가기 */
+.sidebar-portal-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 12px 4px;
+    padding: 9px 14px;
+    background: #f0f4ff;
+    border-radius: 8px;
+    border: 1px solid #dce3ff;
+    color: #243bb2;
+    font-weight: 600;
+    font-size: 13px;
+    text-decoration: none;
+    transition: all 0.15s;
+}
+.sidebar-portal-link:hover {
+    background: #e0e7ff;
+    border-color: #b4c0ff;
+}
+.sidebar-portal-link .icon {
+    font-size: 16px;
+}
+
+/* 섹션 */
 .sidebar-section {
-    padding: 12px 0 4px;
+    padding: 8px 0 4px;
 }
 .sidebar-section-title {
     font-size: 10px;
     font-weight: 700;
-    color: #64748b;
+    color: #94a3b8;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    padding: 0 16px 8px;
+    letter-spacing: 0.5px;
+    padding: 0 20px 8px;
 }
+
+/* 메뉴 아이템 */
 .sidebar-item {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 10px 16px;
-    font-size: 14px;
-    color: #cbd5e1;
+    margin: 1px 12px;
+    font-size: 13.5px;
+    color: #64748b;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.12s;
     text-decoration: none;
-    border-left: 3px solid transparent;
+    border-radius: 8px;
+    border-left: none;
 }
 .sidebar-item:hover {
-    background: rgba(255,255,255,0.08);
-    color: #fff;
+    background: #f1f5f9;
+    color: #1e293b;
 }
 .sidebar-item.active {
-    background: rgba(36,59,178,0.3);
-    color: #fff;
-    border-left-color: #60a5fa;
+    background: #e8ecff;
+    color: #243bb2;
+    font-weight: 600;
 }
+
+/* 아코디언 토글 */
 .sidebar-toggle {
     cursor: pointer;
 }
 .sidebar-toggle .arrow {
     margin-left: auto;
-    font-size: 14px;
-    transition: transform 0.2s;
-    color: #64748b;
+    font-size: 11px;
+    transition: transform 0.25s;
+    color: #94a3b8;
 }
 .sidebar-group.open .sidebar-toggle .arrow {
     transform: rotate(90deg);
 }
+
+/* 하위 메뉴 */
 .sidebar-sub {
     max-height: 0;
     overflow: hidden;
@@ -84,73 +128,96 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 16px 8px 44px;
-    font-size: 13px;
+    padding: 7px 16px 7px 48px;
+    margin: 1px 12px;
+    font-size: 12.5px;
     color: #94a3b8;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.12s;
     text-decoration: none;
-    border-left: 3px solid transparent;
+    border-radius: 7px;
 }
 .sidebar-sub-item:hover {
-    color: #fff;
-    background: rgba(255,255,255,0.05);
+    color: #243bb2;
+    background: #f0f4ff;
+}
+.sidebar-sub-item.active {
+    color: #243bb2;
+    background: #e8ecff;
+    font-weight: 600;
 }
 .sidebar-sub-item .icon {
     font-size: 14px;
-    width: 20px;
+    width: 18px;
     text-align: center;
     flex-shrink: 0;
 }
 .sidebar-item .icon {
-    font-size: 18px;
+    font-size: 17px;
     width: 24px;
     text-align: center;
     flex-shrink: 0;
 }
+
+/* 하단 */
 .sidebar-bottom {
     margin-top: auto;
-    padding: 12px 16px;
-    border-top: 1px solid rgba(255,255,255,0.1);
+    padding: 10px 16px;
+    border-top: 1px solid #e8ecf3;
+    flex-shrink: 0;
 }
 .sidebar-bottom a {
     color: #94a3b8;
-    font-size: 12px;
+    font-size: 11px;
     text-decoration: none;
 }
 .sidebar-bottom a:hover {
-    color: #fff;
+    color: #243bb2;
 }
 
-/* 메인 콘텐츠 영역 - 사이드바 오른쪽 */
+/* 메인 콘텐츠 영역 */
 .main {
-    margin-left: 220px;
+    margin-left: 260px;
     min-height: 100vh;
+}
+
+/* 상단 바 (향후 로그인 영역 대비) */
+.top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 10px 28px;
+    border-bottom: 1px solid #e8ecf3;
+    background: #fff;
+    flex-shrink: 0;
+    gap: 16px;
+}
+.top-bar-date {
+    font-size: 12px;
+    color: #94a3b8;
+    font-weight: 500;
 }
 
 /* 모바일 반응형 */
 @media (max-width: 768px) {
     .sidebar {
-        width: 60px;
+        width: 100%;
+        height: auto;
+        position: relative;
+        border-right: none;
+        border-bottom: 1px solid #e8ecf3;
+        max-height: 50vh;
     }
-    .sidebar-logo h2,
-    .sidebar-logo .sub,
-    .sidebar-section-title,
-    .sidebar-item span:not(.icon):not(.arrow),
-    .sidebar-sub-item span:not(.icon),
-    .sidebar-toggle .arrow {
-        display: none;
+    .sidebar-logo-img {
+        width: 100px;
     }
-    .sidebar-item,
-    .sidebar-toggle {
-        padding: 12px 0;
-        justify-content: center;
-    }
-    .sidebar-sub-item {
-        padding: 8px 0;
-        justify-content: center;
+    .sidebar-logo .sub {
+        font-size: 12px;
     }
     .main {
-        margin-left: 60px;
+        margin-left: 0;
+    }
+    .top-bar {
+        padding: 10px 16px;
     }
 }
