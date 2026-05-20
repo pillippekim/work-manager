@@ -1,23 +1,19 @@
-/* ===== 좌측 메뉴바 (공통 JS) ===== */
+/* ===== 좌측 메뉴바 + 상단 헤더 (공통 JS) ===== */
 /* 업무관리 포탈(index.html)과 디자인 통일 */
 
-// 이력관리 아코디언 토글
 function toggleSubMenu(el) {
     el.parentElement.classList.toggle('open');
 }
 
-// 사이드바 HTML 삽입 (현재 페이지에 맞게 active 처리)
 function initSidebar() {
     var page = location.pathname.split('/').pop() || 'mold_dashboard.html';
     var hash = location.hash;
 
-    // active 클래스 결정
     var dashActive = (page === 'mold_dashboard.html') ? ' active' : '';
     var layoutActive = (page === 'mold_layout.html') ? ' active' : '';
     var adminActive = (page === 'mold_admin.html') ? ' active' : '';
     var historyActive = (page === 'mold_history.html');
 
-    // 이력관리 하위 메뉴 active
     var damageActive = (historyActive && hash === '#damage') ? ' active' : '';
     var cleaningActive = (historyActive && hash === '#cleaning') ? ' active' : '';
     var repairActive = (historyActive && hash === '#repair') ? ' active' : '';
@@ -26,23 +22,33 @@ function initSidebar() {
     var historyToggleActive = historyActive ? ' active' : '';
     var historyGroupOpen = historyActive ? ' open' : '';
 
+    // 상단 헤더 바 삽입
+    var headerEl = document.getElementById('top-header');
+    if (headerEl) {
+        var now = new Date();
+        var days = ['일','월','화','수','목','금','토'];
+        var dateStr = now.getFullYear() + '년 ' + (now.getMonth()+1) + '월 ' + now.getDate() + '일 (' + days[now.getDay()] + ')';
+
+        headerEl.innerHTML =
+            '<div class="top-header-left">' +
+                '<img class="top-header-logo" src="hkht_logo_white.png" alt="HKHT" style="height:28px;background:linear-gradient(135deg,#1e2a4a,#243bb2);padding:4px 10px;border-radius:6px;">' +
+                '<div class="top-header-divider"></div>' +
+                '<div class="top-header-title">㈜한국하이테크</div>' +
+            '</div>' +
+            '<div class="top-header-right">' +
+                '<div class="top-header-date">' + dateStr + '</div>' +
+            '</div>';
+    }
+
+    // 사이드바 삽입
     var nav = document.getElementById('sidebar-nav');
     if (!nav) return;
 
     nav.innerHTML =
-        // 로고 헤더 (포탈과 동일)
-        '<div class="sidebar-logo">' +
-            '<img class="sidebar-logo-img" src="hkht_logo_white.png" alt="HKHT">' +
-            '<div class="sub">업무관리 포탈</div>' +
-        '</div>' +
-
-        // 포탈 바로가기
         '<a class="sidebar-portal-link" href="index.html">' +
-            '<span class="icon">🏠</span>' +
-            '<span>포탈 홈</span>' +
+            '<span class="icon">🏠</span><span>포탈 홈</span>' +
         '</a>' +
 
-        // 금형관리 메뉴
         '<div class="sidebar-section">' +
             '<div class="sidebar-section-title">금형관리</div>' +
             '<a class="sidebar-item' + dashActive + '" href="mold_dashboard.html">' +
@@ -72,21 +78,7 @@ function initSidebar() {
             '</div>' +
         '</div>' +
 
-        // 하단
         '<div class="sidebar-bottom"><a href="#">㈜한국하이테크</a></div>';
 }
 
-// 상단 바 날짜 표시
-function initTopBar() {
-    var dateEl = document.getElementById('topBarDate');
-    if (!dateEl) return;
-    var now = new Date();
-    var days = ['일','월','화','수','목','금','토'];
-    dateEl.textContent = now.getFullYear() + '년 ' + (now.getMonth()+1) + '월 ' + now.getDate() + '일 (' + days[now.getDay()] + ')';
-}
-
-// 페이지 로드 시 자동 실행
-document.addEventListener('DOMContentLoaded', function() {
-    initSidebar();
-    initTopBar();
-});
+document.addEventListener('DOMContentLoaded', initSidebar);

@@ -1,42 +1,36 @@
-/* ===== 좌측 메뉴바 (공통 CSS) ===== */
-/* 금형관리 4개 페이지 공유: dashboard, layout, admin, history */
+/* ===== 좌측 메뉴바 + 상단 헤더 (공통 CSS) ===== */
+/* 금형관리 4개 페이지: dashboard, layout, admin, history */
 /* 업무관리 포탈(index.html)과 디자인 통일 */
 
+@font-face{font-family:'ONE Mobile Title';src:url('ONE_MOBILE_TITLE.TTF') format('truetype');font-weight:normal;font-style:normal;}
+
+/* 상단 헤더 바 (전체 가로) */
+.top-header{
+    position:fixed;top:0;left:0;right:0;
+    height:56px;background:#fff;border-bottom:1px solid #e2e8f0;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 24px;z-index:300;
+}
+.top-header-left{display:flex;align-items:center;gap:14px;}
+.top-header-logo{height:28px;width:auto;object-fit:contain;}
+.top-header-divider{width:1px;height:24px;background:#e2e8f0;}
+.top-header-title{font-family:'ONE Mobile Title','Noto Sans KR',sans-serif;font-size:15px;color:#1e293b;letter-spacing:0.5px;}
+.top-header-right{display:flex;align-items:center;gap:16px;}
+.top-header-date{font-size:12px;color:#94a3b8;font-weight:500;}
+
+/* 사이드바 (헤더 아래) */
 .sidebar {
     position: fixed;
-    top: 0;
+    top: 56px;
     left: 0;
     width: 260px;
-    height: 100vh;
+    height: calc(100vh - 56px);
     background: #fff;
     border-right: 1px solid #e2e8f0;
     z-index: 200;
     display: flex;
     flex-direction: column;
-}
-
-/* 로고 헤더 (포탈과 동일) */
-.sidebar-logo {
-    padding: 14px 18px 12px;
-    background: linear-gradient(135deg, #1e2a4a 0%, #243bb2 100%);
-    color: #fff;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-}
-.sidebar-logo-img {
-    width: 140px;
-    height: auto;
-    object-fit: contain;
-}
-.sidebar-logo .sub {
-    font-size: 15px;
-    font-weight: 700;
-    color: rgba(255,255,255,0.85);
-    letter-spacing: 1.5px;
-    text-align: center;
+    overflow-y: auto;
 }
 
 /* 포탈 바로가기 */
@@ -89,7 +83,6 @@
     transition: all 0.12s;
     text-decoration: none;
     border-radius: 8px;
-    border-left: none;
 }
 .sidebar-item:hover {
     background: #f1f5f9;
@@ -100,30 +93,20 @@
     color: #243bb2;
     font-weight: 600;
 }
-
-/* 아코디언 토글 */
-.sidebar-toggle {
-    cursor: pointer;
-}
+.sidebar-toggle { cursor: pointer; }
 .sidebar-toggle .arrow {
     margin-left: auto;
     font-size: 11px;
     transition: transform 0.25s;
     color: #94a3b8;
 }
-.sidebar-group.open .sidebar-toggle .arrow {
-    transform: rotate(90deg);
-}
-
-/* 하위 메뉴 */
+.sidebar-group.open .sidebar-toggle .arrow { transform: rotate(90deg); }
 .sidebar-sub {
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.3s ease;
 }
-.sidebar-group.open .sidebar-sub {
-    max-height: 200px;
-}
+.sidebar-group.open .sidebar-sub { max-height: 200px; }
 .sidebar-sub-item {
     display: flex;
     align-items: center;
@@ -137,87 +120,37 @@
     text-decoration: none;
     border-radius: 7px;
 }
-.sidebar-sub-item:hover {
-    color: #243bb2;
-    background: #f0f4ff;
-}
-.sidebar-sub-item.active {
-    color: #243bb2;
-    background: #e8ecff;
-    font-weight: 600;
-}
-.sidebar-sub-item .icon {
-    font-size: 14px;
-    width: 18px;
-    text-align: center;
-    flex-shrink: 0;
-}
-.sidebar-item .icon {
-    font-size: 17px;
-    width: 24px;
-    text-align: center;
-    flex-shrink: 0;
-}
-
-/* 하단 */
+.sidebar-sub-item:hover { color: #243bb2; background: #f0f4ff; }
+.sidebar-sub-item.active { color: #243bb2; background: #e8ecff; font-weight: 600; }
+.sidebar-sub-item .icon { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+.sidebar-item .icon { font-size: 17px; width: 24px; text-align: center; flex-shrink: 0; }
 .sidebar-bottom {
     margin-top: auto;
     padding: 10px 16px;
     border-top: 1px solid #e8ecf3;
     flex-shrink: 0;
 }
-.sidebar-bottom a {
-    color: #94a3b8;
-    font-size: 11px;
-    text-decoration: none;
-}
-.sidebar-bottom a:hover {
-    color: #243bb2;
-}
+.sidebar-bottom a { color: #94a3b8; font-size: 11px; text-decoration: none; }
+.sidebar-bottom a:hover { color: #243bb2; }
 
-/* 메인 콘텐츠 영역 */
+/* 메인 콘텐츠 */
 .main {
     margin-left: 260px;
-    min-height: 100vh;
+    margin-top: 56px;
+    min-height: calc(100vh - 56px);
 }
 
-/* 상단 바 (향후 로그인 영역 대비) */
-.top-bar {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    padding: 10px 28px;
-    border-bottom: 1px solid #e8ecf3;
-    background: #fff;
-    flex-shrink: 0;
-    gap: 16px;
-}
-.top-bar-date {
-    font-size: 12px;
-    color: #94a3b8;
-    font-weight: 500;
-}
-
-/* 모바일 반응형 */
+/* 모바일 */
 @media (max-width: 768px) {
+    .top-header { padding: 0 12px; height: 50px; }
     .sidebar {
         width: 100%;
         height: auto;
         position: relative;
+        top: 0;
         border-right: none;
         border-bottom: 1px solid #e8ecf3;
-        max-height: 50vh;
+        max-height: 45vh;
     }
-    .sidebar-logo-img {
-        width: 100px;
-    }
-    .sidebar-logo .sub {
-        font-size: 12px;
-    }
-    .main {
-        margin-left: 0;
-    }
-    .top-bar {
-        padding: 10px 16px;
-    }
+    .main { margin-left: 0; margin-top: 50px; }
 }
