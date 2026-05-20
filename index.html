@@ -7,31 +7,46 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;display:flex;flex-direction:column;}
+body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 
-/* 헤더 */
-.portal-header{background:linear-gradient(135deg,#1e2a4a 0%,#243bb2 60%,#3b5ee6 100%);padding:18px 28px;color:#fff;position:relative;overflow:hidden;}
-.portal-header::before{content:'';position:absolute;top:-50px;right:-50px;width:160px;height:160px;background:rgba(255,255,255,0.04);border-radius:50%;}
-.header-content{max-width:1400px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1;}
-.company-name{font-size:11px;color:rgba(255,255,255,0.6);letter-spacing:1px;margin-bottom:3px;}
-.portal-title{font-size:22px;font-weight:800;letter-spacing:-0.5px;}
-.header-date{font-size:12px;color:rgba(255,255,255,0.65);}
+/* ═══ 좌측 메뉴 (fixed, 화면 최좌측 고정) ═══ */
+.left-menu{
+    position:fixed;top:0;left:0;
+    width:260px;height:100vh;
+    background:#fff;border-right:1px solid #e2e8f0;
+    padding:0;overflow-y:auto;
+    z-index:200;display:flex;flex-direction:column;
+}
 
-/* 본문 */
-.portal-body{display:flex;flex:1;max-width:1400px;margin:0 auto;width:100%;}
+/* 메뉴 헤더 (로고 영역) */
+.menu-header{
+    padding:20px 20px 18px;
+    border-bottom:1px solid #e8ecf3;
+    background:linear-gradient(135deg,#1e2a4a 0%,#243bb2 100%);
+    color:#fff;flex-shrink:0;
+    display:flex;align-items:center;gap:14px;
+}
+.menu-header-logo{
+    width:42px;height:42px;object-fit:contain;
+    border-radius:8px;background:rgba(255,255,255,0.95);padding:4px;
+    flex-shrink:0;
+}
+.menu-header-text{}
+.menu-header-text .company-name{font-size:10px;color:rgba(255,255,255,0.55);letter-spacing:1px;margin-bottom:2px;}
+.menu-header-text .portal-title{font-size:16px;font-weight:800;letter-spacing:-0.3px;}
 
-/* ═══ 좌측 메뉴 ═══ */
-.left-menu{width:260px;background:#fff;border-right:1px solid #e8ecf3;padding:16px 0;overflow-y:auto;flex-shrink:0;height:calc(100vh - 60px);position:sticky;top:0;}
+/* 메뉴 스크롤 영역 */
+.menu-scroll{flex:1;overflow-y:auto;padding:12px 0 4px;}
 
-.menu-group{padding:0 14px;margin-bottom:8px;}
-.menu-group-title{font-size:11px;font-weight:700;color:#94a3b8;padding:12px 8px 6px;letter-spacing:0.5px;}
+.menu-group{padding:0 12px;margin-bottom:6px;}
+.menu-group-title{font-size:10px;font-weight:700;color:#94a3b8;padding:10px 8px 6px;letter-spacing:0.5px;text-transform:uppercase;}
 
 /* 대분류 */
 .cat-item{margin-bottom:2px;}
-.cat-btn{display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;border-radius:10px;transition:background 0.12s;width:100%;border:none;background:none;font-family:inherit;text-align:left;}
+.cat-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-radius:10px;transition:background 0.12s;width:100%;border:none;background:none;font-family:inherit;text-align:left;}
 .cat-btn:hover{background:#f1f5f9;}
-.cat-btn .c-icon{font-size:18px;width:26px;text-align:center;flex-shrink:0;}
-.cat-btn .c-label{font-size:14px;font-weight:600;color:#1e293b;flex:1;}
+.cat-btn .c-icon{font-size:17px;width:24px;text-align:center;flex-shrink:0;}
+.cat-btn .c-label{font-size:13.5px;font-weight:600;color:#1e293b;flex:1;}
 .cat-btn .c-badge{font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;}
 .c-badge.on{background:#dbeafe;color:#2563eb;}
 .c-badge.off{background:#f1f5f9;color:#b0b8c9;}
@@ -41,11 +56,11 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;d
 .cat-item.open>.cat-body{display:block;}
 
 /* 중분류 */
-.sub-item{margin:0 8px 2px;}
-.sub-btn{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;border-radius:8px;transition:background 0.12s;width:100%;border:none;background:none;font-family:inherit;text-align:left;}
+.sub-item{margin:0 6px 2px;}
+.sub-btn{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-radius:8px;transition:background 0.12s;width:100%;border:none;background:none;font-family:inherit;text-align:left;}
 .sub-btn:hover{background:#eef0f5;}
-.sub-btn .s-icon{font-size:15px;width:22px;text-align:center;}
-.sub-btn .s-label{font-size:13px;font-weight:600;color:#334155;flex:1;}
+.sub-btn .s-icon{font-size:14px;width:20px;text-align:center;}
+.sub-btn .s-label{font-size:12.5px;font-weight:600;color:#334155;flex:1;}
 .sub-btn .s-badge{font-size:8px;font-weight:600;padding:1px 6px;border-radius:4px;}
 .sub-btn .s-arrow{font-size:10px;color:#94a3b8;transition:transform 0.25s;}
 .sub-item.open>.sub-btn .s-arrow{transform:rotate(180deg);}
@@ -53,23 +68,30 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;d
 .sub-item.open>.sub-body{display:block;}
 
 /* 소분류 (최종 링크) */
-.nav-link{display:flex;align-items:center;gap:9px;padding:8px 12px 8px 42px;font-size:13px;color:#64748b;text-decoration:none;border-radius:7px;margin:1px 8px;transition:all 0.12s;}
+.nav-link{display:flex;align-items:center;gap:9px;padding:7px 12px 7px 40px;font-size:12.5px;color:#64748b;text-decoration:none;border-radius:7px;margin:1px 6px;transition:all 0.12s;}
 .nav-link:hover{background:#e8ecff;color:#243bb2;}
-.nav-link .n-icon{font-size:15px;width:20px;text-align:center;}
-
-/* 대분류 직접 링크 (flat) */
-.flat-link{display:flex;align-items:center;gap:9px;padding:8px 12px 8px 36px;font-size:13px;color:#64748b;text-decoration:none;border-radius:7px;margin:1px 8px;transition:all 0.12s;}
-.flat-link:hover{background:#e8ecff;color:#243bb2;}
-.flat-link .f-icon{font-size:14px;width:20px;text-align:center;}
+.nav-link .n-icon{font-size:14px;width:18px;text-align:center;}
 
 /* 비활성 */
 .disabled{opacity:0.4;pointer-events:none;}
 
 /* 구분선 */
-.menu-divider{height:1px;background:#e8ecf3;margin:10px 14px;}
+.menu-divider{height:1px;background:#e8ecf3;margin:8px 12px;}
 
-/* ═══ 우측 콘텐츠 ═══ */
-.right-content{flex:1;padding:24px 28px;overflow-y:auto;min-width:0;}
+/* 메뉴 하단 */
+.menu-bottom{padding:10px 16px;border-top:1px solid #e8ecf3;flex-shrink:0;}
+.menu-bottom a{color:#94a3b8;font-size:11px;text-decoration:none;}
+.menu-bottom a:hover{color:#243bb2;}
+
+/* ═══ 메인 영역 (사이드바 오른쪽) ═══ */
+.main{margin-left:260px;min-height:100vh;}
+
+/* 콘텐츠 */
+.right-content{padding:24px 28px;}
+
+/* 콘텐츠 상단 (날짜 표시) */
+.content-top{display:flex;justify-content:flex-end;align-items:center;margin-bottom:20px;}
+.today-date{font-size:12px;color:#94a3b8;font-weight:500;}
 
 /* 즐겨찾기 */
 .fav-section{margin-bottom:24px;}
@@ -110,157 +132,170 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;d
 .nb{font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;background:#fef2f2;color:#dc2626;flex-shrink:0;}
 .ndate{font-size:11px;color:#94a3b8;flex-shrink:0;}
 
-/* 모바일 */
-@media(max-width:900px){
-    .portal-body{flex-direction:column;}
-    .left-menu{width:100%;height:auto;position:static;border-right:none;border-bottom:1px solid #e8ecf3;padding:10px 0;max-height:45vh;overflow-y:auto;}
+/* ═══ 모바일 반응형 ═══ */
+@media(max-width:768px){
+    .left-menu{
+        width:100%;height:auto;position:relative;
+        border-right:none;border-bottom:1px solid #e8ecf3;
+        max-height:50vh;
+    }
+    .main{margin-left:0;}
     .right-content{padding:16px;}
     .fav-grid{grid-template-columns:repeat(3,1fr);}
     .alarm-grid{grid-template-columns:1fr;}
 }
 @media(max-width:480px){
     .fav-grid{grid-template-columns:repeat(2,1fr);}
-    .portal-title{font-size:18px;}
+    .menu-header-text .portal-title{font-size:14px;}
+    .menu-header-logo{width:34px;height:34px;}
 }
 </style>
 </head>
 <body>
 
-<!-- 헤더 -->
-<div class="portal-header">
-    <div class="header-content">
-        <div>
+<!-- ═══ 좌측 메뉴 (fixed, 화면 최좌측 고정) ═══ -->
+<div class="left-menu">
+
+    <!-- 메뉴 상단 로고 -->
+    <div class="menu-header">
+        <img class="menu-header-logo" src="hkht_logo.png" alt="HKHT">
+        <div class="menu-header-text">
             <div class="company-name">㈜한국하이테크</div>
             <div class="portal-title">업무관리 포탈</div>
         </div>
-        <div class="header-date" id="todayDate"></div>
     </div>
-</div>
 
-<div class="portal-body">
+    <!-- 메뉴 스크롤 영역 -->
+    <div class="menu-scroll">
 
-<!-- ═══ 좌측 메뉴 ═══ -->
-<div class="left-menu">
+        <div class="menu-group">
+            <div class="menu-group-title">업무관리</div>
 
-    <div class="menu-group">
-        <div class="menu-group-title">업무관리</div>
-
-        <!-- 생산관리 -->
-        <div class="cat-item" id="c-prod">
-            <button class="cat-btn" onclick="tC('c-prod')">
-                <span class="c-icon">🏭</span>
-                <span class="c-label">생산관리</span>
-                <span class="c-badge on">운영</span>
-                <span class="c-arrow">▼</span>
-            </button>
-            <div class="cat-body">
-                <div class="sub-item" id="s-mold">
-                    <button class="sub-btn" onclick="tS('s-mold')">
-                        <span class="s-icon">🔧</span>
-                        <span class="s-label">금형관리</span>
-                        <span class="s-badge c-badge on">1차</span>
-                        <span class="s-arrow">▼</span>
-                    </button>
-                    <div class="sub-body">
-                        <a class="nav-link" href="mold_dashboard.html"><span class="n-icon">📊</span>대시보드</a>
-                        <a class="nav-link" href="mold_layout.html"><span class="n-icon">🗄️</span>적치대 현황</a>
-                        <a class="nav-link" href="mold_admin.html"><span class="n-icon">📋</span>금형 상세관리</a>
-                        <a class="nav-link" href="mold_history.html"><span class="n-icon">🔧</span>이력 관리</a>
+            <!-- 생산관리 -->
+            <div class="cat-item" id="c-prod">
+                <button class="cat-btn" onclick="tC('c-prod')">
+                    <span class="c-icon">🏭</span>
+                    <span class="c-label">생산관리</span>
+                    <span class="c-badge on">운영</span>
+                    <span class="c-arrow">▼</span>
+                </button>
+                <div class="cat-body">
+                    <div class="sub-item" id="s-mold">
+                        <button class="sub-btn" onclick="tS('s-mold')">
+                            <span class="s-icon">🔧</span>
+                            <span class="s-label">금형관리</span>
+                            <span class="s-badge c-badge on">1차</span>
+                            <span class="s-arrow">▼</span>
+                        </button>
+                        <div class="sub-body">
+                            <a class="nav-link" href="mold_dashboard.html"><span class="n-icon">📊</span>대시보드</a>
+                            <a class="nav-link" href="mold_layout.html"><span class="n-icon">🗄️</span>적치대 현황</a>
+                            <a class="nav-link" href="mold_admin.html"><span class="n-icon">📋</span>금형 상세관리</a>
+                            <a class="nav-link" href="mold_history.html"><span class="n-icon">🔧</span>이력 관리</a>
+                        </div>
+                    </div>
+                    <div class="sub-item disabled">
+                        <button class="sub-btn">
+                            <span class="s-icon">📦</span>
+                            <span class="s-label">재고관리</span>
+                            <span class="s-badge c-badge off">2차</span>
+                        </button>
                     </div>
                 </div>
-                <div class="sub-item disabled">
-                    <button class="sub-btn">
-                        <span class="s-icon">📦</span>
-                        <span class="s-label">재고관리</span>
-                        <span class="s-badge c-badge off">2차</span>
-                    </button>
-                </div>
+            </div>
+
+            <!-- 품질/물류/R&D/경영 -->
+            <div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">✅</span><span class="c-label">품질관리</span><span class="c-badge off">향후</span></button></div>
+            <div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">🚚</span><span class="c-label">물류관리</span><span class="c-badge off">향후</span></button></div>
+            <div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">🔬</span><span class="c-label">R&D</span><span class="c-badge off">향후</span></button></div>
+            <div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">💼</span><span class="c-label">경영지원</span><span class="c-badge off">향후</span></button></div>
+        </div>
+
+        <div class="menu-divider"></div>
+
+        <div class="menu-group">
+            <div class="menu-group-title">현장관리</div>
+            <div class="cat-item">
+                <a class="cat-btn" href="https://pillippekim.github.io/project-moon/index.html" style="text-decoration:none;color:inherit;">
+                    <span class="c-icon">📝</span>
+                    <span class="c-label">작업일지 프로그램</span>
+                    <span class="c-badge on">바로가기</span>
+                </a>
             </div>
         </div>
 
-        <!-- 품질/물류/R&D/경영 -->
-        <div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">✅</span><span class="c-label">품질관리</span><span class="c-badge off">향후</span></button></div>
-        <div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">🚚</span><span class="c-label">물류관리</span><span class="c-badge off">향후</span></button></div>
-        <div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">🔬</span><span class="c-label">R&D</span><span class="c-badge off">향후</span></button></div>
-        <div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">💼</span><span class="c-label">경영지원</span><span class="c-badge off">향후</span></button></div>
-    </div>
+        <div class="menu-divider"></div>
 
-    <div class="menu-divider"></div>
-
-    <div class="menu-group">
-        <div class="menu-group-title">현장관리</div>
-
-        <!-- 작업일지 프로그램 바로가기 -->
-        <div class="cat-item">
-            <a class="cat-btn" href="https://pillippekim.github.io/project-moon/index.html" style="text-decoration:none;color:inherit;">
-                <span class="c-icon">📝</span>
-                <span class="c-label">작업일지 프로그램</span>
-                <span class="c-badge on">바로가기</span>
-            </a>
+        <div class="menu-group">
+            <div class="menu-group-title">시스템</div>
+            <div class="cat-item">
+                <a class="cat-btn" href="https://pillippekim.github.io/project-moon/admin.html" style="text-decoration:none;color:inherit;">
+                    <span class="c-icon">⚙️</span>
+                    <span class="c-label">관리자 페이지</span>
+                </a>
+            </div>
         </div>
 
     </div>
 
-    <div class="menu-divider"></div>
-
-    <div class="menu-group">
-        <div class="menu-group-title">시스템</div>
-        <div class="cat-item">
-            <a class="cat-btn" href="https://pillippekim.github.io/project-moon/admin.html" style="text-decoration:none;color:inherit;">
-                <span class="c-icon">⚙️</span>
-                <span class="c-label">관리자 페이지</span>
-            </a>
-        </div>
+    <!-- 메뉴 하단 -->
+    <div class="menu-bottom">
+        <a href="#">㈜한국하이테크</a>
     </div>
-
 </div>
 
-<!-- ═══ 우측 콘텐츠 ═══ -->
-<div class="right-content">
+<!-- ═══ 메인 영역 ═══ -->
+<div class="main">
+    <div class="right-content">
 
-    <!-- 즐겨찾기 -->
-    <div class="fav-section">
-        <div class="sec-label">⭐ 즐겨찾기</div>
-        <div class="fav-grid" id="favGrid"></div>
-    </div>
+        <!-- 상단 날짜 -->
+        <div class="content-top">
+            <div class="today-date" id="todayDate"></div>
+        </div>
 
-    <!-- 주요 현황 -->
-    <div class="alarm-section">
-        <div class="sec-label">🔔 주요 현황</div>
-        <div class="alarm-grid">
-            <!-- 금형 현황 -->
-            <div class="alarm-widget">
-                <div class="alarm-wh">
-                    <div class="alarm-wt">🔧 금형 현황</div>
-                    <a class="alarm-wmore" href="mold_dashboard.html">자세히 →</a>
+        <!-- 즐겨찾기 -->
+        <div class="fav-section">
+            <div class="sec-label">⭐ 즐겨찾기</div>
+            <div class="fav-grid" id="favGrid"></div>
+        </div>
+
+        <!-- 주요 현황 -->
+        <div class="alarm-section">
+            <div class="sec-label">🔔 주요 현황</div>
+            <div class="alarm-grid">
+                <!-- 금형 현황 -->
+                <div class="alarm-widget">
+                    <div class="alarm-wh">
+                        <div class="alarm-wt">🔧 금형 현황</div>
+                        <a class="alarm-wmore" href="mold_dashboard.html">자세히 →</a>
+                    </div>
+                    <div class="alarm-wb" id="moldAlarm"><div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">불러오는 중...</div></div>
                 </div>
-                <div class="alarm-wb" id="moldAlarm"><div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">불러오는 중...</div></div>
-            </div>
-            <!-- 오늘 작업일지 -->
-            <div class="alarm-widget">
-                <div class="alarm-wh">
-                    <div class="alarm-wt">📝 오늘 작업일지</div>
-                    <a class="alarm-wmore" href="https://pillippekim.github.io/project-moon/index.html">자세히 →</a>
+                <!-- 오늘 작업일지 -->
+                <div class="alarm-widget">
+                    <div class="alarm-wh">
+                        <div class="alarm-wt">📝 오늘 작업일지</div>
+                        <a class="alarm-wmore" href="https://pillippekim.github.io/project-moon/index.html">자세히 →</a>
+                    </div>
+                    <div class="alarm-wb" id="reportAlarm"><div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">불러오는 중...</div></div>
                 </div>
-                <div class="alarm-wb" id="reportAlarm"><div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">불러오는 중...</div></div>
             </div>
         </div>
-    </div>
 
-    <!-- 공지사항 -->
-    <div class="notice-section">
-        <div class="notice-w">
-            <div class="notice-wh"><div class="notice-wt">📢 공지사항</div></div>
-            <div class="notice-wb">
-                <div class="n-item"><div class="nd red"></div><div class="nt">금형관리 시스템 신규 오픈 — 입출고/수리의뢰 기능 추가</div><span class="nb">NEW</span><div class="ndate">05.20</div></div>
-                <div class="n-item"><div class="nd blue"></div><div class="nt">업무관리 포탈 v2.0 배포</div><div class="ndate">05.20</div></div>
-                <div class="n-item"><div class="nd blue"></div><div class="nt">조립 작업일지 LOT 기능 추가</div><div class="ndate">05.19</div></div>
-                <div class="n-item"><div class="nd gray"></div><div class="nt">Supabase 자동 백업 시스템 구축 (32개 테이블)</div><div class="ndate">05.18</div></div>
+        <!-- 공지사항 -->
+        <div class="notice-section">
+            <div class="notice-w">
+                <div class="notice-wh"><div class="notice-wt">📢 공지사항</div></div>
+                <div class="notice-wb">
+                    <div class="n-item"><div class="nd red"></div><div class="nt">금형관리 시스템 신규 오픈 — 입출고/수리의뢰 기능 추가</div><span class="nb">NEW</span><div class="ndate">05.20</div></div>
+                    <div class="n-item"><div class="nd blue"></div><div class="nt">업무관리 포탈 v2.0 배포</div><div class="ndate">05.20</div></div>
+                    <div class="n-item"><div class="nd blue"></div><div class="nt">조립 작업일지 LOT 기능 추가</div><div class="ndate">05.19</div></div>
+                    <div class="n-item"><div class="nd gray"></div><div class="nt">Supabase 자동 백업 시스템 구축 (32개 테이블)</div><div class="ndate">05.18</div></div>
+                </div>
             </div>
         </div>
-    </div>
 
-</div>
+    </div>
 </div>
 
 <script>
@@ -301,7 +336,7 @@ async function loadMoldAlarm(){
 }
 
 async function loadReportAlarm(){
-    var today=new Date().toISOString().split('T')[0];
+    var today=(function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
     var tables=[{n:'성형',t:'molding_reports'},{n:'검사',t:'inspection_reports'},{n:'조립',t:'assembly_reports'},{n:'절단',t:'cutting_reports'},{n:'CMB',t:'cmb_reports'},{n:'코팅',t:'coating_reports'},{n:'후경화',t:'postcure_reports'},{n:'사출',t:'shot_reports'},{n:'포장',t:'packaging_reports'}];
     var h='',tot=0;
     try{
