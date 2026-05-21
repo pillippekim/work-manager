@@ -169,6 +169,8 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
 .sc-alert .num { color:#dc2626; }
 
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth_guard.js"></script>
 </head>
 <body>
 
@@ -1065,6 +1067,9 @@ async function submitStockIn() {
 loadData();
 </script>
 <script src="sidebar.js"></script>
+<script>
+(async function(){ var user = await checkAuth(); if(!user) return; })();
+</script>
 </div><!-- main -->
 </body>
 </html>

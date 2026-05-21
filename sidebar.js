@@ -34,7 +34,25 @@ function initSidebar() {
             '</div>' +
             '<div class="top-header-right">' +
                 '<div class="top-header-date">' + dateStr + '</div>' +
+                '<div class="top-header-user" id="headerUser"></div>' +
             '</div>';
+
+        // 사용자 정보 표시
+        try {
+            var cached = sessionStorage.getItem('userInfo');
+            if (cached) {
+                var u = JSON.parse(cached);
+                var avatar = u.name ? u.name.charAt(0) : '?';
+                var role = u.user_type === 'super' ? '슈퍼관리자' : (u.department || u.process || '');
+                document.getElementById('headerUser').innerHTML =
+                    '<div class="top-header-avatar">' + avatar + '</div>' +
+                    '<div class="top-header-uinfo">' +
+                        '<div class="top-header-uname">' + (u.name || '-') + '</div>' +
+                        '<div class="top-header-urole">' + role + '</div>' +
+                    '</div>' +
+                    '<button class="top-header-logout" onclick="logout()">로그아웃</button>';
+            }
+        } catch(e) {}
     }
 
     /* ── 사이드바 ── */

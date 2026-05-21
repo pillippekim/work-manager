@@ -177,6 +177,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
     .top-header-title{font-size:11px;}
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth_guard.js"></script>
 </head>
 <body>
 
@@ -189,6 +191,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
     </div>
     <div class="top-header-right">
         <div class="top-header-date" id="todayDate"></div>
+        <div id="headerUserArea" style="display:flex;align-items:center;gap:10px;"></div>
         <!-- 향후 로그인 구현 시 아래 주석 해제 -->
         <!--
         <a class="top-header-portal-btn" href="index.html">🏠 업무관리 포탈</a>
@@ -310,6 +313,20 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 </div>
 
 <script>
+// 로그인 체크
+(async function(){
+    var user = await checkAuth();
+    if(!user) return;
+    // 헤더에 사용자 정보 표시
+    var avatar = user.name ? user.name.charAt(0) : '?';
+    var role = user.user_type === 'super' ? '슈퍼관리자' : (user.department || user.process || '');
+    var el = document.getElementById('headerUserArea');
+    if(el) el.innerHTML =
+        '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#243bb2,#1a2a85);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;">' + avatar + '</div>' +
+        '<div><div style="font-size:13px;font-weight:600;color:#334155;">' + (user.name||'-') + '</div><div style="font-size:10px;color:#94a3b8;">' + role + '</div></div>' +
+        '<button onclick="logout()" style="font-size:12px;color:#94a3b8;cursor:pointer;padding:6px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;font-family:inherit;transition:all 0.12s;">로그아웃</button>';
+})();
+
 var now=new Date(),days=['일','월','화','수','목','금','토'];
 document.getElementById('todayDate').textContent=now.getFullYear()+'년 '+(now.getMonth()+1)+'월 '+now.getDate()+'일 ('+days[now.getDay()]+')';
 function tC(id){document.getElementById(id).classList.toggle('open');}

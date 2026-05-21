@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로그인 - 업무관리 포탈</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@font-face{font-family:'ONE Mobile Title';src:url('ONE_MOBILE_TITLE.TTF') format('truetype');font-weight:normal;font-style:normal;}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: linear-gradient(135deg, #1e2a4a 0%, #243bb2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.login-card { background: white; border-radius: 20px; padding: 2.5rem 2rem; width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+.logo-area { text-align: center; margin-bottom: 2rem; }
+.logo-area img { max-width: 180px; height: auto; margin-bottom: 14px; }
+.logo-sub { font-family: 'ONE Mobile Title', 'Noto Sans KR', sans-serif; font-size: 16px; color: #1e293b; letter-spacing: 1px; }
+.form-group { margin-bottom: 1rem; }
+.form-label { font-size: 13px; color: #555; margin-bottom: 6px; display: block; font-weight: 500; }
+.form-input { width: 100%; font-size: 15px; border: 2px solid #e5e5e5; border-radius: 10px; padding: 12px 14px; outline: none; font-family: inherit; color: #111; transition: border-color 0.15s; }
+.form-input:focus { border-color: #243bb2; }
+.error-msg { background: #fff5f5; border: 1px solid #fca5a5; color: #e53e3e; font-size: 13px; padding: 10px 14px; border-radius: 8px; margin-bottom: 1rem; display: none; }
+.error-msg.show { display: block; }
+.login-btn { width: 100%; font-size: 15px; padding: 13px; border-radius: 10px; background: #243bb2; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; transition: opacity 0.15s; margin-top: 4px; }
+.login-btn:hover:not(:disabled) { opacity: 0.9; }
+.login-btn:disabled { background: #aaa; cursor: not-allowed; }
+.help-text { text-align: center; font-size: 12px; color: #aaa; margin-top: 1.5rem; line-height: 1.6; }
+.help-text strong { color: #666; }
+.spinner { display: none; width: 16px; height: 16px; border: 2px solid white; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 8px; }
+.spinner.active { display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="login-card">
+  <div class="logo-area">
+    <img src="hkht_logo.png" alt="㈜한국하이테크" />
+    <div class="logo-sub">업무관리 포탈</div>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="form-group">
+    <label class="form-label">입사코드</label>
+    <input class="form-input" type="text" id="empCode" placeholder="예: 16020101"
+      maxlength="8" autocomplete="username" />
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">비밀번호</label>
+    <input class="form-input" type="password" id="password" placeholder="비밀번호 입력"
+      autocomplete="current-password" onkeydown="if(event.key==='Enter') login()" />
+  </div>
+
+  <button class="login-btn" id="loginBtn" onclick="login()">
+    <span class="spinner" id="spinner"></span>
+    <span id="loginText">로그인</span>
+  </button>
+
+  <div class="help-text">
+    입사코드는 <strong>입사일(YYMMDD) + 일련번호(2자리)</strong> 형식이에요.<br>
+    비밀번호를 잊으셨다면 관리자에게 문의해주세요.
+  </div>
+</div>
+
+<script>
+var SB_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+var db = window.supabase.createClient(SB_URL, SB_KEY);
+
+// 이미 로그인된 상태면 메인으로
+async function checkSession() {
+  var result = await db.auth.getSession();
+  if (result.data.session) location.href = 'index.html';
+}
+checkSession();
+
+function showError(msg) {
+  var el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+function hideError() {
+  document.getElementById('errorMsg').classList.remove('show');
+}
+
+async function login() {
+  var empCode = document.getElementById('empCode').value.trim();
+  var password = document.getElementById('password').value;
+  hideError();
+
+  if (!empCode) { showError('입사코드를 입력해주세요.'); return; }
+  if (!password) { showError('비밀번호를 입력해주세요.'); return; }
+
+  var btn = document.getElementById('loginBtn');
+  var spinner = document.getElementById('spinner');
+  var loginText = document.getElementById('loginText');
+  btn.disabled = true;
+  spinner.classList.add('active');
+  loginText.textContent = '로그인 중...';
+
+  var email = empCode + '@hkht.local';
+  var result = await db.auth.signInWithPassword({ email: email, password: password });
+
+  if (result.error) {
+    spinner.classList.remove('active');
+    loginText.textContent = '로그인';
+    btn.disabled = false;
+    if (result.error.message.indexOf('Invalid login credentials') !== -1) {
+      showError('입사코드 또는 비밀번호가 올바르지 않아요.');
+    } else {
+      showError('로그인 실패: ' + result.error.message);
+    }
+    return;
+  }
+
+  // 사용자 정보 조회
+  var userResult = await db.from('users').select('*').eq('auth_user_id', result.data.user.id).single();
+  var userInfo = userResult.data;
+
+  if (!userInfo) {
+    showError('사용자 정보를 찾을 수 없어요. 관리자에게 문의해주세요.');
+    await db.auth.signOut();
+    spinner.classList.remove('active');
+    loginText.textContent = '로그인';
+    btn.disabled = false;
+    return;
+  }
+
+  if (!userInfo.active) {
+    showError('비활성화된 계정이에요. 관리자에게 문의해주세요.');
+    await db.auth.signOut();
+    spinner.classList.remove('active');
+    loginText.textContent = '로그인';
+    btn.disabled = false;
+    return;
+  }
+
+  // 사용자 정보 캐시
+  sessionStorage.setItem('userInfo', JSON.stringify(userInfo));
+
+  // 첫 로그인이면 비밀번호 변경 화면으로 (project-moon으로 이동)
+  if (!userInfo.password_changed) {
+    loginText.textContent = '✓ 로그인 성공';
+    setTimeout(function() { location.href = 'https://pillippekim.github.io/project-moon/change_password.html'; }, 400);
+    return;
+  }
+
+  loginText.textContent = '✓ 로그인 성공';
+  setTimeout(function() { location.href = 'index.html'; }, 400);
+}
+
+window.onload = function() { document.getElementById('empCode').focus(); };
+</script>
+</body>
+</html>

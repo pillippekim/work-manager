@@ -19,6 +19,13 @@
 .top-header-title{font-family:'ONE Mobile Title','Noto Sans KR',sans-serif;font-size:15px;color:#1e293b;letter-spacing:0.5px;}
 .top-header-right{display:flex;align-items:center;gap:16px;}
 .top-header-date{font-size:12px;color:#94a3b8;font-weight:500;}
+.top-header-user{display:flex;align-items:center;gap:10px;}
+.top-header-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#243bb2,#1a2a85);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;}
+.top-header-uinfo{}
+.top-header-uname{font-size:13px;font-weight:600;color:#334155;}
+.top-header-urole{font-size:10px;color:#94a3b8;}
+.top-header-logout{font-size:12px;color:#94a3b8;cursor:pointer;padding:6px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;font-family:inherit;transition:all 0.12s;}
+.top-header-logout:hover{background:#fef2f2;color:#ef4444;border-color:#fca5a5;}
 
 /* ═══ 좌측 사이드바 (헤더 아래) ═══ */
 .sidebar{

@@ -78,6 +78,8 @@ body { font-family:'Noto Sans KR','Pretendard',sans-serif; background:#f1f3f9; c
     .stat-grid { grid-template-columns:repeat(3,1fr); }
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth_guard.js"></script>
 </head>
 <body>
 
@@ -172,5 +174,8 @@ async function loadHistory(){
 loadData();
 </script>
 <script src="sidebar.js"></script>
+<script>
+(async function(){ var user = await checkAuth(); if(!user) return; })();
+</script>
 </body>
 </html>
