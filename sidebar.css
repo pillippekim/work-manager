@@ -13,7 +13,8 @@
     padding:0 24px;z-index:300;
 }
 .top-header-left{display:flex;align-items:center;gap:14px;}
-.top-header-logo{height:30px;width:auto;object-fit:contain;}
+.top-header-logo{height:30px;width:auto;object-fit:contain;cursor:pointer;transition:opacity 0.15s;}
+.top-header-logo:hover{opacity:0.8;}
 .top-header-divider{width:1px;height:24px;background:#d1d5db;}
 .top-header-title{font-family:'ONE Mobile Title','Noto Sans KR',sans-serif;font-size:15px;color:#1e293b;letter-spacing:0.5px;}
 .top-header-right{display:flex;align-items:center;gap:16px;}

@@ -20,7 +20,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
     padding:0 24px;z-index:300;
 }
 .top-header-left{display:flex;align-items:center;gap:14px;}
-.top-header-logo{height:30px;width:auto;object-fit:contain;}
+.top-header-logo{height:30px;width:auto;object-fit:contain;cursor:pointer;transition:opacity 0.15s;}
+.top-header-logo:hover{opacity:0.8;}
 .top-header-divider{width:1px;height:24px;background:#d1d5db;}
 .top-header-title{font-family:'ONE Mobile Title','Noto Sans KR',sans-serif;font-size:15px;color:#1e293b;letter-spacing:0.5px;}
 .top-header-right{display:flex;align-items:center;gap:16px;}
@@ -182,7 +183,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 <!-- ═══ 상단 헤더 바 (전체 가로) ═══ -->
 <div class="top-header">
     <div class="top-header-left">
-        <img class="top-header-logo" src="hkht_logo.png" alt="HKHT">
+        <a href="index.html" style="text-decoration:none;"><img class="top-header-logo" src="hkht_logo.png" alt="HKHT"></a>
         <div class="top-header-divider"></div>
         <div class="top-header-title">㈜한국하이테크</div>
     </div>
