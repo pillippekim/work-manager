@@ -223,7 +223,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
                         <div class="sub-body">
                             <a class="nav-link" href="mold_dashboard.html"><span class="n-icon">📊</span>대시보드</a>
                             <a class="nav-link" href="mold_layout.html"><span class="n-icon">🗄️</span>적치대 현황</a>
-                            <a class="nav-link" href="mold_admin.html"><span class="n-icon">📋</span>금형 상세관리</a>
+                            <a class="nav-link" href="mold_detail.html"><span class="n-icon">📋</span>금형 상세관리</a>
                             <a class="nav-link" href="mold_history.html"><span class="n-icon">🔧</span>이력 관리</a>
                         </div>
                     </div>
@@ -256,10 +256,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
                 <div class="cat-body">
                     <a class="nav-link" href="https://pillippekim.github.io/project-moon/users.html"><span class="n-icon">👥</span>사용자 관리</a>
                     <a class="nav-link" href="https://pillippekim.github.io/project-moon/audit.html"><span class="n-icon">📋</span>변경 이력</a>
-                    <a class="nav-link" href="https://pillippekim.github.io/project-moon/admin.html"><span class="n-icon">📊</span>데이터 조회</a>
-                    <a class="nav-link" href="https://pillippekim.github.io/project-moon/safety_admin.html"><span class="n-icon">🔍</span>설비 점검 조회</a>
-                    <a class="nav-link" href="https://pillippekim.github.io/project-moon/master.html"><span class="n-icon">🗂️</span>기준정보 관리</a>
-                    <a class="nav-link" href="https://pillippekim.github.io/project-moon/docs_admin.html"><span class="n-icon">📄</span>문서 관리</a>
+                    <a class="nav-link" href="https://pillippekim.github.io/project-moon/data_viewer.html"><span class="n-icon">📊</span>데이터 조회</a>
+                    <a class="nav-link" href="https://pillippekim.github.io/project-moon/safety_viewer.html"><span class="n-icon">🔍</span>설비 점검 조회</a>
+                    <a class="nav-link" href="https://pillippekim.github.io/project-moon/master_data.html"><span class="n-icon">🗂️</span>기준정보 관리</a>
+                    <a class="nav-link" href="https://pillippekim.github.io/project-moon/docs_manager.html"><span class="n-icon">📄</span>문서 관리</a>
                 </div>
             </div>
         </div>
@@ -318,7 +318,7 @@ function tS(id){document.getElementById(id).classList.toggle('open');}
 /* 즐겨찾기 */
 var ALL_MENU=[
     {icon:'📊',name:'대시보드',url:'mold_dashboard.html'},{icon:'🗄️',name:'적치대 현황',url:'mold_layout.html'},
-    {icon:'📋',name:'금형 상세관리',url:'mold_admin.html'},{icon:'🔧',name:'이력 관리',url:'mold_history.html'},
+    {icon:'📋',name:'금형 상세관리',url:'mold_detail.html'},{icon:'🔧',name:'이력 관리',url:'mold_history.html'},
     {icon:'🧪',name:'혼련(CMB) 작업일지',url:'https://pillippekim.github.io/project-moon/cmb.html'},
     {icon:'✂️',name:'재단 작업일지',url:'https://pillippekim.github.io/project-moon/cutting.html'},
     {icon:'🔫',name:'도포 작업일지',url:'https://pillippekim.github.io/project-moon/coating.html'},
@@ -328,17 +328,17 @@ var ALL_MENU=[
     {icon:'🔩',name:'조립 작업일지',url:'https://pillippekim.github.io/project-moon/assembly.html'},
     {icon:'🔍',name:'검사 작업일지',url:'https://pillippekim.github.io/project-moon/inspection.html'},
     {icon:'📦',name:'포장 작업일지',url:'https://pillippekim.github.io/project-moon/packaging.html'},
-    {icon:'📊',name:'데이터 조회',url:'https://pillippekim.github.io/project-moon/admin.html'},
-    {icon:'🔍',name:'설비 점검 조회',url:'https://pillippekim.github.io/project-moon/safety_admin.html'},
-    {icon:'📄',name:'문서 관리',url:'https://pillippekim.github.io/project-moon/docs_admin.html'},
+    {icon:'📊',name:'데이터 조회',url:'https://pillippekim.github.io/project-moon/data_viewer.html'},
+    {icon:'🔍',name:'설비 점검 조회',url:'https://pillippekim.github.io/project-moon/safety_viewer.html'},
+    {icon:'📄',name:'문서 관리',url:'https://pillippekim.github.io/project-moon/docs_manager.html'},
     {icon:'🔎',name:'문서 조회',url:'https://pillippekim.github.io/project-moon/docs_viewer.html'},
-    {icon:'🗂️',name:'기준정보 관리',url:'https://pillippekim.github.io/project-moon/master.html'},
+    {icon:'🗂️',name:'기준정보 관리',url:'https://pillippekim.github.io/project-moon/master_data.html'},
     {icon:'👥',name:'사용자 관리',url:'https://pillippekim.github.io/project-moon/users.html'},
     {icon:'📋',name:'변경 이력',url:'https://pillippekim.github.io/project-moon/audit.html'},
 ];
 var DEFAULT_FAVS=[
     {icon:'📊',name:'대시보드',url:'mold_dashboard.html'},{icon:'🗄️',name:'적치대 현황',url:'mold_layout.html'},
-    {icon:'📋',name:'금형 상세관리',url:'mold_admin.html'},{icon:'🏭',name:'성형 작업일지',url:'https://pillippekim.github.io/project-moon/molding.html'},
+    {icon:'📋',name:'금형 상세관리',url:'mold_detail.html'},{icon:'🏭',name:'성형 작업일지',url:'https://pillippekim.github.io/project-moon/molding.html'},
     {icon:'🔍',name:'검사 작업일지',url:'https://pillippekim.github.io/project-moon/inspection.html'},
     {icon:'🔩',name:'조립 작업일지',url:'https://pillippekim.github.io/project-moon/assembly.html'},
 ];

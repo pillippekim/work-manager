@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>금형 상세관리 - HKHT</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="sidebar.css">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif; background:#f1f3f9; color:#1e293b; }
+
+/* 헤더 */
+.header { background:#243bb2; color:#fff; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+.header h1 { font-size:18px; font-weight:700; }
+.header .sub { font-size:12px; opacity:0.8; }
+.header-right { display:flex; gap:8px; }
+.btn-head { background:none; border:1px solid rgba(255,255,255,0.4); color:#fff; padding:6px 14px; border-radius:6px; font-size:13px; cursor:pointer; }
+.btn-head:hover { background:rgba(255,255,255,0.15); }
+
+/* 요약 카드 */
+.summary-bar { display:flex; gap:8px; padding:12px 16px; overflow-x:auto; }
+.summary-card { flex-shrink:0; background:#fff; border-radius:10px; padding:10px 14px; min-width:80px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); transition:all 0.15s; }
+.summary-card:hover { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+.summary-card .num { font-size:20px; font-weight:700; }
+.summary-card .label { font-size:11px; color:#64748b; margin-top:2px; }
+
+/* 도구 모음 */
+.toolbar { display:flex; gap:8px; padding:8px 16px; flex-wrap:wrap; align-items:center; }
+.search-input { flex:1; min-width:200px; padding:9px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none; }
+.search-input:focus { border-color:#243bb2; box-shadow:0 0 0 3px rgba(36,59,178,0.15); }
+.filter-select { padding:9px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; outline:none; background:#fff; }
+.btn-primary { background:#243bb2; color:#fff; border:none; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.btn-primary:hover { background:#1e32a0; }
+.btn-success { background:#16a34a; color:#fff; border:none; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.btn-success:hover { background:#15803d; }
+
+/* 테이블 */
+.table-wrap { padding:0 16px 100px; overflow-x:auto; }
+table.data-table { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.08); font-size:13px; }
+table.data-table thead { background:#f8fafc; }
+table.data-table th { padding:10px 8px; text-align:left; font-weight:600; color:#475569; font-size:12px; border-bottom:2px solid #e2e8f0; white-space:nowrap; cursor:pointer; }
+table.data-table th:hover { background:#eef0ff; }
+table.data-table td { padding:9px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+table.data-table tr:hover { background:#f8fafc; }
+table.data-table tr.row-warning { background:#fef3c7; }
+table.data-table tr.row-danger { background:#fee2e2; }
+
+/* 상태 배지 */
+.badge { padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+.badge-stored { background:#dcfce7; color:#166534; }
+.badge-inuse { background:#fee2e2; color:#991b1b; }
+.badge-repair { background:#fef3c7; color:#92400e; }
+.badge-retired { background:#f1f5f9; color:#64748b; }
+
+/* 타발수 게이지 */
+.shot-gauge { display:flex; align-items:center; gap:6px; }
+.shot-bar { width:60px; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden; }
+.shot-bar-fill { height:100%; border-radius:4px; transition:width 0.5s; }
+.shot-pct { font-size:11px; font-weight:600; min-width:35px; }
+
+/* 행 액션 버튼 */
+.row-actions { display:flex; gap:4px; }
+.btn-row-edit { background:#d97706; color:#fff; border:none; padding:5px 10px; border-radius:5px; font-size:11px; cursor:pointer; }
+.btn-row-edit:hover { background:#b45309; }
+.btn-row-del { background:#dc2626; color:#fff; border:none; padding:5px 10px; border-radius:5px; font-size:11px; cursor:pointer; }
+.btn-row-del:hover { background:#b91c1c; }
+.btn-row-shot { background:#2563eb; color:#fff; border:none; padding:5px 10px; border-radius:5px; font-size:11px; cursor:pointer; }
+.btn-row-shot:hover { background:#1d4ed8; }
+
+/* 모달 */
+.modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; }
+.modal-overlay.show { display:flex; }
+.modal-content { background:#fff; border-radius:14px; padding:24px; max-width:520px; width:92%; max-height:85vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
+.modal-content h3 { font-size:18px; color:#243bb2; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; }
+.modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:#94a3b8; padding:4px; }
+.modal-close:hover { color:#1e293b; }
+
+/* 폼 */
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:4px; }
+.form-group input, .form-group select, .form-group textarea { width:100%; padding:9px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none; }
+.form-group input:focus, .form-group select:focus { border-color:#243bb2; box-shadow:0 0 0 3px rgba(36,59,178,0.15); }
+.form-row { display:flex; gap:12px; }
+.form-row .form-group { flex:1; }
+.btn-modal-submit { width:100%; padding:12px; background:#243bb2; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; margin-top:8px; }
+.btn-modal-submit:hover { background:#1e32a0; }
+.btn-modal-danger { background:#dc2626; }
+.btn-modal-danger:hover { background:#b91c1c; }
+
+/* 페이지네이션 */
+.pagination { display:flex; justify-content:center; align-items:center; gap:8px; padding:16px; }
+.page-btn { padding:6px 12px; border:1px solid #d1d5db; border-radius:6px; background:#fff; font-size:13px; cursor:pointer; }
+.page-btn.active { background:#243bb2; color:#fff; border-color:#243bb2; }
+.page-btn:disabled { opacity:0.4; cursor:default; }
+.page-info { font-size:13px; color:#64748b; }
+
+/* 로딩 */
+.loading { text-align:center; padding:60px 20px; color:#64748b; }
+.spinner { display:inline-block; width:32px; height:32px; border:3px solid #e2e8f0; border-top-color:#243bb2; border-radius:50%; animation:spin 0.8s linear infinite; margin-bottom:12px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* 알림 토스트 */
+.toast { position:fixed; top:70px; right:16px; padding:12px 20px; border-radius:8px; color:#fff; font-size:14px; font-weight:600; z-index:300; opacity:0; transform:translateY(-10px); transition:all 0.3s; }
+.toast.show { opacity:1; transform:translateY(0); }
+.toast-success { background:#16a34a; }
+.toast-error { background:#dc2626; }
+
+@media(max-width:640px) {
+    .form-row { flex-direction:column; gap:0; }
+    table.data-table { font-size:11px; }
+    table.data-table th, table.data-table td { padding:7px 4px; }
+}
+
+</style>
+</head>
+<body>
+
+<div id="top-header" class="top-header"></div>
+<nav id="sidebar-nav" class="sidebar"></nav>
+
+<div class="main">
+
+<div class="header">
+    <div>
+        <h1>금형 상세관리</h1>
+        <div class="sub">Mold Master Management</div>
+    </div>
+</div>
+
+<!-- 요약 -->
+<div class="summary-bar" id="summaryBar">
+    <div class="summary-card" style="cursor:pointer;" onclick="filterByCard('')"><div class="num" id="cntTotal" style="color:#243bb2;">-</div><div class="label">전체</div></div>
+    <div class="summary-card" style="cursor:pointer;" onclick="filterByCard('stored')"><div class="num" id="cntStored" style="color:#16a34a;">-</div><div class="label">보관중</div></div>
+    <div class="summary-card" style="cursor:pointer;" onclick="filterByCard('in_use')"><div class="num" id="cntInuse" style="color:#dc2626;">-</div><div class="label">사용중</div></div>
+    <div class="summary-card" style="cursor:pointer;" onclick="filterByCard('repairing')"><div class="num" id="cntRepair" style="color:#f59e0b;">-</div><div class="label">수리중</div></div>
+    <div class="summary-card" style="cursor:pointer;" onclick="filterByCard('retired')"><div class="num" id="cntRetired" style="color:#9ca3af;">-</div><div class="label">사용X</div></div>
+    <div class="summary-card" style="cursor:pointer;" onclick="filterByCard('alert')"><div class="num" id="cntAlert" style="color:#dc2626;">-</div><div class="label">⚠ 유지보수</div></div>
+</div>
+
+<!-- 도구 모음 -->
+<div class="toolbar">
+    <input type="text" class="search-input" id="searchInput" placeholder="사번, 금형번호, 금형주소 검색...">
+    <select class="filter-select" id="filterStatus">
+        <option value="">전체 상태</option>
+        <option value="stored">보관중</option>
+        <option value="in_use">사용중</option>
+        <option value="repairing">수리중</option>
+        <option value="retired">사용X</option>
+        <option value="alert">⚠ 유지보수 필요</option>
+    </select>
+    <select class="filter-select" id="filterBuilding">
+        <option value="">전체 동</option>
+    </select>
+    <button class="btn-primary" onclick="openAddModal()">+ 금형 등록</button>
+    <button class="btn-primary" onclick="openUploadModal()" style="background:#7c3aed;">📤 타발수 일괄등록</button>
+    <button class="btn-success" onclick="downloadExcel()">📥 엑셀</button>
+</div>
+
+<!-- 테이블 -->
+<div class="table-wrap">
+    <table class="data-table" id="moldTable">
+        <thead>
+            <tr>
+                <th onclick="sortBy('mold_code')">금형코드 ⇅</th>
+                <th onclick="sortBy('product_code')">사번 ⇅</th>
+                <th onclick="sortBy('address')">금형주소 ⇅</th>
+                <th onclick="sortBy('status')">상태</th>
+                <th>타발수</th>
+                <th onclick="sortBy('note')">비고</th>
+                <th>관리</th>
+            </tr>
+        </thead>
+        <tbody id="moldTableBody">
+            <tr><td colspan="7"><div class="loading"><div class="spinner"></div><br>데이터 불러오는 중...</div></td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- 페이지네이션 -->
+<div class="pagination" id="pagination"></div>
+
+<!-- 등록/수정 모달 -->
+<div class="modal-overlay" id="formModal">
+    <div class="modal-content">
+        <h3>
+            <span id="formModalTitle">금형 등록</span>
+            <button class="modal-close" onclick="closeFormModal()">✕</button>
+        </h3>
+        <div id="formModalBody">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>금형품명코드 *</label>
+                    <input type="text" id="fMoldCode" placeholder="예: M502264A">
+                </div>
+                <div class="form-group">
+                    <label>사번 (제품코드) *</label>
+                    <input type="text" id="fProductCode" placeholder="예: 502264">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>금형차수</label>
+                    <input type="text" id="fMoldSuffix" placeholder="A, B, C..." maxlength="2">
+                </div>
+                <div class="form-group">
+                    <label>상태 *</label>
+                    <select id="fStatus">
+                        <option value="stored">보관중</option>
+                        <option value="in_use">사용중</option>
+                        <option value="repairing">수리중</option>
+                        <option value="retired">사용X</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>금형주소 (적치대 위치)</label>
+                <select id="fSlotAddress">
+                    <option value="">-- 위치 선택 --</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>누적 타발수</label>
+                    <input type="number" id="fTotalShots" value="0" min="0">
+                </div>
+                <div class="form-group">
+                    <label>유지보수 기준 타발수</label>
+                    <input type="number" id="fMaintenanceThreshold" placeholder="예: 50000" min="0">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>캐비티 수</label>
+                    <input type="number" id="fCavity" min="0">
+                </div>
+                <div class="form-group">
+                    <label>중량 (kg)</label>
+                    <input type="number" id="fWeight" step="0.1" min="0">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>제작사</label>
+                    <input type="text" id="fMaker" placeholder="금형 제작 업체">
+                </div>
+                <div class="form-group">
+                    <label>제작일</label>
+                    <input type="date" id="fMadeDate">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>금형 재질</label>
+                    <input type="text" id="fMaterial" placeholder="예: SKD11, NAK80">
+                </div>
+                <div class="form-group">
+                    <label>공용금형 (상대 사번)</label>
+                    <input type="text" id="fSharedWith" placeholder="공용 시 상대 사번">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>스페어 여부</label>
+                    <select id="fIsSpare">
+                        <option value="false">아니오</option>
+                        <option value="true">예 (스페어)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>활성 여부</label>
+                    <select id="fIsActive">
+                        <option value="true">사용중 (활성)</option>
+                        <option value="false">사용X (비활성)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>비고</label>
+                <textarea id="fNote" rows="2" placeholder="RH, LH, 구형, 신형 등"></textarea>
+            </div>
+            <input type="hidden" id="fEditId" value="">
+            <button class="btn-modal-submit" id="btnFormSubmit" onclick="submitForm()">등록</button>
+        </div>
+    </div>
+</div>
+
+<!-- 삭제 확인 모달 -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal-content" style="max-width:380px;">
+        <h3>
+            <span>금형 삭제</span>
+            <button class="modal-close" onclick="closeDeleteModal()">✕</button>
+        </h3>
+        <p style="margin-bottom:16px;color:#64748b;" id="deleteMsg">이 금형을 삭제하시겠습니까?</p>
+        <button class="btn-modal-submit btn-modal-danger" onclick="confirmDelete()">삭제</button>
+    </div>
+</div>
+
+<!-- 타발수 입력 모달 -->
+<div class="modal-overlay" id="shotModal">
+    <div class="modal-content" style="max-width:380px;">
+        <h3>
+            <span>타발수 입력</span>
+            <button class="modal-close" onclick="closeShotModal()">✕</button>
+        </h3>
+        <div id="shotInfo" style="margin-bottom:12px;font-size:14px;color:#475569;"></div>
+        <div class="form-group">
+            <label>이번 작업 타발수</label>
+            <input type="number" id="shotInput" min="1" placeholder="이번 작업의 타발수 입력">
+        </div>
+        <div class="form-group">
+            <label>작업일</label>
+            <input type="date" id="shotDate">
+        </div>
+        <button class="btn-modal-submit" onclick="submitShot()">타발수 기록</button>
+    </div>
+</div>
+
+<!-- 타발수 일괄 업로드 모달 -->
+<div class="modal-overlay" id="uploadModal">
+    <div class="modal-content" style="max-width:560px;">
+        <h3>
+            <span>📤 타발수 일괄 등록</span>
+            <button class="modal-close" onclick="closeUploadModal()">✕</button>
+        </h3>
+        <div style="background:#f0f4ff;padding:14px;border-radius:8px;margin-bottom:16px;font-size:13px;color:#475569;line-height:1.6;">
+            <strong>사용 방법:</strong><br>
+            1. 아래 <strong>양식 다운로드</strong> 버튼으로 엑셀 양식을 받으세요<br>
+            2. 엑셀에 사번, 누적타발수, 기준타발수를 입력하세요<br>
+            3. 완성된 엑셀을 아래에서 업로드하면 일괄 반영됩니다
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+            <button class="btn-primary" onclick="downloadTemplate()" style="background:#0ea5e9;">📥 양식 다운로드</button>
+            <button class="btn-primary" onclick="downloadCurrentShots()" style="background:#16a34a;">📥 현재 타발수 내보내기</button>
+        </div>
+        <div class="form-group">
+            <label>엑셀 파일 업로드 (.xlsx)</label>
+            <input type="file" id="uploadFile" accept=".xlsx,.xls" style="padding:8px;">
+        </div>
+        <div id="uploadPreview" style="display:none;margin-bottom:12px;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">미리보기 (상위 10건)</div>
+            <div style="overflow-x:auto;" id="uploadPreviewTable"></div>
+            <div style="margin-top:8px;font-size:13px;color:#475569;" id="uploadSummary"></div>
+        </div>
+        <button class="btn-submit" id="btnUploadSubmit" onclick="submitUpload()" style="display:none;">일괄 반영</button>
+    </div>
+</div>
+
+<!-- 토스트 -->
+<div class="toast" id="toast"></div>
+
+<script>
+// =============================================
+// Supabase 설정
+// =============================================
+var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+
+var allMolds = [];
+var allSlots = [];
+var buildings = [];
+var displayMolds = [];
+var currentPage = 1;
+var pageSize = 30;
+var sortField = 'mold_code';
+var sortDir = 'asc';
+var deleteTargetId = null;
+var shotTargetMold = null;
+
+// =============================================
+// API 헬퍼
+// =============================================
+function supaHeaders() {
+    return {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+    };
+}
+
+async function supaFetch(table, query) {
+    var url = SUPABASE_URL + '/rest/v1/' + table;
+    if (query) url += '?' + query;
+    var res = await fetch(url, { headers: supaHeaders() });
+    return await res.json();
+}
+
+async function supaInsert(table, data) {
+    var url = SUPABASE_URL + '/rest/v1/' + table;
+    var res = await fetch(url, {
+        method: 'POST',
+        headers: supaHeaders(),
+        body: JSON.stringify(data)
+    });
+    return await res.json();
+}
+
+async function supaUpdate(table, id, data) {
+    var url = SUPABASE_URL + '/rest/v1/' + table + '?id=eq.' + id;
+    var res = await fetch(url, {
+        method: 'PATCH',
+        headers: supaHeaders(),
+        body: JSON.stringify(data)
+    });
+    return await res.json();
+}
+
+async function supaDelete(table, id) {
+    var url = SUPABASE_URL + '/rest/v1/' + table + '?id=eq.' + id;
+    var res = await fetch(url, {
+        method: 'DELETE',
+        headers: supaHeaders()
+    });
+    return res.ok;
+}
+
+// =============================================
+// 데이터 로드
+// =============================================
+async function loadData() {
+    try {
+        buildings = await supaFetch('mold_buildings', 'order=sort_order.asc');
+        allSlots = await supaFetch('mold_slots', 'order=address.asc&limit=1000');
+        allMolds = await supaFetch('molds', 'select=*,mold_slots(address,building_id,floor_num,row_num)&order=mold_code.asc');
+
+        // 동 필터 옵션 생성
+        var sel = document.getElementById('filterBuilding');
+        for (var i = 0; i < buildings.length; i++) {
+            var opt = document.createElement('option');
+            opt.value = buildings[i].id;
+            opt.textContent = buildings[i].building_name;
+            sel.appendChild(opt);
+        }
+
+        // 슬롯 주소 옵션 생성 (등록/수정용)
+        buildSlotOptions();
+
+        updateSummary();
+        applyFilters();
+    } catch(e) {
+        document.getElementById('moldTableBody').innerHTML =
+            '<tr><td colspan="7" style="color:#dc2626;text-align:center;padding:40px;">데이터 로드 실패: ' + e.message + '</td></tr>';
+    }
+}
+
+function buildSlotOptions() {
+    var sel = document.getElementById('fSlotAddress');
+    // 기존 옵션 제거 (첫 번째 기본 옵션 유지)
+    while (sel.options.length > 1) sel.remove(1);
+
+    // 동별로 그룹화
+    for (var b = 0; b < buildings.length; b++) {
+        var bld = buildings[b];
+        var group = document.createElement('optgroup');
+        group.label = bld.building_name;
+        var bSlots = allSlots.filter(function(s) { return s.building_id === bld.id; });
+        for (var s = 0; s < bSlots.length; s++) {
+            var opt = document.createElement('option');
+            opt.value = bSlots[s].id;
+            opt.textContent = bSlots[s].address;
+            group.appendChild(opt);
+        }
+        sel.appendChild(group);
+    }
+}
+
+// =============================================
+// 요약 카드
+// =============================================
+function updateSummary() {
+    var total = allMolds.length;
+    var stored = 0, inuse = 0, repair = 0, retired = 0, alert = 0;
+    for (var i = 0; i < allMolds.length; i++) {
+        var m = allMolds[i];
+        if (!m.is_active) { retired++; continue; }
+        if (m.status === 'stored') stored++;
+        else if (m.status === 'in_use') inuse++;
+        else if (m.status === 'repairing') repair++;
+        // 유지보수 알람 카운트
+        if (m.maintenance_threshold && m.total_shots >= m.maintenance_threshold * 0.8) alert++;
+    }
+    document.getElementById('cntTotal').textContent = total;
+    document.getElementById('cntStored').textContent = stored;
+    document.getElementById('cntInuse').textContent = inuse;
+    document.getElementById('cntRepair').textContent = repair;
+    document.getElementById('cntRetired').textContent = retired;
+    document.getElementById('cntAlert').textContent = alert;
+}
+
+// =============================================
+// 필터 + 검색
+// =============================================
+document.getElementById('searchInput').addEventListener('input', function() { currentPage = 1; applyFilters(); });
+document.getElementById('filterStatus').addEventListener('change', function() { currentPage = 1; applyFilters(); });
+document.getElementById('filterBuilding').addEventListener('change', function() { currentPage = 1; applyFilters(); });
+
+function filterByCard(status) {
+    document.getElementById('filterStatus').value = status;
+    currentPage = 1;
+    applyFilters();
+}
+
+function applyFilters() {
+    var keyword = document.getElementById('searchInput').value.trim().toUpperCase();
+    var statusFilter = document.getElementById('filterStatus').value;
+    var buildingFilter = document.getElementById('filterBuilding').value;
+
+    displayMolds = allMolds.filter(function(m) {
+        // 키워드 검색
+        if (keyword) {
+            var pc = (m.product_code || '').toUpperCase();
+            var mc = (m.mold_code || '').toUpperCase();
+            var addr = (m.mold_slots ? m.mold_slots.address : '').toUpperCase();
+            var note = (m.note || '').toUpperCase();
+            if (pc.indexOf(keyword) === -1 && mc.indexOf(keyword) === -1 &&
+                addr.indexOf(keyword) === -1 && note.indexOf(keyword) === -1) {
+                return false;
+            }
+        }
+        // 상태 필터
+        if (statusFilter) {
+            if (statusFilter === 'alert') {
+                // 유지보수 필요: 타발수 80% 이상
+                if (!m.is_active || !m.maintenance_threshold || m.maintenance_threshold <= 0) return false;
+                var pct = (m.total_shots || 0) / m.maintenance_threshold * 100;
+                if (pct < 80) return false;
+            } else if (statusFilter === 'retired' && m.is_active) return false;
+            else if (statusFilter !== 'retired' && statusFilter !== 'alert' && (!m.is_active || m.status !== statusFilter)) return false;
+        }
+        // 동 필터
+        if (buildingFilter) {
+            if (!m.mold_slots || m.mold_slots.building_id !== parseInt(buildingFilter)) return false;
+        }
+        return true;
+    });
+
+    // 정렬
+    displayMolds.sort(function(a, b) {
+        var va, vb;
+        if (sortField === 'address') {
+            va = a.mold_slots ? a.mold_slots.address : '';
+            vb = b.mold_slots ? b.mold_slots.address : '';
+        } else {
+            va = a[sortField] || '';
+            vb = b[sortField] || '';
+        }
+        if (typeof va === 'string') va = va.toUpperCase();
+        if (typeof vb === 'string') vb = vb.toUpperCase();
+        if (va < vb) return sortDir === 'asc' ? -1 : 1;
+        if (va > vb) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    renderTable();
+    renderPagination();
+}
+
+function sortBy(field) {
+    if (sortField === field) {
+        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortField = field;
+        sortDir = 'asc';
+    }
+    applyFilters();
+}
+
+// =============================================
+// 테이블 렌더링
+// =============================================
+function renderTable() {
+    var start = (currentPage - 1) * pageSize;
+    var end = Math.min(start + pageSize, displayMolds.length);
+    var pageData = displayMolds.slice(start, end);
+
+    var html = '';
+    for (var i = 0; i < pageData.length; i++) {
+        var m = pageData[i];
+        var addr = m.mold_slots ? m.mold_slots.address : '-';
+
+        // 상태 배지
+        var statusText = '보관중';
+        var badgeClass = 'badge-stored';
+        if (!m.is_active) { statusText = '사용X'; badgeClass = 'badge-retired'; }
+        else if (m.status === 'in_use') { statusText = '사용중'; badgeClass = 'badge-inuse'; }
+        else if (m.status === 'repairing') { statusText = '수리중'; badgeClass = 'badge-repair'; }
+
+        // 타발수 게이지
+        var shotHtml = '-';
+        if (m.total_shots !== null && m.total_shots !== undefined) {
+            var shots = m.total_shots;
+            var threshold = m.maintenance_threshold || 0;
+            if (threshold > 0) {
+                var pct = Math.round((shots / threshold) * 100);
+                var barColor = pct >= 100 ? '#dc2626' : pct >= 80 ? '#f59e0b' : '#22c55e';
+                shotHtml = '<div class="shot-gauge">'
+                    + '<span>' + shots.toLocaleString() + '</span>'
+                    + '<div class="shot-bar"><div class="shot-bar-fill" style="width:' + Math.min(pct, 100) + '%;background:' + barColor + ';"></div></div>'
+                    + '<span class="shot-pct" style="color:' + barColor + ';">' + pct + '%</span>'
+                    + '</div>';
+            } else {
+                shotHtml = shots.toLocaleString();
+            }
+        }
+
+        // 행 강조 (유지보수 경고)
+        var rowClass = '';
+        if (m.is_active && m.maintenance_threshold && m.total_shots >= m.maintenance_threshold) {
+            rowClass = ' class="row-danger"';
+        } else if (m.is_active && m.maintenance_threshold && m.total_shots >= m.maintenance_threshold * 0.8) {
+            rowClass = ' class="row-warning"';
+        }
+
+        // 비고 (스페어/공용 표시 포함)
+        var noteText = m.note || '';
+        if (m.is_spare) noteText = '[S] ' + noteText;
+        if (m.shared_with) noteText = '[공용:' + m.shared_with + '] ' + noteText;
+
+        html += '<tr' + rowClass + '>'
+            + '<td><strong>' + (m.mold_code || '-') + '</strong></td>'
+            + '<td>' + (m.product_code || '-') + '</td>'
+            + '<td>' + addr + '</td>'
+            + '<td><span class="badge ' + badgeClass + '">' + statusText + '</span></td>'
+            + '<td>' + shotHtml + '</td>'
+            + '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + noteText + '">' + noteText + '</td>'
+            + '<td><div class="row-actions">'
+            + '<button class="btn-row-shot" onclick="openShotModal(\'' + m.id + '\')" title="타발수 입력">🔨</button>'
+            + '<button class="btn-row-edit" onclick="openEditModal(\'' + m.id + '\')" title="수정">✏️</button>'
+            + '<button class="btn-row-del" onclick="openDeleteModal(\'' + m.id + '\')" title="삭제">🗑️</button>'
+            + '</div></td>'
+            + '</tr>';
+    }
+
+    if (pageData.length === 0) {
+        html = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">검색 결과가 없습니다</td></tr>';
+    }
+
+    document.getElementById('moldTableBody').innerHTML = html;
+}
+
+// =============================================
+// 페이지네이션
+// =============================================
+function renderPagination() {
+    var totalPages = Math.ceil(displayMolds.length / pageSize);
+    if (totalPages <= 1) {
+        document.getElementById('pagination').innerHTML =
+            '<span class="page-info">' + displayMolds.length + '건</span>';
+        return;
+    }
+
+    var html = '<button class="page-btn" onclick="goPage(' + (currentPage - 1) + ')"' + (currentPage === 1 ? ' disabled' : '') + '>◀</button>';
+
+    var startP = Math.max(1, currentPage - 2);
+    var endP = Math.min(totalPages, currentPage + 2);
+    for (var p = startP; p <= endP; p++) {
+        html += '<button class="page-btn' + (p === currentPage ? ' active' : '') + '" onclick="goPage(' + p + ')">' + p + '</button>';
+    }
+
+    html += '<button class="page-btn" onclick="goPage(' + (currentPage + 1) + ')"' + (currentPage === totalPages ? ' disabled' : '') + '>▶</button>';
+    html += '<span class="page-info">' + displayMolds.length + '건</span>';
+
+    document.getElementById('pagination').innerHTML = html;
+}
+
+function goPage(p) {
+    var totalPages = Math.ceil(displayMolds.length / pageSize);
+    if (p < 1 || p > totalPages) return;
+    currentPage = p;
+    renderTable();
+    renderPagination();
+    window.scrollTo(0, 0);
+}
+
+// =============================================
+// 등록 모달
+// =============================================
+function openAddModal() {
+    document.getElementById('formModalTitle').textContent = '금형 등록';
+    document.getElementById('btnFormSubmit').textContent = '등록';
+    document.getElementById('fEditId').value = '';
+    document.getElementById('fMoldCode').value = '';
+    document.getElementById('fProductCode').value = '';
+    document.getElementById('fMoldSuffix').value = '';
+    document.getElementById('fStatus').value = 'stored';
+    document.getElementById('fSlotAddress').value = '';
+    document.getElementById('fTotalShots').value = '0';
+    document.getElementById('fMaintenanceThreshold').value = '';
+    document.getElementById('fCavity').value = '';
+    document.getElementById('fWeight').value = '';
+    document.getElementById('fMaker').value = '';
+    document.getElementById('fMadeDate').value = '';
+    document.getElementById('fMaterial').value = '';
+    document.getElementById('fSharedWith').value = '';
+    document.getElementById('fIsSpare').value = 'false';
+    document.getElementById('fIsActive').value = 'true';
+    document.getElementById('fNote').value = '';
+    document.getElementById('formModal').classList.add('show');
+}
+
+// =============================================
+// 수정 모달
+// =============================================
+function openEditModal(id) {
+    var m = allMolds.find(function(x) { return x.id === id; });
+    if (!m) return;
+
+    document.getElementById('formModalTitle').textContent = '금형 수정 — ' + m.mold_code;
+    document.getElementById('btnFormSubmit').textContent = '수정 저장';
+    document.getElementById('fEditId').value = m.id;
+    document.getElementById('fMoldCode').value = m.mold_code || '';
+    document.getElementById('fProductCode').value = m.product_code || '';
+    document.getElementById('fMoldSuffix').value = m.mold_suffix || '';
+    document.getElementById('fStatus').value = m.is_active ? m.status : 'retired';
+    document.getElementById('fSlotAddress').value = m.slot_id || '';
+    document.getElementById('fTotalShots').value = m.total_shots || 0;
+    document.getElementById('fMaintenanceThreshold').value = m.maintenance_threshold || '';
+    document.getElementById('fCavity').value = m.cavity_count || '';
+    document.getElementById('fWeight').value = m.weight_kg || '';
+    document.getElementById('fMaker').value = m.maker || '';
+    document.getElementById('fMadeDate').value = m.made_date || '';
+    document.getElementById('fMaterial').value = m.material || '';
+    document.getElementById('fSharedWith').value = m.shared_with || '';
+    document.getElementById('fIsSpare').value = m.is_spare ? 'true' : 'false';
+    document.getElementById('fIsActive').value = m.is_active ? 'true' : 'false';
+    document.getElementById('fNote').value = m.note || '';
+    document.getElementById('formModal').classList.add('show');
+}
+
+function closeFormModal() {
+    document.getElementById('formModal').classList.remove('show');
+}
+
+// =============================================
+// 등록/수정 제출
+// =============================================
+async function submitForm() {
+    var moldCode = document.getElementById('fMoldCode').value.trim();
+    var productCode = document.getElementById('fProductCode').value.trim();
+    if (!moldCode || !productCode) {
+        showToast('금형코드와 사번은 필수입니다', 'error');
+        return;
+    }
+
+    var statusVal = document.getElementById('fStatus').value;
+    var isActive = document.getElementById('fIsActive').value === 'true';
+    if (statusVal === 'retired') {
+        isActive = false;
+        statusVal = 'stored';
+    }
+
+    var slotId = document.getElementById('fSlotAddress').value;
+
+    var data = {
+        mold_code: moldCode,
+        product_code: productCode,
+        mold_suffix: document.getElementById('fMoldSuffix').value.trim(),
+        status: statusVal,
+        slot_id: slotId ? parseInt(slotId) : null,
+        total_shots: parseInt(document.getElementById('fTotalShots').value) || 0,
+        maintenance_threshold: parseInt(document.getElementById('fMaintenanceThreshold').value) || null,
+        cavity_count: parseInt(document.getElementById('fCavity').value) || null,
+        weight_kg: parseFloat(document.getElementById('fWeight').value) || null,
+        maker: document.getElementById('fMaker').value.trim() || null,
+        made_date: document.getElementById('fMadeDate').value || null,
+        material: document.getElementById('fMaterial').value.trim() || null,
+        shared_with: document.getElementById('fSharedWith').value.trim() || null,
+        is_spare: document.getElementById('fIsSpare').value === 'true',
+        is_active: isActive,
+        note: document.getElementById('fNote').value.trim()
+    };
+
+    var editId = document.getElementById('fEditId').value;
+
+    try {
+        if (editId) {
+            await supaUpdate('molds', editId, data);
+            showToast('금형 수정 완료: ' + moldCode, 'success');
+        } else {
+            await supaInsert('molds', data);
+            showToast('금형 등록 완료: ' + moldCode, 'success');
+        }
+        closeFormModal();
+        await loadData();
+    } catch(e) {
+        showToast('저장 실패: ' + e.message, 'error');
+    }
+}
+
+// =============================================
+// 삭제
+// =============================================
+function openDeleteModal(id) {
+    var m = allMolds.find(function(x) { return x.id === id; });
+    if (!m) return;
+    deleteTargetId = id;
+    document.getElementById('deleteMsg').textContent =
+        '금형 "' + m.mold_code + '" (' + m.product_code + ')을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.';
+    document.getElementById('deleteModal').classList.add('show');
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('show');
+    deleteTargetId = null;
+}
+
+async function confirmDelete() {
+    if (!deleteTargetId) return;
+    try {
+        await supaDelete('molds', deleteTargetId);
+        showToast('금형 삭제 완료', 'success');
+        closeDeleteModal();
+        await loadData();
+    } catch(e) {
+        showToast('삭제 실패: ' + e.message, 'error');
+    }
+}
+
+// =============================================
+// 타발수 입력
+// =============================================
+function openShotModal(id) {
+    var m = allMolds.find(function(x) { return x.id === id; });
+    if (!m) return;
+    shotTargetMold = m;
+
+    var threshold = m.maintenance_threshold ? m.maintenance_threshold.toLocaleString() : '미설정';
+    document.getElementById('shotInfo').innerHTML =
+        '<strong>' + m.mold_code + '</strong> (' + m.product_code + ')<br>'
+        + '현재 누적: <strong>' + (m.total_shots || 0).toLocaleString() + '</strong> / 기준: ' + threshold;
+
+    document.getElementById('shotInput').value = '';
+    document.getElementById('shotDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('shotModal').classList.add('show');
+}
+
+function closeShotModal() {
+    document.getElementById('shotModal').classList.remove('show');
+    shotTargetMold = null;
+}
+
+async function submitShot() {
+    if (!shotTargetMold) return;
+    var shots = parseInt(document.getElementById('shotInput').value);
+    if (!shots || shots <= 0) {
+        showToast('타발수를 입력하세요', 'error');
+        return;
+    }
+
+    var newTotal = (shotTargetMold.total_shots || 0) + shots;
+    var workDate = document.getElementById('shotDate').value;
+
+    try {
+        // 타발수 로그 기록
+        await supaInsert('mold_shot_logs', {
+            mold_id: shotTargetMold.id,
+            shots: shots,
+            cumulative_shots: newTotal,
+            work_date: workDate
+        });
+
+        // 금형 마스터 누적 타발수 업데이트
+        await supaUpdate('molds', shotTargetMold.id, {
+            total_shots: newTotal
+        });
+
+        showToast('타발수 기록 완료: +' + shots.toLocaleString() + ' (누적 ' + newTotal.toLocaleString() + ')', 'success');
+        closeShotModal();
+        await loadData();
+    } catch(e) {
+        showToast('타발수 기록 실패: ' + e.message, 'error');
+    }
+}
+
+// =============================================
+// 엑셀 다운로드
+// =============================================
+function downloadExcel() {
+    var data = displayMolds.map(function(m) {
+        var statusText = '보관중';
+        if (!m.is_active) statusText = '사용X';
+        else if (m.status === 'in_use') statusText = '사용중';
+        else if (m.status === 'repairing') statusText = '수리중';
+
+        return {
+            '금형코드': m.mold_code || '',
+            '사번': m.product_code || '',
+            '금형차수': m.mold_suffix || '',
+            '금형주소': m.mold_slots ? m.mold_slots.address : '',
+            '상태': statusText,
+            '누적타발수': m.total_shots || 0,
+            '유지보수기준': m.maintenance_threshold || '',
+            '캐비티': m.cavity_count || '',
+            '중량(kg)': m.weight_kg || '',
+            '제작사': m.maker || '',
+            '제작일': m.made_date || '',
+            '재질': m.material || '',
+            '스페어': m.is_spare ? 'Y' : '',
+            '공용': m.shared_with || '',
+            '비고': m.note || ''
+        };
+    });
+
+    var ws = XLSX.utils.json_to_sheet(data);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '금형목록');
+
+    var today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    XLSX.writeFile(wb, '금형관리_' + today + '.xlsx');
+    showToast('엑셀 다운로드 완료', 'success');
+}
+
+// =============================================
+// 토스트 알림
+// =============================================
+function showToast(msg, type) {
+    var el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast toast-' + type + ' show';
+    setTimeout(function() { el.classList.remove('show'); }, 3000);
+}
+
+// =============================================
+// 모달 바깥 클릭 닫기
+// =============================================
+document.getElementById('formModal').addEventListener('click', function(e) { if (e.target === this) closeFormModal(); });
+document.getElementById('deleteModal').addEventListener('click', function(e) { if (e.target === this) closeDeleteModal(); });
+document.getElementById('shotModal').addEventListener('click', function(e) { if (e.target === this) closeShotModal(); });
+document.getElementById('uploadModal').addEventListener('click', function(e) { if (e.target === this) closeUploadModal(); });
+
+// =============================================
+// 타발수 일괄 업로드
+// =============================================
+var uploadRows = [];
+
+function openUploadModal() {
+    document.getElementById('uploadFile').value = '';
+    document.getElementById('uploadPreview').style.display = 'none';
+    document.getElementById('btnUploadSubmit').style.display = 'none';
+    uploadRows = [];
+    document.getElementById('uploadModal').classList.add('show');
+}
+
+function closeUploadModal() {
+    document.getElementById('uploadModal').classList.remove('show');
+}
+
+// 양식 다운로드
+function downloadTemplate() {
+    var data = [
+        {'사번': '502264', '누적타발수': 15000, '기준타발수': 50000},
+        {'사번': '502270', '누적타발수': 48000, '기준타발수': 50000},
+        {'사번': '', '누적타발수': '', '기준타발수': ''}
+    ];
+    var ws = XLSX.utils.json_to_sheet(data);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '타발수입력');
+    XLSX.writeFile(wb, '타발수_일괄등록_양식.xlsx');
+    showToast('양식 다운로드 완료 — 사번/누적타발수/기준타발수를 입력하세요', 'success');
+}
+
+// 현재 타발수 내보내기
+function downloadCurrentShots() {
+    var data = allMolds.filter(function(m) { return m.is_active; }).map(function(m) {
+        return {
+            '사번': m.product_code || '',
+            '금형코드': m.mold_code || '',
+            '누적타발수': m.total_shots || 0,
+            '기준타발수': m.maintenance_threshold || ''
+        };
+    });
+    var ws = XLSX.utils.json_to_sheet(data);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '현재타발수');
+    XLSX.writeFile(wb, '현재_타발수_현황.xlsx');
+    showToast('현재 타발수 내보내기 완료', 'success');
+}
+
+// 파일 선택 시 미리보기
+document.getElementById('uploadFile').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+        try {
+            var wb = XLSX.read(ev.target.result, {type:'binary'});
+            var ws = wb.Sheets[wb.SheetNames[0]];
+            var json = XLSX.utils.sheet_to_json(ws);
+
+            uploadRows = [];
+            for (var i = 0; i < json.length; i++) {
+                var row = json[i];
+                var sabun = String(row['사번'] || '').trim();
+                if (!sabun) continue;
+                var shots = parseInt(row['누적타발수']) || 0;
+                var threshold = parseInt(row['기준타발수']) || null;
+                // 해당 사번의 금형 찾기
+                var mold = allMolds.find(function(m) { return m.product_code === sabun; });
+                uploadRows.push({
+                    sabun: sabun,
+                    shots: shots,
+                    threshold: threshold,
+                    moldId: mold ? mold.id : null,
+                    moldCode: mold ? mold.mold_code : '(미발견)',
+                    currentShots: mold ? (mold.total_shots || 0) : 0
+                });
+            }
+
+            // 미리보기 테이블
+            var html = '<table class="dt" style="font-size:12px;"><thead><tr><th>사번</th><th>금형코드</th><th>현재타발</th><th>→ 변경</th><th>기준타발</th><th>상태</th></tr></thead><tbody>';
+            var matched = 0, notFound = 0;
+            for (var i = 0; i < Math.min(uploadRows.length, 10); i++) {
+                var r = uploadRows[i];
+                var status = r.moldId ? '✅ 매칭' : '❌ 미발견';
+                if (r.moldId) matched++; else notFound++;
+                html += '<tr>'
+                    + '<td>' + r.sabun + '</td>'
+                    + '<td>' + r.moldCode + '</td>'
+                    + '<td>' + r.currentShots.toLocaleString() + '</td>'
+                    + '<td style="color:#243bb2;font-weight:700;">' + r.shots.toLocaleString() + '</td>'
+                    + '<td>' + (r.threshold ? r.threshold.toLocaleString() : '-') + '</td>'
+                    + '<td>' + status + '</td>'
+                    + '</tr>';
+            }
+            // 나머지 카운트
+            for (var i = 10; i < uploadRows.length; i++) {
+                if (uploadRows[i].moldId) matched++; else notFound++;
+            }
+            html += '</tbody></table>';
+
+            document.getElementById('uploadPreviewTable').innerHTML = html;
+            document.getElementById('uploadSummary').innerHTML =
+                '총 <strong>' + uploadRows.length + '</strong>건 | '
+                + '매칭 <strong style="color:#16a34a;">' + matched + '</strong>건 | '
+                + '미발견 <strong style="color:#dc2626;">' + notFound + '</strong>건';
+            document.getElementById('uploadPreview').style.display = 'block';
+            document.getElementById('btnUploadSubmit').style.display = 'block';
+        } catch(err) {
+            showToast('엑셀 파일 읽기 실패: ' + err.message, 'error');
+        }
+    };
+    reader.readAsBinaryString(file);
+});
+
+// 일괄 반영
+async function submitUpload() {
+    var matched = uploadRows.filter(function(r) { return r.moldId; });
+    if (matched.length === 0) {
+        showToast('매칭된 금형이 없습니다', 'error');
+        return;
+    }
+    if (!confirm(matched.length + '건의 금형 타발수를 일괄 반영하시겠습니까?')) return;
+
+    var success = 0, fail = 0;
+    for (var i = 0; i < matched.length; i++) {
+        var r = matched[i];
+        try {
+            var updateData = { total_shots: r.shots };
+            if (r.threshold) updateData.maintenance_threshold = r.threshold;
+            await supaUpdate('molds', r.moldId, updateData);
+            success++;
+        } catch(e) {
+            fail++;
+        }
+    }
+
+    showToast('일괄 반영 완료: 성공 ' + success + '건' + (fail > 0 ? ', 실패 ' + fail + '건' : ''), success > 0 ? 'success' : 'error');
+    closeUploadModal();
+    await loadData();
+}
+
+// =============================================
+// 초기화
+// =============================================
+loadData();
+</script>
+<script src="sidebar.js"></script>
+</div><!-- main -->
+</body>
+</html>

@@ -7,12 +7,12 @@ function initSidebar() {
     var hash = location.hash;
 
     // 금형관리 페이지 여부
-    var isMoldPage = ['mold_dashboard.html','mold_layout.html','mold_admin.html','mold_history.html'].indexOf(page) !== -1;
+    var isMoldPage = ['mold_dashboard.html','mold_layout.html','mold_detail.html','mold_history.html'].indexOf(page) !== -1;
 
     // 금형관리 하위 페이지 active
     var dashActive = (page === 'mold_dashboard.html') ? ' nav-active' : '';
     var layoutActive = (page === 'mold_layout.html') ? ' nav-active' : '';
-    var adminActive = (page === 'mold_admin.html') ? ' nav-active' : '';
+    var adminActive = (page === 'mold_detail.html') ? ' nav-active' : '';
     var historyActive = (page === 'mold_history.html') ? ' nav-active' : '';
 
     // 금형관리 페이지면 생산관리 > 금형관리 자동 펼침
@@ -63,7 +63,7 @@ function initSidebar() {
                         '<div class="sub-body">' +
                             '<a class="nav-link' + dashActive + '" href="mold_dashboard.html"><span class="n-icon">📊</span>대시보드</a>' +
                             '<a class="nav-link' + layoutActive + '" href="mold_layout.html"><span class="n-icon">🗄️</span>적치대 현황</a>' +
-                            '<a class="nav-link' + adminActive + '" href="mold_admin.html"><span class="n-icon">📋</span>금형 상세관리</a>' +
+                            '<a class="nav-link' + adminActive + '" href="mold_detail.html"><span class="n-icon">📋</span>금형 상세관리</a>' +
                             '<a class="nav-link' + historyActive + '" href="mold_history.html"><span class="n-icon">🔧</span>이력 관리</a>' +
                         '</div>' +
                     '</div>' +
@@ -104,10 +104,10 @@ function initSidebar() {
                 '<div class="cat-body">' +
                     '<a class="nav-link" href="https://pillippekim.github.io/project-moon/users.html"><span class="n-icon">👥</span>사용자 관리</a>' +
                     '<a class="nav-link" href="https://pillippekim.github.io/project-moon/audit.html"><span class="n-icon">📋</span>변경 이력</a>' +
-                    '<a class="nav-link" href="https://pillippekim.github.io/project-moon/admin.html"><span class="n-icon">📊</span>데이터 조회</a>' +
-                    '<a class="nav-link" href="https://pillippekim.github.io/project-moon/safety_admin.html"><span class="n-icon">🔍</span>설비 점검 조회</a>' +
-                    '<a class="nav-link" href="https://pillippekim.github.io/project-moon/master.html"><span class="n-icon">🗂️</span>기준정보 관리</a>' +
-                    '<a class="nav-link" href="https://pillippekim.github.io/project-moon/docs_admin.html"><span class="n-icon">📄</span>문서 관리</a>' +
+                    '<a class="nav-link" href="https://pillippekim.github.io/project-moon/data_viewer.html"><span class="n-icon">📊</span>데이터 조회</a>' +
+                    '<a class="nav-link" href="https://pillippekim.github.io/project-moon/safety_viewer.html"><span class="n-icon">🔍</span>설비 점검 조회</a>' +
+                    '<a class="nav-link" href="https://pillippekim.github.io/project-moon/master_data.html"><span class="n-icon">🗂️</span>기준정보 관리</a>' +
+                    '<a class="nav-link" href="https://pillippekim.github.io/project-moon/docs_manager.html"><span class="n-icon">📄</span>문서 관리</a>' +
                 '</div>' +
             '</div>' +
         '</div>' +
