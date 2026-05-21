@@ -524,11 +524,25 @@ function makeAddress(buildingName, floor, row) {
 // =============================================
 // 금형 상세 팝업
 // =============================================
-function showMoldDetail(address) {
+async function showMoldDetail(address) {
     var cellMolds = molds.filter(function(m) {
         return m.mold_slots && m.mold_slots.address === address;
     });
     if (cellMolds.length === 0) return;
+
+    // 각 금형의 최근 상태 변경일 일괄 조회
+    var moldIds = cellMolds.map(function(m) { return m.id; });
+    var statusDates = {};
+    try {
+        for (var si = 0; si < moldIds.length; si++) {
+            var logRes = await fetch(SB + '/rest/v1/mold_status_logs?mold_id=eq.' + moldIds[si] + '&order=changed_at.desc&limit=1', { headers: H });
+            var logData = await logRes.json();
+            if (Array.isArray(logData) && logData.length > 0) {
+                var dt = new Date(logData[0].changed_at);
+                statusDates[moldIds[si]] = (dt.getMonth()+1) + '/' + dt.getDate() + ' ' + String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
+            }
+        }
+    } catch(e) {}
 
     var html = '';
     for (var i = 0; i < cellMolds.length; i++) {
@@ -551,6 +565,12 @@ function showMoldDetail(address) {
         html += '<div class="modal-row"><span class="label">금형품명코드</span><span class="value">' + (m.mold_code || '-') + '</span></div>';
         html += '<div class="modal-row"><span class="label">금형차수</span><span class="value">' + (m.mold_suffix || '-') + '</span></div>';
         html += '<div class="modal-row"><span class="label">상태</span><span class="value"><span class="status-badge ' + badgeClass + '">' + statusText + '</span></span></div>';
+
+        // 상태 변경 시작일 표시
+        if (statusDates[m.id]) {
+            html += '<div class="modal-row"><span class="label" style="font-size:12px;color:#94a3b8;">상태 변경일</span><span class="value" style="font-size:12px;color:#94a3b8;">' + statusDates[m.id] + ' 부터</span></div>';
+        }
+
         html += '<div class="modal-row"><span class="label">누적 타발수</span><span class="value">' + (m.total_shots || 0).toLocaleString() + '</span></div>';
 
         if (m.maintenance_threshold) {
