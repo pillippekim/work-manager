@@ -86,7 +86,7 @@ function initSidebar() {
         '<div class="menu-group">' +
             '<div class="menu-group-title">현장관리</div>' +
             '<div class="cat-item">' +
-                '<a class="cat-btn" href="https://pillippekim.github.io/project-moon/index.html" style="text-decoration:none;color:inherit;">' +
+                '<a class="cat-btn" href="https://pillippekim.github.io/project-moon/index.html" target="_blank" style="text-decoration:none;color:inherit;">' +
                     '<span class="c-icon">📝</span><span class="c-label">작업일지 프로그램</span><span class="c-badge on">바로가기</span>' +
                 '</a>' +
             '</div>' +
