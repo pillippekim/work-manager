@@ -56,6 +56,33 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
 .sticky-top { position:sticky; top:50px; z-index:90; background:#f1f3f9; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
 
 /* 그리드 컨테이너 */
+.split-layout { display:flex; gap:0; }
+.split-left { flex:1; min-width:0; overflow-x:auto; }
+.split-right { width:420px; flex-shrink:0; border-left:1px solid #e2e8f0; background:#fff; display:flex; flex-direction:column; height:calc(100vh - 56px - 50px); position:sticky; top:106px; }
+.split-right.collapsed { width:40px; min-width:40px; }
+.split-right.collapsed .detail-panel-body { display:none; }
+.split-right.collapsed .detail-panel-header { writing-mode:vertical-rl; text-orientation:mixed; padding:16px 8px; }
+.detail-panel-header { padding:12px 16px; border-bottom:1px solid #e8ecf3; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.detail-panel-title { font-size:14px; font-weight:700; color:#1e293b; display:flex; align-items:center; gap:8px; }
+.detail-panel-toggle { background:none; border:none; cursor:pointer; font-size:16px; color:#94a3b8; padding:4px; }
+.detail-panel-toggle:hover { color:#1e293b; }
+.detail-panel-body { flex:1; overflow-y:auto; }
+.detail-panel-toolbar { padding:8px 12px; border-bottom:1px solid #f1f5f9; display:flex; gap:6px; align-items:center; flex-shrink:0; }
+.detail-panel-toolbar input { flex:1; padding:6px 10px; border:1.5px solid #e2e8f0; border-radius:6px; font-size:12px; outline:none; font-family:inherit; }
+.detail-panel-toolbar input:focus { border-color:#243bb2; }
+.detail-panel-toolbar select { padding:5px 8px; border:1.5px solid #e2e8f0; border-radius:6px; font-size:11px; font-family:inherit; outline:none; background:#fff; }
+.detail-table { width:100%; border-collapse:collapse; font-size:12px; }
+.detail-table th { padding:8px 10px; background:#f8f9fc; color:#64748b; font-weight:600; font-size:11px; text-align:left; border-bottom:1px solid #e8ecf3; position:sticky; top:0; z-index:1; white-space:nowrap; }
+.detail-table td { padding:7px 10px; border-bottom:1px solid #f1f5f9; color:#334155; vertical-align:middle; }
+.detail-table tr:hover { background:#f8fafc; }
+.detail-table .badge { padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600; }
+.detail-table .badge-stored { background:#dcfce7; color:#166534; }
+.detail-table .badge-inuse { background:#fee2e2; color:#991b1b; }
+.detail-table .badge-repair { background:#fef3c7; color:#92400e; }
+.detail-table .badge-retired { background:#f1f5f9; color:#64748b; }
+.detail-table .td-code { font-weight:600; color:#243bb2; cursor:pointer; }
+.detail-table .td-code:hover { text-decoration:underline; }
+.detail-empty { text-align:center; padding:40px 16px; color:#94a3b8; font-size:13px; }
 .grid-container { padding:8px 16px 80px; overflow-x:auto; }
 .grid-table { border-collapse:separate; border-spacing:4px; }
 .grid-table th { font-size:13px; font-weight:600; color:#64748b; padding:6px 8px; text-align:center; min-width:70px; }
@@ -159,6 +186,8 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
     .summary-card { min-width:75px; padding:8px 10px; }
     .summary-card .num { font-size:18px; }
     .grid-table th { font-size:11px; min-width:50px; }
+    .split-layout { flex-direction:column; }
+    .split-right { width:100%; height:auto; position:relative; top:0; border-left:none; border-top:1px solid #e2e8f0; max-height:50vh; }
 }
 
 /* 유지보수 알람 배너 */
@@ -260,10 +289,50 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
 </div>
 <!-- 고정 영역 끝 -->
 
-<!-- 그리드 -->
+<!-- 2분할 레이아웃: 좌측 적치대 + 우측 상세관리 -->
+<div class="split-layout">
+
+<!-- 좌측: 적치대 그리드 -->
+<div class="split-left">
 <div class="grid-container" id="gridContainer">
     <div class="loading"><div class="spinner"></div><br>데이터 불러오는 중...</div>
 </div>
+</div>
+
+<!-- 우측: 금형 상세관리 패널 -->
+<div class="split-right" id="detailPanel">
+    <div class="detail-panel-header">
+        <div class="detail-panel-title">📋 금형 상세관리</div>
+        <button class="detail-panel-toggle" onclick="toggleDetailPanel()" title="접기/펼치기">◀</button>
+    </div>
+    <div class="detail-panel-toolbar">
+        <input type="text" id="detailSearch" placeholder="사번/금형번호 검색..." oninput="filterDetailTable()">
+        <select id="detailStatusFilter" onchange="filterDetailTable()">
+            <option value="">전체</option>
+            <option value="stored">보관중</option>
+            <option value="in_use">사용중</option>
+            <option value="repairing">수리중</option>
+        </select>
+    </div>
+    <div class="detail-panel-body">
+        <table class="detail-table">
+            <thead>
+                <tr>
+                    <th>금형코드</th>
+                    <th>사번</th>
+                    <th>위치</th>
+                    <th>상태</th>
+                    <th>타발수</th>
+                </tr>
+            </thead>
+            <tbody id="detailTableBody">
+                <tr><td colspan="5" class="detail-empty">불러오는 중...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</div><!-- split-layout 끝 -->
 
 <!-- 금형 상세 팝업 -->
 <div class="modal-overlay" id="moldModal">
@@ -449,6 +518,7 @@ function selectBuilding(buildingId) {
     currentBuildingId = buildingId;
     renderBuildingSelector();
     renderGrid();
+    renderDetailTable();
 }
 
 // =============================================
@@ -741,6 +811,113 @@ async function saveNoteFromPopup(moldId, idx) {
 
 function closeMoldModal() {
     document.getElementById('moldModal').classList.remove('show');
+}
+
+// =============================================
+// 우측 상세관리 패널
+// =============================================
+function renderDetailTable() {
+    var tbody = document.getElementById('detailTableBody');
+    if (!tbody || !molds) return;
+
+    var search = (document.getElementById('detailSearch').value || '').trim().toLowerCase();
+    var statusFilter = document.getElementById('detailStatusFilter').value;
+
+    var filtered = molds.filter(function(m) {
+        if (!m.is_active) return false;
+        if (statusFilter && m.status !== statusFilter) return false;
+        if (search) {
+            var code = (m.mold_code || '').toLowerCase();
+            var pcode = (m.product_code || '').toLowerCase();
+            var addr = (m.mold_slots && m.mold_slots.address) ? m.mold_slots.address.toLowerCase() : '';
+            if (code.indexOf(search) === -1 && pcode.indexOf(search) === -1 && addr.indexOf(search) === -1) return false;
+        }
+        return true;
+    });
+
+    // 정렬: 금형코드 순
+    filtered.sort(function(a, b) { return (a.mold_code || '').localeCompare(b.mold_code || ''); });
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="detail-empty">검색 결과가 없습니다</td></tr>';
+        return;
+    }
+
+    var html = '';
+    for (var i = 0; i < filtered.length; i++) {
+        var m = filtered[i];
+        var addr = (m.mold_slots && m.mold_slots.address) ? m.mold_slots.address : '-';
+        var statusText = '보관중';
+        var badgeClass = 'badge-stored';
+        if (m.status === 'in_use') { statusText = '사용중'; badgeClass = 'badge-inuse'; }
+        else if (m.status === 'repairing') { statusText = '수리중'; badgeClass = 'badge-repair'; }
+
+        html += '<tr>'
+            + '<td class="td-code" onclick="scrollToMoldInGrid(\'' + addr + '\')">' + (m.mold_code || '-') + '</td>'
+            + '<td>' + (m.product_code || '-') + '</td>'
+            + '<td>' + addr + '</td>'
+            + '<td><span class="badge ' + badgeClass + '">' + statusText + '</span></td>'
+            + '<td>' + (m.total_shots || 0).toLocaleString() + '</td>'
+            + '</tr>';
+    }
+    tbody.innerHTML = html;
+}
+
+function filterDetailTable() {
+    renderDetailTable();
+}
+
+function toggleDetailPanel() {
+    var panel = document.getElementById('detailPanel');
+    var btn = panel.querySelector('.detail-panel-toggle');
+    panel.classList.toggle('collapsed');
+    btn.textContent = panel.classList.contains('collapsed') ? '▶' : '◀';
+}
+
+// 상세 테이블에서 금형코드 클릭 → 적치대 격자에서 해당 위치 찾기
+function scrollToMoldInGrid(address) {
+    if (!address || address === '-') return;
+    // 해당 동/구역으로 이동
+    var parts = address.match(/(\d+)동(\d+)호/);
+    if (!parts) return;
+    var building = parseInt(parts[1]);
+    var ho = parseInt(parts[2]);
+
+    // 현재 구역 확인하고 해당 동으로 전환
+    var currentZone = null;
+    for (var z = 0; z < zones.length; z++) {
+        var zBuildings = zones[z].buildings || [];
+        for (var b = 0; b < zBuildings.length; b++) {
+            if (zBuildings[b].number === building) {
+                currentZone = z;
+                break;
+            }
+        }
+        if (currentZone !== null) break;
+    }
+
+    if (currentZone !== null && currentZone !== currentZoneIdx) {
+        selectZone(currentZone);
+    }
+
+    if (currentBuilding !== building) {
+        selectBuilding(building);
+    }
+
+    // 잠시 후 해당 셀 하이라이트
+    setTimeout(function() {
+        var cells = document.querySelectorAll('.slot-cell');
+        for (var c = 0; c < cells.length; c++) {
+            var cellAddr = cells[c].getAttribute('data-address');
+            if (cellAddr && cellAddr.indexOf(building + '동' + ho + '호') !== -1) {
+                cells[c].style.outline = '3px solid #243bb2';
+                cells[c].style.outlineOffset = '2px';
+                cells[c].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(function(el) { el.style.outline = ''; el.style.outlineOffset = ''; }, 3000, cells[c]);
+                break;
+            }
+        }
+    }, 300);
 }
 
 // 모달 바깥 클릭 시 닫기
