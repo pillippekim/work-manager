@@ -83,6 +83,29 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
 .btn-repair { background:#f59e0b; color:#fff; }
 .btn-return { background:#22c55e; color:#fff; }
 .btn-stockin { background:#243bb2; color:#fff; }
+
+/* 팝업 내 추가 기능 버튼 */
+.btn-shot-input { background:#7c3aed; color:#fff; }
+.btn-edit-mold { background:#6366f1; color:#fff; }
+.modal-section-title { font-size:12px; font-weight:700; color:#94a3b8; margin:16px 0 8px; padding-top:12px; border-top:1px solid #e8ecf3; text-transform:uppercase; letter-spacing:0.5px; }
+.history-list { max-height:150px; overflow-y:auto; }
+.history-item { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #f8f9fc; font-size:12px; }
+.history-item:last-child { border-bottom:none; }
+.history-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.history-text { flex:1; color:#334155; }
+.history-date { color:#94a3b8; font-size:11px; flex-shrink:0; }
+/* 타발수 인라인 입력 */
+.shot-inline { display:flex; gap:6px; align-items:center; margin-top:8px; }
+.shot-inline input { width:100px; padding:6px 10px; border:2px solid #e2e8f0; border-radius:6px; font-size:13px; font-family:inherit; outline:none; }
+.shot-inline input:focus { border-color:#243bb2; }
+.shot-inline button { padding:6px 12px; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
+.shot-inline .btn-shot-save { background:#7c3aed; color:#fff; }
+.shot-inline .btn-shot-cancel { background:#f1f5f9; color:#64748b; }
+/* 비고 인라인 수정 */
+.note-inline { display:flex; gap:6px; align-items:center; margin-top:8px; }
+.note-inline input { flex:1; padding:6px 10px; border:2px solid #e2e8f0; border-radius:6px; font-size:13px; font-family:inherit; outline:none; }
+.note-inline input:focus { border-color:#243bb2; }
+.note-inline button { padding:6px 12px; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
 .btn-cancel { background:#f1f5f9; color:#64748b; }
 
 /* 입고 폼 */
@@ -591,23 +614,129 @@ async function showMoldDetail(address) {
         html += '<div class="action-btns">';
         if (m.is_active) {
             if (m.status === 'stored') {
-                // 보관중 → 출고(사용중) 또는 수리의뢰
                 html += '<button class="btn-action btn-stockout" onclick="doStockOut(\'' + m.id + '\')">📤 출고 (사용)</button>';
                 html += '<button class="btn-action btn-repair" onclick="doRepairRequest(\'' + m.id + '\')">🔧 수리의뢰</button>';
             } else if (m.status === 'in_use') {
-                // 사용중 → 반납(보관중) 또는 수리의뢰
                 html += '<button class="btn-action btn-return" onclick="doReturn(\'' + m.id + '\')">📥 반납 (보관)</button>';
                 html += '<button class="btn-action btn-repair" onclick="doRepairRequest(\'' + m.id + '\')">🔧 수리의뢰</button>';
             } else if (m.status === 'repairing') {
-                // 수리중 → 수리완료(보관중)
                 html += '<button class="btn-action btn-return" onclick="doRepairComplete(\'' + m.id + '\')">✅ 수리완료</button>';
             }
         }
         html += '</div>';
+
+        // ── 타발수 입력 ──
+        html += '<div class="modal-section-title">🔨 타발수 입력</div>';
+        html += '<div class="shot-inline" id="shotArea_' + i + '">';
+        html += '<input type="number" id="shotInput_' + i + '" placeholder="추가 타발수" min="0">';
+        html += '<button class="btn-shot-save" onclick="saveShotFromPopup(\'' + m.id + '\',' + i + ')">저장</button>';
+        html += '</div>';
+
+        // ── 비고 수정 ──
+        html += '<div class="modal-section-title">✏️ 비고 수정</div>';
+        html += '<div class="note-inline">';
+        html += '<input type="text" id="noteInput_' + i + '" value="' + (m.note || '').replace(/"/g, '&quot;') + '" placeholder="비고 입력">';
+        html += '<button class="btn-shot-save" onclick="saveNoteFromPopup(\'' + m.id + '\',' + i + ')">저장</button>';
+        html += '</div>';
+
+        // ── 최근 상태변경 이력 ──
+        html += '<div class="modal-section-title">📋 최근 상태 변경 이력</div>';
+        html += '<div class="history-list" id="historyList_' + i + '"><div style="text-align:center;padding:8px;color:#94a3b8;font-size:12px;">불러오는 중...</div></div>';
+
+        // 이력 비동기 로드 예약
+        (function(moldId, idx) {
+            setTimeout(function() { loadStatusHistory(moldId, idx); }, 100);
+        })(m.id, i);
     }
 
     document.getElementById('moldModalContent').innerHTML = html;
     document.getElementById('moldModal').classList.add('show');
+}
+
+// 상태 변경 이력 로드
+async function loadStatusHistory(moldId, idx) {
+    var el = document.getElementById('historyList_' + idx);
+    if (!el) return;
+    try {
+        var res = await fetch(SB + '/rest/v1/mold_status_logs?mold_id=eq.' + moldId + '&order=changed_at.desc&limit=5', { headers: H });
+        var logs = await res.json();
+        if (!Array.isArray(logs) || logs.length === 0) {
+            el.innerHTML = '<div style="text-align:center;padding:8px;color:#94a3b8;font-size:12px;">이력이 없습니다</div>';
+            return;
+        }
+        var h = '';
+        var statusMap = { stored: '보관중', in_use: '사용중', repairing: '수리중' };
+        var colorMap = { stored: '#22c55e', in_use: '#ef4444', repairing: '#f59e0b' };
+        for (var j = 0; j < logs.length; j++) {
+            var log = logs[j];
+            var fromText = statusMap[log.from_status] || log.from_status || '?';
+            var toText = statusMap[log.to_status] || log.to_status || '?';
+            var toColor = colorMap[log.to_status] || '#94a3b8';
+            var dt = new Date(log.changed_at);
+            var dateStr = (dt.getMonth()+1) + '/' + dt.getDate() + ' ' + String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
+            var reason = log.reason ? ' (' + log.reason + ')' : '';
+            h += '<div class="history-item">';
+            h += '<div class="history-dot" style="background:' + toColor + '"></div>';
+            h += '<div class="history-text">' + fromText + ' → ' + toText + reason + '</div>';
+            h += '<div class="history-date">' + dateStr + '</div>';
+            h += '</div>';
+        }
+        el.innerHTML = h;
+    } catch(e) {
+        el.innerHTML = '<div style="text-align:center;padding:8px;color:#94a3b8;font-size:12px;">이력을 불러올 수 없습니다</div>';
+    }
+}
+
+// 팝업에서 타발수 저장
+async function saveShotFromPopup(moldId, idx) {
+    var input = document.getElementById('shotInput_' + idx);
+    var addShots = parseInt(input.value);
+    if (isNaN(addShots) || addShots <= 0) { alert('추가 타발수를 입력해주세요.'); return; }
+
+    // 현재 금형의 total_shots 가져오기
+    var mold = molds.find(function(m) { return m.id === moldId; });
+    if (!mold) return;
+    var newTotal = (mold.total_shots || 0) + addShots;
+
+    try {
+        var res = await fetch(SB + '/rest/v1/molds?id=eq.' + moldId, {
+            method: 'PATCH',
+            headers: Object.assign({}, H, { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+            body: JSON.stringify({ total_shots: newTotal })
+        });
+        if (res.ok) {
+            alert('타발수 저장 완료! (' + (mold.total_shots||0).toLocaleString() + ' → ' + newTotal.toLocaleString() + ')');
+            input.value = '';
+            mold.total_shots = newTotal;
+            // 팝업 갱신
+            var addr = mold.mold_slots ? mold.mold_slots.address : '';
+            closeMoldModal();
+            if (addr) showMoldDetail(addr);
+        } else {
+            alert('저장 실패');
+        }
+    } catch(e) { alert('오류: ' + e.message); }
+}
+
+// 팝업에서 비고 저장
+async function saveNoteFromPopup(moldId, idx) {
+    var input = document.getElementById('noteInput_' + idx);
+    var note = input.value.trim();
+
+    try {
+        var res = await fetch(SB + '/rest/v1/molds?id=eq.' + moldId, {
+            method: 'PATCH',
+            headers: Object.assign({}, H, { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+            body: JSON.stringify({ note: note })
+        });
+        if (res.ok) {
+            alert('비고 저장 완료!');
+            var mold = molds.find(function(m) { return m.id === moldId; });
+            if (mold) mold.note = note;
+        } else {
+            alert('저장 실패');
+        }
+    } catch(e) { alert('오류: ' + e.message); }
 }
 
 function closeMoldModal() {
