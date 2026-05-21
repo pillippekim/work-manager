@@ -1,10 +1,9 @@
-/* ===== 좌측 메뉴바 + 상단 헤더 (공통 CSS) ===== */
-/* 금형관리 4개 페이지: dashboard, layout, admin, history */
-/* 업무관리 포탈(index.html)과 디자인 통일 */
+/* ===== 공통 사이드바 + 상단 헤더 (CSS) ===== */
+/* 포탈(index.html)과 동일한 디자인 */
 
 @font-face{font-family:'ONE Mobile Title';src:url('ONE_MOBILE_TITLE.TTF') format('truetype');font-weight:normal;font-style:normal;}
 
-/* 상단 헤더 바 (전체 가로) */
+/* ═══ 상단 헤더 바 ═══ */
 .top-header{
     position:fixed;top:0;left:0;right:0;
     height:56px;background:#fff;
@@ -20,139 +19,64 @@
 .top-header-right{display:flex;align-items:center;gap:16px;}
 .top-header-date{font-size:12px;color:#94a3b8;font-weight:500;}
 
-/* 사이드바 (헤더 아래) */
-.sidebar {
-    position: fixed;
-    top: 56px;
-    left: 0;
-    width: 260px;
-    height: calc(100vh - 56px);
-    background: #fff;
-    border-right: 1px solid #e2e8f0;
-    z-index: 200;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
+/* ═══ 좌측 사이드바 (헤더 아래) ═══ */
+.sidebar{
+    position:fixed;top:56px;left:0;
+    width:260px;height:calc(100vh - 56px);
+    background:#fff;border-right:1px solid #e2e8f0;
+    z-index:200;display:flex;flex-direction:column;
 }
+.menu-scroll{flex:1;overflow-y:auto;padding:12px 0 4px;}
+.menu-group{padding:0 12px;margin-bottom:6px;}
+.menu-group-title{font-size:10px;font-weight:700;color:#94a3b8;padding:10px 8px 6px;letter-spacing:0.5px;text-transform:uppercase;}
 
-/* 포탈 바로가기 */
-.sidebar-portal-link {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 10px 12px 4px;
-    padding: 9px 14px;
-    background: #f0f4ff;
-    border-radius: 8px;
-    border: 1px solid #dce3ff;
-    color: #243bb2;
-    font-weight: 600;
-    font-size: 13px;
-    text-decoration: none;
-    transition: all 0.15s;
-}
-.sidebar-portal-link:hover {
-    background: #e0e7ff;
-    border-color: #b4c0ff;
-}
-.sidebar-portal-link .icon {
-    font-size: 16px;
-}
+/* 대분류 */
+.cat-item{margin-bottom:2px;}
+.cat-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-radius:10px;transition:background 0.12s;width:100%;border:none;background:none;font-family:inherit;text-align:left;}
+.cat-btn:hover{background:#f1f5f9;}
+.cat-btn .c-icon{font-size:17px;width:24px;text-align:center;flex-shrink:0;}
+.cat-btn .c-label{font-size:13.5px;font-weight:600;color:#1e293b;flex:1;}
+.cat-btn .c-badge{font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;}
+.c-badge.on{background:#dbeafe;color:#2563eb;}
+.c-badge.off{background:#f1f5f9;color:#b0b8c9;}
+.cat-btn .c-arrow{font-size:11px;color:#94a3b8;transition:transform 0.25s;margin-left:4px;}
+.cat-item.open>.cat-btn .c-arrow{transform:rotate(180deg);}
+.cat-body{display:none;padding:2px 0 6px;}
+.cat-item.open>.cat-body{display:block;}
 
-/* 섹션 */
-.sidebar-section {
-    padding: 8px 0 4px;
-}
-.sidebar-section-title {
-    font-size: 10px;
-    font-weight: 700;
-    color: #94a3b8;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 0 20px 8px;
-}
+/* 중분류 */
+.sub-item{margin:0 6px 2px;}
+.sub-btn{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-radius:8px;transition:background 0.12s;width:100%;border:none;background:none;font-family:inherit;text-align:left;}
+.sub-btn:hover{background:#eef0f5;}
+.sub-btn .s-icon{font-size:14px;width:20px;text-align:center;}
+.sub-btn .s-label{font-size:12.5px;font-weight:600;color:#334155;flex:1;}
+.sub-btn .s-badge{font-size:8px;font-weight:600;padding:1px 6px;border-radius:4px;}
+.sub-btn .s-arrow{font-size:10px;color:#94a3b8;transition:transform 0.25s;}
+.sub-item.open>.sub-btn .s-arrow{transform:rotate(180deg);}
+.sub-body{display:none;padding:2px 0 4px;}
+.sub-item.open>.sub-body{display:block;}
 
-/* 메뉴 아이템 */
-.sidebar-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 16px;
-    margin: 1px 12px;
-    font-size: 13.5px;
-    color: #64748b;
-    cursor: pointer;
-    transition: all 0.12s;
-    text-decoration: none;
-    border-radius: 8px;
-}
-.sidebar-item:hover {
-    background: #f1f5f9;
-    color: #1e293b;
-}
-.sidebar-item.active {
-    background: #e8ecff;
-    color: #243bb2;
-    font-weight: 600;
-}
-.sidebar-toggle { cursor: pointer; }
-.sidebar-toggle .arrow {
-    margin-left: auto;
-    font-size: 11px;
-    transition: transform 0.25s;
-    color: #94a3b8;
-}
-.sidebar-group.open .sidebar-toggle .arrow { transform: rotate(90deg); }
-.sidebar-sub {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease;
-}
-.sidebar-group.open .sidebar-sub { max-height: 200px; }
-.sidebar-sub-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 7px 16px 7px 48px;
-    margin: 1px 12px;
-    font-size: 12.5px;
-    color: #94a3b8;
-    cursor: pointer;
-    transition: all 0.12s;
-    text-decoration: none;
-    border-radius: 7px;
-}
-.sidebar-sub-item:hover { color: #243bb2; background: #f0f4ff; }
-.sidebar-sub-item.active { color: #243bb2; background: #e8ecff; font-weight: 600; }
-.sidebar-sub-item .icon { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
-.sidebar-item .icon { font-size: 17px; width: 24px; text-align: center; flex-shrink: 0; }
-.sidebar-bottom {
-    margin-top: auto;
-    padding: 10px 16px;
-    border-top: 1px solid #e8ecf3;
-    flex-shrink: 0;
-}
-.sidebar-bottom a { color: #94a3b8; font-size: 11px; text-decoration: none; }
-.sidebar-bottom a:hover { color: #243bb2; }
+/* 소분류 (최종 링크) */
+.nav-link{display:flex;align-items:center;gap:9px;padding:7px 12px 7px 40px;font-size:12.5px;color:#64748b;text-decoration:none;border-radius:7px;margin:1px 6px;transition:all 0.12s;}
+.nav-link:hover{background:#e8ecff;color:#243bb2;}
+.nav-link .n-icon{font-size:14px;width:18px;text-align:center;}
 
-/* 메인 콘텐츠 */
-.main {
-    margin-left: 260px;
-    margin-top: 56px;
-    min-height: calc(100vh - 56px);
-}
+/* 현재 페이지 하이라이트 */
+.nav-link.nav-active{background:#e8ecff;color:#243bb2;font-weight:600;}
+
+.disabled{opacity:0.4;pointer-events:none;}
+.menu-divider{height:1px;background:#e8ecf3;margin:8px 12px;}
+.menu-bottom{padding:10px 16px;border-top:1px solid #e8ecf3;flex-shrink:0;}
+.menu-bottom a{color:#94a3b8;font-size:11px;text-decoration:none;}
+.menu-bottom a:hover{color:#243bb2;}
+
+/* ═══ 메인 콘텐츠 ═══ */
+.main{margin-left:260px;margin-top:56px;min-height:calc(100vh - 56px);}
 
 /* 모바일 */
-@media (max-width: 768px) {
-    .top-header { padding: 0 12px; height: 50px; }
-    .sidebar {
-        width: 100%;
-        height: auto;
-        position: relative;
-        top: 0;
-        border-right: none;
-        border-bottom: 1px solid #e8ecf3;
-        max-height: 45vh;
-    }
-    .main { margin-left: 0; margin-top: 50px; }
+@media(max-width:768px){
+    .top-header{padding:0 12px;height:50px;}
+    .top-header-title{font-size:13px;}
+    .sidebar{width:100%;height:auto;position:relative;top:0;border-right:none;border-bottom:1px solid #e8ecf3;max-height:45vh;}
+    .main{margin-left:0;margin-top:50px;}
 }
