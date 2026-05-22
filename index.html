@@ -233,8 +233,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 <!-- ═══ 좌측 메뉴 (헤더 아래) ═══ -->
 <div class="left-menu">
     <div class="menu-scroll">
+        <!-- 1. 업무관리 -->
         <div class="menu-group">
             <div class="menu-group-title">업무관리</div>
+            <!-- 생산관리 -->
             <div class="cat-item" id="c-prod">
                 <button class="cat-btn" onclick="tC('c-prod')">
                     <span class="c-icon">🏭</span><span class="c-label">생산관리</span>
@@ -257,14 +259,23 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
                     </div>
                 </div>
             </div>
+            <!-- 품질관리 > 공정검사 -->
             <div class="cat-item" id="c-quality">
                 <button class="cat-btn" onclick="tC('c-quality')">
                     <span class="c-icon">✅</span><span class="c-label">품질관리</span>
                     <span class="c-badge on">운영</span><span class="c-arrow">▼</span>
                 </button>
                 <div class="cat-body">
-                    <a class="nav-link" href="https://pillippekim.github.io/project-moon/inspection_round.html"><span class="n-icon">📋</span>공정검사 작성</a>
-                    <a class="nav-link" href="https://pillippekim.github.io/project-moon/inspection_round_viewer.html"><span class="n-icon">📂</span>공정검사 조회</a>
+                    <div class="sub-item" id="s-insp">
+                        <button class="sub-btn" onclick="tS('s-insp')">
+                            <span class="s-icon">🔬</span><span class="s-label">공정검사</span>
+                            <span class="s-arrow">▼</span>
+                        </button>
+                        <div class="sub-body">
+                            <a class="nav-link" href="https://pillippekim.github.io/project-moon/inspection_round.html"><span class="n-icon">📋</span>공정검사 작성</a>
+                            <a class="nav-link" href="inspection_round_viewer.html"><span class="n-icon">📂</span>공정검사 조회</a>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">🚚</span><span class="c-label">물류관리</span><span class="c-badge off">향후</span></button></div>
@@ -272,6 +283,23 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
             <div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">💼</span><span class="c-label">경영지원</span><span class="c-badge off">향후</span></button></div>
         </div>
         <div class="menu-divider"></div>
+        <!-- 2. 데이터관리 -->
+        <div class="menu-group">
+            <div class="menu-group-title">데이터관리</div>
+            <div class="cat-item" id="c-data">
+                <button class="cat-btn" onclick="tC('c-data')">
+                    <span class="c-icon">📊</span><span class="c-label">데이터 관리</span>
+                    <span class="c-badge on">운영</span><span class="c-arrow">▼</span>
+                </button>
+                <div class="cat-body">
+                    <a class="nav-link" href="data_viewer.html"><span class="n-icon">📊</span>데이터 조회 및 추출</a>
+                    <a class="nav-link" href="safety_viewer.html"><span class="n-icon">🔍</span>설비 점검 조회</a>
+                    <a class="nav-link" href="docs_manager.html"><span class="n-icon">📄</span>문서 관리</a>
+                </div>
+            </div>
+        </div>
+        <div class="menu-divider"></div>
+        <!-- 3. 현장관리 -->
         <div class="menu-group">
             <div class="menu-group-title">현장관리</div>
             <div class="cat-item">
@@ -281,6 +309,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
             </div>
         </div>
         <div class="menu-divider"></div>
+        <!-- 4. 시스템 -->
         <div class="menu-group">
             <div class="menu-group-title">시스템</div>
             <div class="cat-item" id="c-system">
@@ -288,12 +317,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
                     <span class="c-icon">⚙️</span><span class="c-label">시스템 관리</span><span class="c-arrow">▼</span>
                 </button>
                 <div class="cat-body">
-                    <a class="nav-link" href="https://pillippekim.github.io/project-moon/users.html"><span class="n-icon">👥</span>사용자 관리</a>
+                    <a class="nav-link" href="master_data.html"><span class="n-icon">🗂️</span>기준정보 관리</a>
+                    <a class="nav-link" href="users.html"><span class="n-icon">👥</span>사용자 관리</a>
                     <a class="nav-link" href="https://pillippekim.github.io/project-moon/audit.html"><span class="n-icon">📋</span>변경 이력</a>
-                    <a class="nav-link" href="https://pillippekim.github.io/project-moon/data_viewer.html"><span class="n-icon">📊</span>데이터 조회</a>
-                    <a class="nav-link" href="https://pillippekim.github.io/project-moon/safety_viewer.html"><span class="n-icon">🔍</span>설비 점검 조회</a>
-                    <a class="nav-link" href="https://pillippekim.github.io/project-moon/master_data.html"><span class="n-icon">🗂️</span>기준정보 관리</a>
-                    <a class="nav-link" href="https://pillippekim.github.io/project-moon/docs_manager.html"><span class="n-icon">📄</span>문서 관리</a>
                 </div>
             </div>
         </div>
@@ -379,16 +405,16 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 
     // worker/모니터 계정: 허용 메뉴 외 비활성화
     if (user.user_type === 'worker' || user.process === '모니터') {
-        // 허용 페이지 목록
+        // worker: 금형(적치대+대시보드) + 작업일지 + 공정검사(작성/조회) + 문서조회
         var allowedUrls = [
             'mold_dashboard.html', 'mold_layout.html',
             'project-moon/index.html', 'project-moon/cmb.html', 'project-moon/cutting.html',
             'project-moon/coating.html', 'project-moon/molding.html', 'project-moon/postcure.html',
             'project-moon/shot.html', 'project-moon/assembly.html', 'project-moon/inspection.html',
             'project-moon/packaging.html', 'project-moon/docs_viewer.html',
-            'project-moon/inspection_round.html', 'project-moon/inspection_round_viewer.html'
+            'project-moon/inspection_round.html', 'inspection_round_viewer.html'
         ];
-        // 모니터 계정은 금형관리만
+        // 모니터 계정은 금형(적치대+대시보드)만
         if (user.process === '모니터') {
             allowedUrls = ['mold_dashboard.html', 'mold_layout.html'];
         }
@@ -405,9 +431,12 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
                 links[i].style.cursor = 'default';
             }
         }
-        // 시스템 관리 카테고리 전체 비활성화
-        var sysItem = document.getElementById('c-system');
-        if (sysItem) { sysItem.style.opacity = '0.35'; sysItem.style.pointerEvents = 'none'; }
+        // 데이터관리 + 시스템관리 카테고리 전체 비활성화
+        var disableCats = ['c-data', 'c-system'];
+        for (var k = 0; k < disableCats.length; k++) {
+            var catEl = document.getElementById(disableCats[k]);
+            if (catEl) { catEl.style.opacity = '0.35'; catEl.style.pointerEvents = 'none'; }
+        }
     }
 })();
 
@@ -420,6 +449,8 @@ function tS(id){document.getElementById(id).classList.toggle('open');}
 var ALL_MENU=[
     {icon:'📊',name:'대시보드 / 이력',url:'mold_dashboard.html'},{icon:'🗄️',name:'적치대 현황',url:'mold_layout.html'},
     {icon:'📋',name:'금형 상세관리',url:'mold_detail.html'},
+    {icon:'📋',name:'공정검사 작성',url:'https://pillippekim.github.io/project-moon/inspection_round.html'},
+    {icon:'📂',name:'공정검사 조회',url:'inspection_round_viewer.html'},
     {icon:'🧪',name:'혼련(CMB) 작업일지',url:'https://pillippekim.github.io/project-moon/cmb.html'},
     {icon:'✂️',name:'재단 작업일지',url:'https://pillippekim.github.io/project-moon/cutting.html'},
     {icon:'🔫',name:'도포 작업일지',url:'https://pillippekim.github.io/project-moon/coating.html'},
@@ -429,12 +460,12 @@ var ALL_MENU=[
     {icon:'🔩',name:'조립 작업일지',url:'https://pillippekim.github.io/project-moon/assembly.html'},
     {icon:'🔍',name:'검사 작업일지',url:'https://pillippekim.github.io/project-moon/inspection.html'},
     {icon:'📦',name:'포장 작업일지',url:'https://pillippekim.github.io/project-moon/packaging.html'},
-    {icon:'📊',name:'데이터 조회',url:'https://pillippekim.github.io/project-moon/data_viewer.html'},
-    {icon:'🔍',name:'설비 점검 조회',url:'https://pillippekim.github.io/project-moon/safety_viewer.html'},
-    {icon:'📄',name:'문서 관리',url:'https://pillippekim.github.io/project-moon/docs_manager.html'},
+    {icon:'📊',name:'데이터 조회 및 추출',url:'data_viewer.html'},
+    {icon:'🔍',name:'설비 점검 조회',url:'safety_viewer.html'},
+    {icon:'📄',name:'문서 관리',url:'docs_manager.html'},
     {icon:'🔎',name:'문서 조회',url:'https://pillippekim.github.io/project-moon/docs_viewer.html'},
-    {icon:'🗂️',name:'기준정보 관리',url:'https://pillippekim.github.io/project-moon/master_data.html'},
-    {icon:'👥',name:'사용자 관리',url:'https://pillippekim.github.io/project-moon/users.html'},
+    {icon:'🗂️',name:'기준정보 관리',url:'master_data.html'},
+    {icon:'👥',name:'사용자 관리',url:'users.html'},
     {icon:'📋',name:'변경 이력',url:'https://pillippekim.github.io/project-moon/audit.html'},
 ];
 var DEFAULT_FAVS=[
