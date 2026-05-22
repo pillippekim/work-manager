@@ -6,41 +6,29 @@
 <title>설비 점검 조회 - HKHT</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="common.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="auth_guard.js"></script>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Noto Sans KR','Pretendard',sans-serif;background:#f1f3f9;color:#1a1a2e;min-height:100vh}
-.container{max-width:1400px;margin:0 auto}
-.top-bar{display:flex;justify-content:space-between;align-items:center;background:white;padding:16px 24px;border-radius:12px;box-shadow:0 2px 8px rgba(36,59,178,0.08);margin-bottom:20px;position:sticky;top:0;z-index:50}
-.top-bar a{background:#f0f3f9;color:#243bb2;border:none;padding:10px 18px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none}
-.top-bar h1{font-size:20px;font-weight:700;color:#243bb2}
-.card{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(36,59,178,0.08);padding:20px 24px;margin-bottom:20px}
+/* ── safety_viewer 고유 스타일 ── */
+.container{max-width:1400px}
 .filter-bar{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
 .filter-group label{display:block;font-size:12px;color:#888;margin-bottom:4px;font-weight:500}
-.filter-group input,.filter-group select{padding:8px 12px;border:1px solid #e0e4ed;border-radius:8px;font-size:14px;background:#fafbfd}
-.btn-search{background:#243bb2;color:white;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
-.btn-excel{background:#059669;color:white;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+.filter-group input,.filter-group select{padding:8px 12px;border:1px solid #d1d5db;border-radius:7px;font-size:13px;background:#fff;outline:none;font-family:inherit}
+.filter-group input:focus,.filter-group select:focus{border-color:#243bb2}
+.btn-excel{background:#059669;color:white;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
 .period-btns{display:grid;grid-template-columns:1fr 1fr;gap:4px}
-.period-btn{padding:8px 14px;border:1px solid #e0e4ed;background:white;color:#555;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.period-btn{padding:8px 14px;border:1px solid #d1d5db;background:white;color:#555;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit}
 .period-btn.active{background:#243bb2;color:white;border-color:#243bb2}
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
-.stat-card{background:white;border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(36,59,178,0.08)}
-.stat-label{font-size:12px;color:#888}
-.stat-num{font-size:24px;font-weight:700;color:#243bb2}
 .table-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{background:#f0f3f9;color:#243bb2;font-weight:700;padding:10px 8px;border:1px solid #e0e4ed;font-size:12px;white-space:nowrap}
-td{padding:8px;border:1px solid #e0e4ed;vertical-align:middle}
+th{background:#f8fafc;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0}
+td{border-bottom:1px solid #f1f5f9}
 .badge{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;font-size:14px;font-weight:700;color:white}
 .badge-normal{background:#10b981}
 .badge-repair{background:#f59e0b}
 .badge-unusable{background:#ef4444}
 .badge-notuse{background:#6b7280}
-.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(100px);background:#243bb2;color:white;padding:14px 28px;border-radius:10px;font-size:14px;font-weight:600;opacity:0;transition:all 0.3s;z-index:999}
-.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
-@media(max-width:768px){.stats-row{grid-template-columns:1fr 1fr}.filter-bar{flex-direction:column}}
 </style>
 </head>
 <body>
@@ -58,9 +46,16 @@ td{padding:8px;border:1px solid #e0e4ed;vertical-align:middle}
 
 <div class="main">
 <div class="container">
-  <div class="top-bar">
-    <h1>🔧 설비 점검 조회</h1>
-    <span id="userInfo" style="font-size:13px;color:#666"></span>
+<div class="page-header">
+    <div class="header-row">
+      <div>
+        <h1>🔧 설비 점검 조회</h1>
+        <div class="sub">전체 공정 설비 점검 이력 조회 및 추출</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn-excel" onclick="downloadExcel()">📥 엑셀</button>
+      </div>
+    </div>
   </div>
 
   <div class="card">

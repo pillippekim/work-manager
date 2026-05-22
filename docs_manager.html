@@ -6,36 +6,23 @@
 <title>문서 관리 - HKHT</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="common.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth_guard.js"></script>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Noto Sans KR','Pretendard',sans-serif; background: #f1f3f9; color: #1e293b; }
+/* ── docs_manager 고유 스타일 ── */
 .app { max-width: 980px; margin: 0 auto; }
-.top-nav { display: flex; align-items: center; justify-content: space-between; background: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(36,59,178,0.08); margin-bottom: 20px; }
-.back-btn { background: #f0f3f9; color: #243bb2; border: none; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; font-family: inherit; }
-.back-btn:hover { background: #e3e8f5; text-decoration: none; }
-.nav-title { font-size: 20px; font-weight: 700; color: #243bb2; }
-.nav-sep { display: none; }
-.nav-cur { display: none; }
-.card { background: white; border-radius: 12px; border: 1px solid #e5e5e5; padding: 1rem 1.25rem; margin-bottom: 1rem; }
 
-/* 업로드 */
+/* 업로드 토글 */
 .upload-toggle { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
 .upload-toggle-title { font-size: 14px; color: #888; }
-.btn-toggle-upload { font-size: 13px; padding: 8px 18px; border-radius: 8px; background: #2563eb; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
-.upload-area { display: none; background: #f9f9f9; border: 1.5px dashed #ddd; border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
+.btn-toggle-upload { font-size: 13px; padding: 8px 18px; border-radius: 8px; background: #243bb2; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
+.upload-area { display: none; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
 .upload-area.open { display: block; }
 
 /* 파일명 규칙 안내 */
-.rule-box { background: #eff6ff; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 12px; color: #2563eb; line-height: 1.7; }
+.rule-box { background: #eef0ff; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 12px; color: #243bb2; line-height: 1.7; }
 .rule-box strong { font-weight: 600; }
-
-/* 다중 파일 드롭존 */
-.file-zone { border: 1.5px dashed #cbd5e1; border-radius: 8px; padding: 1.5rem; text-align: center; cursor: pointer; background: white; transition: border-color 0.15s; margin-bottom: 12px; }
-.file-zone:hover, .file-zone.dragover { border-color: #2563eb; background: #eff6ff; }
-.file-zone-icon { font-size: 28px; margin-bottom: 6px; }
-.file-zone-text { font-size: 13px; color: #888; }
 
 /* 파일 파싱 결과 */
 .parsed-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
@@ -47,48 +34,38 @@ body { font-family: 'Noto Sans KR','Pretendard',sans-serif; background: #f1f3f9;
 .parsed-fields { display: grid; grid-template-columns: repeat(4, 1fr) 1fr; gap: 8px; align-items: end; }
 .pf-group { display: flex; flex-direction: column; gap: 4px; }
 .pf-label { font-size: 11px; color: #888; }
-.pf-input, .pf-select { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 6px; padding: 6px 8px; outline: none; font-family: inherit; color: #111; background: white; width: 100%; }
-.pf-input:focus, .pf-select:focus { border-color: #2563eb; }
+.pf-input, .pf-select { font-size: 13px; border: 1px solid #d1d5db; border-radius: 6px; padding: 6px 8px; outline: none; font-family: inherit; color: #111; background: white; width: 100%; }
+.pf-input:focus, .pf-select:focus { border-color: #243bb2; }
 .upload-mode { display: flex; gap: 8px; }
 .mode-btn { flex: 1; font-size: 12px; padding: 6px; border-radius: 6px; border: 1.5px solid #e5e5e5; background: white; cursor: pointer; font-family: inherit; color: #555; text-align: center; }
-.mode-btn.selected { border-color: #2563eb; background: #eff6ff; color: #2563eb; font-weight: 500; }
+.mode-btn.selected { border-color: #243bb2; background: #eef0ff; color: #243bb2; font-weight: 500; }
 .btn-remove-file { background: none; border: none; cursor: pointer; color: #aaa; font-size: 18px; padding: 0 4px; }
 .btn-remove-file:hover { color: #e53e3e; }
-
 .upload-footer { display: flex; justify-content: space-between; align-items: center; }
 .upload-info { font-size: 12px; color: #aaa; }
-.btn-upload-all { font-size: 13px; padding: 9px 24px; border-radius: 8px; background: #2563eb; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
+.btn-upload-all { font-size: 13px; padding: 9px 24px; border-radius: 8px; background: #243bb2; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
 .btn-upload-all:disabled { background: #aaa; cursor: not-allowed; }
 .progress-bar { width: 100%; height: 4px; background: #e5e5e5; border-radius: 2px; margin-top: 10px; display: none; }
-.progress-fill { height: 100%; background: #2563eb; border-radius: 2px; transition: width 0.3s; }
+.progress-fill { height: 100%; background: #243bb2; border-radius: 2px; transition: width 0.3s; }
 
-/* 탭 */
+/* 문서 유형 탭 */
 .tab-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1rem; }
 .tab-btn { display: flex; flex-direction: column; align-items: center; padding: 10px 16px; border-radius: 10px; border: 1.5px solid #e5e5e5; background: white; cursor: pointer; font-family: inherit; transition: all 0.15s; min-width: 100px; }
-.tab-btn:hover { border-color: #2563eb; }
-.tab-btn.active { border-color: #2563eb; background: #eff6ff; }
+.tab-btn:hover { border-color: #243bb2; }
+.tab-btn.active { border-color: #243bb2; background: #eef0ff; }
 .tab-label { font-size: 12px; color: #888; margin-bottom: 4px; }
-.tab-btn.active .tab-label { color: #2563eb; }
+.tab-btn.active .tab-label { color: #243bb2; }
 .tab-count { font-size: 20px; font-weight: 700; color: #111; }
-.tab-btn.active .tab-count { color: #2563eb; }
+.tab-btn.active .tab-count { color: #243bb2; }
 .tab-unit { font-size: 11px; color: #aaa; }
 
-/* 검색 */
-.search-bar { display: flex; gap: 10px; margin-bottom: 1rem; align-items: center; }
-.search-input { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 12px; outline: none; font-family: inherit; color: #111; width: 180px; }
-.search-input:focus { border-color: #2563eb; }
+/* 구버전 필터 */
 .filter-toggle { font-size: 12px; padding: 7px 12px; border-radius: 8px; border: 1px solid #e5e5e5; background: white; cursor: pointer; font-family: inherit; color: #555; }
-.filter-toggle.active { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+.filter-toggle.active { border-color: #243bb2; color: #243bb2; background: #eef0ff; }
 
-/* 테이블 */
-.table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th { font-size: 12px; font-weight: 500; color: #888; padding: 9px 12px; background: #f9f9f9; border-bottom: 1px solid #eee; text-align: left; white-space: nowrap; ; position: sticky; top: 0; z-index: 10; }
-td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; color: #111; vertical-align: middle; }
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: #fafafa; }
+/* 문서 유형 배지 */
 .doc-type-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
-.type-검사기준서 { background: #eff6ff; color: #2563eb; }
+.type-검사기준서 { background: #eff6ff; color: #243bb2; }
 .type-작업표준서 { background: #f0fdf4; color: #16a34a; }
 .type-검사협정서 { background: #fff7ed; color: #ea580c; }
 .type-관리계획서 { background: #fdf4ff; color: #9333ea; }
@@ -96,38 +73,14 @@ tr:hover td { background: #fafafa; }
 .version-badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 6px; background: #f3f4f6; color: #555; font-weight: 500; }
 .current-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #f0fdf4; color: #16a34a; font-weight: 500; }
 .old-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #f9f9f9; color: #aaa; }
-.action-btns { display: flex; gap: 4px; }
-.btn-view { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: #eff6ff; color: #2563eb; border: none; cursor: pointer; font-family: inherit; }
+.btn-view { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: #eff6ff; color: #243bb2; border: none; cursor: pointer; font-family: inherit; }
 .btn-edit { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: #f0fdf4; color: #16a34a; border: none; cursor: pointer; font-family: inherit; }
-.btn-del { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: transparent; color: #e53e3e; border: 1px solid #fca5a5; cursor: pointer; font-family: inherit; }
-.btn-del:hover { background: #fff0f0; }
-.empty-row td { text-align: center; color: #aaa; padding: 2.5rem; font-size: 14px; }
 
-/* 수정 모달 */
-.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
-.modal-overlay.open { display: flex; }
-.modal-box { background: white; border-radius: 12px; padding: 1.5rem; width: 480px; }
-.modal-title { font-size: 16px; font-weight: 600; color: #111; margin-bottom: 1rem; }
-.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
+/* 모달 파일 업로드 */
+.modal-file-zone { border: 1.5px dashed #cbd5e1; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; background: #f8fafc; margin-bottom: 1rem; font-size: 13px; color: #888; }
+.modal-file-zone:hover { border-color: #243bb2; }
+.modal-file-selected { font-size: 13px; color: #243bb2; font-weight: 500; margin-top: 4px; }
 .modal-field { display: flex; flex-direction: column; gap: 5px; }
-.modal-label { font-size: 12px; color: #888; }
-.modal-input, .modal-select { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 10px; outline: none; font-family: inherit; color: #111; }
-.modal-input:focus, .modal-select:focus { border-color: #2563eb; }
-.modal-file-zone { border: 1.5px dashed #cbd5e1; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; background: #f9f9f9; margin-bottom: 1rem; font-size: 13px; color: #888; }
-.modal-file-zone:hover { border-color: #2563eb; }
-.modal-file-selected { font-size: 13px; color: #2563eb; font-weight: 500; margin-top: 4px; }
-.modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
-.btn-modal-cancel { font-size: 13px; padding: 9px 18px; border-radius: 8px; background: transparent; color: #888; border: 1px solid #ddd; cursor: pointer; font-family: inherit; }
-.btn-modal-save { font-size: 13px; padding: 9px 18px; border-radius: 8px; background: #2563eb; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
-
-.toast { display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #111; color: white; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 999; white-space: nowrap; }
-.toast.show { display: block; }
-
-/* 테이블 헤더 고정 */
-.table-scroll-wrap { max-height: 600px; overflow-y: auto; overflow-x: auto; border-radius: 8px; border: 1px solid #f0f0f0; }
-.table-scroll-wrap table { margin: 0; }
-.table-scroll-wrap thead th { position: sticky; top: 0; z-index: 10; background: #f9f9f9; box-shadow: inset 0 -1px 0 #eee; }
-
 </style>
 </head>
 <body>
@@ -157,9 +110,16 @@ tr:hover td { background: #fafafa; }
 <div class="main">
 <div class="app">
 
-  <div class="top-nav">
-    <span class="nav-title">📄 문서 관리</span>
-    <span style="width:100px"></span>
+  <div class="page-header">
+    <div class="header-row">
+      <div>
+        <h1>📄 문서 관리</h1>
+        <div class="sub">검사기준서, 작업표준서 PDF 업로드 및 이력 관리</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn-toggle-upload" onclick="toggleUpload()">+ 문서 업로드</button>
+      </div>
+    </div>
   </div>
 
   <!-- 업로드 토글 -->
