@@ -24,19 +24,23 @@ function initSidebar() {
         var mainEl = document.querySelector('.main');
         if (mainEl) { mainEl.style.marginLeft = '0'; }
 
-        // 헤더바는 로고 + 사용자 + 로그아웃만
+        // 헤더바는 로고 + 페이지 탭 + 사용자 + 로그아웃
         var headerEl = document.getElementById('top-header');
         if (headerEl) {
             var now = new Date();
             var days = ['일','월','화','수','목','금','토'];
             var dateStr = now.getFullYear() + '년 ' + (now.getMonth()+1) + '월 ' + now.getDate() + '일 (' + days[now.getDay()] + ')';
             var avatar = uInfo.name ? uInfo.name.charAt(0) : '?';
+            var curPage = location.pathname.split('/').pop();
+            var layoutActive = curPage === 'mold_layout.html' ? 'background:#243bb2;color:#fff;' : 'background:#e8ecfa;color:#243bb2;';
+            var dashActive = curPage === 'mold_dashboard.html' ? 'background:#243bb2;color:#fff;' : 'background:#e8ecfa;color:#243bb2;';
 
             headerEl.innerHTML =
                 '<div class="top-header-left">' +
                     '<img class="top-header-logo" src="hkht_logo.png" alt="HKHT">' +
                     '<div class="top-header-divider"></div>' +
-                    '<div class="top-header-title">금형 적치대 현황</div>' +
+                    '<a href="mold_layout.html" style="text-decoration:none;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:700;margin-right:6px;' + layoutActive + '">🗄️ 적치대 현황</a>' +
+                    '<a href="mold_dashboard.html" style="text-decoration:none;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:700;' + dashActive + '">📊 대시보드 / 이력</a>' +
                 '</div>' +
                 '<div class="top-header-right">' +
                     '<div class="top-header-date">' + dateStr + '</div>' +
