@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>설비 점검 조회 - HKHT</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sidebar.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="auth_guard.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans KR','Pretendard',sans-serif;background:#f1f3f9;color:#1a1a2e;min-height:100vh}
+.container{max-width:1400px;margin:0 auto}
+.top-bar{display:flex;justify-content:space-between;align-items:center;background:white;padding:16px 24px;border-radius:12px;box-shadow:0 2px 8px rgba(36,59,178,0.08);margin-bottom:20px;position:sticky;top:0;z-index:50}
+.top-bar a{background:#f0f3f9;color:#243bb2;border:none;padding:10px 18px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none}
+.top-bar h1{font-size:20px;font-weight:700;color:#243bb2}
+.card{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(36,59,178,0.08);padding:20px 24px;margin-bottom:20px}
+.filter-bar{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+.filter-group label{display:block;font-size:12px;color:#888;margin-bottom:4px;font-weight:500}
+.filter-group input,.filter-group select{padding:8px 12px;border:1px solid #e0e4ed;border-radius:8px;font-size:14px;background:#fafbfd}
+.btn-search{background:#243bb2;color:white;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+.btn-excel{background:#059669;color:white;border:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+.period-btns{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.period-btn{padding:8px 14px;border:1px solid #e0e4ed;background:white;color:#555;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.period-btn.active{background:#243bb2;color:white;border-color:#243bb2}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat-card{background:white;border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(36,59,178,0.08)}
+.stat-label{font-size:12px;color:#888}
+.stat-num{font-size:24px;font-weight:700;color:#243bb2}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#f0f3f9;color:#243bb2;font-weight:700;padding:10px 8px;border:1px solid #e0e4ed;font-size:12px;white-space:nowrap}
+td{padding:8px;border:1px solid #e0e4ed;vertical-align:middle}
+.badge{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;font-size:14px;font-weight:700;color:white}
+.badge-normal{background:#10b981}
+.badge-repair{background:#f59e0b}
+.badge-unusable{background:#ef4444}
+.badge-notuse{background:#6b7280}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(100px);background:#243bb2;color:white;padding:14px 28px;border-radius:10px;font-size:14px;font-weight:600;opacity:0;transition:all 0.3s;z-index:999}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+@media(max-width:768px){.stats-row{grid-template-columns:1fr 1fr}.filter-bar{flex-direction:column}}
+</style>
+</head>
+<body>
+
+<!-- 권한 체크 로딩 화면 -->
+<div id="authCheckOverlay" style="position:fixed;inset:0;background:#f1f3f9;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="width:36px;height:36px;border:3px solid #e5e5e5;border-top-color:#243bb2;border-radius:50%;animation:authSpin 0.8s linear infinite"></div>
+  <div style="font-size:13px;color:#888;font-family:inherit">권한 확인 중...</div>
+  <style>@keyframes authSpin { to { transform: rotate(360deg); } }</style>
+</div>
+
+<!-- WM 레이아웃 -->
+<div id="top-header" class="top-header"></div>
+<nav id="sidebar-nav" class="sidebar"></nav>
+
+<div class="main">
+<div class="container">
+  <div class="top-bar">
+    <h1>🔧 설비 점검 조회</h1>
+    <span id="userInfo" style="font-size:13px;color:#666"></span>
+  </div>
+
+  <div class="card">
+    <div class="filter-bar">
+      <div class="filter-group"><label>시작일</label><input type="date" id="startDate" /></div>
+      <div class="filter-group"><label>종료일</label><input type="date" id="endDate" /></div>
+      <div class="filter-group">
+        <div class="period-btns">
+          <button class="period-btn active" onclick="setPeriod('today',this)">당일</button>
+          <button class="period-btn" onclick="setPeriod('thisMonth',this)">당월</button>
+          <button class="period-btn" onclick="setPeriod('yesterday',this)">전일</button>
+          <button class="period-btn" onclick="setPeriod('lastMonth',this)">전월</button>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label>공정</label>
+        <select id="filterProcess">
+          <option value="all">전체</option>
+          <option value="cmb">혼련(CMB)</option>
+          <option value="cutting">재단</option>
+          <option value="coating">도포</option>
+          <option value="postcure">2차가류</option>
+          <option value="shot">쇼트</option>
+          <option value="molding">성형</option>
+          <option value="assembly">조립</option>
+        </select>
+      </div>
+      <div class="filter-group"><label>설비명</label><input type="text" id="filterEquip" placeholder="설비 검색" /></div>
+      <button class="btn-search" onclick="loadData()">🔍 조회</button>
+      <button class="btn-excel" onclick="downloadExcel()">📥 엑셀</button>
+    </div>
+  </div>
+
+  <div class="stats-row" id="statsArea">
+    <div class="stat-card"><div class="stat-label">총 점검 건수</div><div class="stat-num" id="statTotal">0 <span style="font-size:14px;font-weight:400">건</span></div></div>
+    <div class="stat-card"><div class="stat-label">정상 (○)</div><div class="stat-num" style="color:#10b981" id="statNormal">0</div></div>
+    <div class="stat-card"><div class="stat-label">수리요망 (△)</div><div class="stat-num" style="color:#f59e0b" id="statRepair">0</div></div>
+    <div class="stat-card"><div class="stat-label">사용불가 (×)</div><div class="stat-num" style="color:#ef4444" id="statUnusable">0</div></div>
+  </div>
+
+  <div class="card" id="resultArea">
+    <div style="text-align:center;color:#aaa;padding:40px;font-size:14px">조회 버튼을 눌러주세요</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const SAFETY_TABLES = [
+  { key:'cmb', table:'cmb_safety_check', label:'혼련(CMB)', dateCol:'check_date' },
+  { key:'cutting', table:'cutting_safety_check', label:'재단', dateCol:'check_date' },
+  { key:'coating', table:'coating_safety_check', label:'도포', dateCol:'check_date' },
+  { key:'postcure', table:'postcure_safety_check', label:'2차가류', dateCol:'check_date' },
+  { key:'shot', table:'shot_safety_check', label:'쇼트', dateCol:'check_date' },
+  { key:'molding', table:'molding_safety_check', label:'성형', dateCol:'check_date' },
+  { key:'assembly', table:'assembly_safety_check', label:'조립', dateCol:'check_date' }
+];
+
+let allData = [];
+
+async function init() {
+  const user = await checkAuth();
+  if (!user) return;
+  document.getElementById('authCheckOverlay').style.display = 'none';
+  document.getElementById('userInfo').textContent = user.name || '';
+  const today = new Date();
+  const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('startDate').value = fmt(today);
+  document.getElementById('endDate').value = fmt(today);
+}
+
+function setPeriod(type, btn) {
+  const now = new Date();
+  const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  let s, e;
+  if (type==='today') { s=e=fmt(now); }
+  else if (type==='yesterday') { s=e=fmt(new Date(now.getFullYear(),now.getMonth(),now.getDate()-1)); }
+  else if (type==='thisMonth') { s=fmt(new Date(now.getFullYear(),now.getMonth(),1)); e=fmt(new Date(now.getFullYear(),now.getMonth()+1,0)); }
+  else if (type==='lastMonth') { s=fmt(new Date(now.getFullYear(),now.getMonth()-1,1)); e=fmt(new Date(now.getFullYear(),now.getMonth(),0)); }
+  document.getElementById('startDate').value = s;
+  document.getElementById('endDate').value = e;
+  document.querySelectorAll('.period-btn').forEach(b=>{b.classList.remove('active')});
+  btn.classList.add('active');
+  loadData();
+}
+
+async function loadData() {
+  const start = document.getElementById('startDate').value;
+  const end = document.getElementById('endDate').value;
+  const proc = document.getElementById('filterProcess').value;
+  const equipFilter = document.getElementById('filterEquip').value.trim().toLowerCase();
+  
+  if (!start || !end) { showToast('기간을 선택해주세요.'); return; }
+  
+  allData = [];
+  const tables = proc === 'all' ? SAFETY_TABLES : SAFETY_TABLES.filter(t => t.key === proc);
+  
+  for (const t of tables) {
+    try {
+      let q = db.from(t.table).select('*').gte(t.dateCol, start).lte(t.dateCol, end);
+      const { data } = await q.order(t.dateCol, { ascending: false });
+      if (data) {
+        data.forEach(r => {
+          if (equipFilter && !(r.equipment_no||'').toLowerCase().includes(equipFilter)) return;
+          allData.push({ ...r, _process: t.label, _table: t.table });
+        });
+      }
+    } catch(e) {}
+  }
+  
+  renderStats();
+  renderTable();
+}
+
+function renderStats() {
+  let normal=0, repair=0, unusable=0, notuse=0;
+  allData.forEach(r => {
+    const cd = r.check_data || {};
+    Object.values(cd).forEach(v => {
+      if (typeof v !== 'string') return;
+      if (v==='○') normal++;
+      else if (v==='△') repair++;
+      else if (v==='×') unusable++;
+      else if (v==='│') notuse++;
+    });
+  });
+  document.getElementById('statTotal').innerHTML = allData.length + ' <span style="font-size:14px;font-weight:400">건</span>';
+  document.getElementById('statNormal').textContent = normal;
+  document.getElementById('statRepair').textContent = repair;
+  document.getElementById('statUnusable').textContent = unusable;
+}
+
+function renderTable() {
+  if (allData.length === 0) {
+    document.getElementById('resultArea').innerHTML = '<div style="text-align:center;color:#aaa;padding:40px;font-size:14px">데이터가 없어요.</div>';
+    return;
+  }
+  
+  const badgeHtml = v => {
+    if (v==='○') return '<span class="badge badge-normal">○</span>';
+    if (v==='△') return '<span class="badge badge-repair">△</span>';
+    if (v==='×') return '<span class="badge badge-unusable">×</span>';
+    if (v==='│') return '<span class="badge badge-notuse">│</span>';
+    return v||'-';
+  };
+  
+  document.getElementById('resultArea').innerHTML = `
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th>NO</th><th>점검일</th><th>공정</th><th>설비</th><th>관리번호</th>
+        <th>점검결과</th><th>특이사항</th><th>점검자</th><th>점검시간</th>
+      </tr></thead>
+      <tbody>
+      ${allData.map((r,i) => {
+        const cd = r.check_data || {};
+        const items = Object.entries(cd).filter(([k,v]) => typeof v === 'string' && k !== 'remarks');
+        const resultHtml = items.map(([k,v]) => badgeHtml(v)).join(' ');
+        const hasIssue = items.some(([k,v]) => v==='△' || v==='×');
+        const time = r.checked_at ? new Date(r.checked_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}) : '-';
+        const remarks = cd.remarks || r.overall_remarks || r.remarks || '-';
+        return `<tr style="${hasIssue?'background:#fef2f2':''}">
+          <td style="text-align:center">${i+1}</td>
+          <td>${r.check_date||r[Object.keys(r).find(k=>k.includes('date'))]||'-'}</td>
+          <td><span style="font-weight:600">${r._process}</span></td>
+          <td style="font-size:12px">${r.equipment_no||'-'}</td>
+          <td style="font-size:11px;color:#888">${r.equipment_id||'-'}</td>
+          <td>${resultHtml}</td>
+          <td style="font-size:12px">${remarks}</td>
+          <td>${r.checked_by_name||'-'}</td>
+          <td style="font-size:11px;color:#888">${time}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+function downloadExcel() {
+  if (allData.length === 0) { showToast('다운로드할 데이터가 없어요.'); return; }
+  const rows = allData.map((r,i) => {
+    const cd = r.check_data || {};
+    const items = Object.entries(cd).filter(([k,v]) => typeof v === 'string' && k !== 'remarks');
+    return {
+      'NO': i+1,
+      '점검일': r.check_date || '-',
+      '공정': r._process,
+      '설비': r.equipment_no || '-',
+      '관리번호': r.equipment_id || '-',
+      '점검결과': items.map(([k,v]) => `${k}:${v}`).join(' / '),
+      '특이사항': cd.remarks || r.overall_remarks || '',
+      '점검자': r.checked_by_name || '-'
+    };
+  });
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, '설비점검');
+  const start = document.getElementById('startDate').value;
+  const end = document.getElementById('endDate').value;
+  XLSX.writeFile(wb, `설비점검_${start}_${end}.xlsx`);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show';
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+init();
+</script>
+<script src="sidebar.js"></script>
+</div><!-- main -->
+</body>
+</html>
