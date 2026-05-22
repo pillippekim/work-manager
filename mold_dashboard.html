@@ -40,6 +40,17 @@ body { font-family:'Noto Sans KR','Pretendard',sans-serif; background:#f1f3f9; c
 .repair-item { display:flex; align-items:center; padding:6px 0; border-bottom:1px solid #f1f5f9; font-size:13px; }
 .repair-item:last-child { border-bottom:none; }
 
+/* ===== 기간 필터 ===== */
+.period-filter { display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap; background:#fff; padding:12px 16px; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+.period-filter label { font-size:13px; font-weight:700; color:#475569; white-space:nowrap; }
+.period-filter input[type="date"] { padding:7px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; outline:none; }
+.period-filter input[type="date"]:focus { border-color:#243bb2; box-shadow:0 0 0 3px rgba(36,59,178,0.15); }
+.btn-period { padding:7px 14px; border:1px solid #d1d5db; background:#fff; color:#555; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; transition:all 0.15s; }
+.btn-period:hover { border-color:#243bb2; color:#243bb2; }
+.btn-period.active { background:#eef0ff; color:#243bb2; border-color:#243bb2; }
+.btn-period-search { padding:7px 18px; background:#243bb2; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.btn-period-search:hover { background:#1e32a0; }
+
 /* ===== 이력 탭 섹션 ===== */
 .tabs { display:flex; gap:0; border-bottom:2px solid #e2e8f0; background:#fff; border-radius:10px 10px 0 0; margin-bottom:0; }
 .tab { padding:12px 24px; font-size:14px; font-weight:600; color:#64748b; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; white-space:nowrap; transition:all 0.2s; }
@@ -121,6 +132,8 @@ table.dt tr:hover { background:#f8fafc; }
     .form-row { flex-direction:column; gap:0; }
     .tab { padding:10px 14px; font-size:13px; }
     table.dt { font-size:11px; }
+    .period-filter { gap:6px; }
+    .period-filter input[type="date"] { flex:1; min-width:120px; }
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -152,6 +165,18 @@ table.dt tr:hover { background:#f8fafc; }
 
 <!-- ========== 하단: 이력 탭 (손상/세척/수리) ========== -->
 <div class="section-title"><span>📝</span> 금형 이력 관리</div>
+
+<div class="period-filter">
+    <label>기간</label>
+    <input type="date" id="histStartDate">
+    <span style="color:#94a3b8;">~</span>
+    <input type="date" id="histEndDate">
+    <button class="btn-period" onclick="setHistPeriod('thisMonth',this)">당월</button>
+    <button class="btn-period" onclick="setHistPeriod('lastMonth',this)">전월</button>
+    <button class="btn-period" onclick="setHistPeriod('3month',this)">3개월</button>
+    <button class="btn-period" onclick="setHistPeriod('all',this)">전체</button>
+    <button class="btn-period-search" onclick="loadHistoryData()">조회</button>
+</div>
 
 <div class="tabs">
     <div class="tab active" onclick="switchTab('damage')">🔴 손상 이력 <span class="badge-count" id="damagePendingCount" style="display:none;">0</span></div>
@@ -366,11 +391,66 @@ async function loadData() {
     }
 }
 
+// =============================================
+// 기간 필터
+// =============================================
+function fmtDate(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function initPeriod() {
+    // 초기값: 당월
+    var now = new Date();
+    document.getElementById('histStartDate').value = fmtDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    document.getElementById('histEndDate').value = fmtDate(now);
+}
+
+function setHistPeriod(type, btn) {
+    var now = new Date();
+    var start = '', end = fmtDate(now);
+    if (type === 'thisMonth') {
+        start = fmtDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    } else if (type === 'lastMonth') {
+        start = fmtDate(new Date(now.getFullYear(), now.getMonth()-1, 1));
+        end = fmtDate(new Date(now.getFullYear(), now.getMonth(), 0));
+    } else if (type === '3month') {
+        start = fmtDate(new Date(now.getFullYear(), now.getMonth()-2, 1));
+    } else if (type === 'all') {
+        start = '';
+        end = '';
+    }
+    document.getElementById('histStartDate').value = start;
+    document.getElementById('histEndDate').value = end;
+    // 버튼 하이라이트
+    var btns = document.querySelectorAll('.btn-period');
+    for (var i=0; i<btns.length; i++) btns[i].classList.remove('active');
+    if (btn) btn.classList.add('active');
+    loadHistoryData();
+}
+
 async function loadHistoryData() {
+    var startVal = document.getElementById('histStartDate').value;
+    var endVal = document.getElementById('histEndDate').value;
+
+    // 기간 쿼리 생성
+    var dmgQ = 'order=damage_date.desc';
+    var clnQ = 'order=request_date.desc';
+    var repQ = 'order=start_date.desc';
+    if (startVal) {
+        dmgQ += '&damage_date=gte.' + startVal;
+        clnQ += '&request_date=gte.' + startVal;
+        repQ += '&start_date=gte.' + startVal;
+    }
+    if (endVal) {
+        dmgQ += '&damage_date=lte.' + endVal;
+        clnQ += '&request_date=lte.' + endVal;
+        repQ += '&start_date=lte.' + endVal;
+    }
+
     try {
-        damageData = await sf('mold_damage_logs','order=damage_date.desc');
-        cleanData = await sf('mold_cleaning_logs','order=request_date.desc');
-        repairData = await sf('mold_maintenance','order=start_date.desc');
+        damageData = await sf('mold_damage_logs', dmgQ);
+        cleanData = await sf('mold_cleaning_logs', clnQ);
+        repairData = await sf('mold_maintenance', repQ);
         moldsData = await sf('molds','select=id,mold_code,product_code&limit=1000');
         workersData = await sf('workers','active=eq.true&order=name_local.asc');
         var equipRaw = await sf('molding_reports','select=equipment_no&limit=1000');
@@ -864,6 +944,7 @@ function handleHash() {
 // 초기화
 // =============================================
 loadData();
+initPeriod();
 loadHistoryData();
 handleHash();
 window.addEventListener('hashchange', handleHash);
