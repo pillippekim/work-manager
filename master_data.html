@@ -154,6 +154,7 @@ tr:hover td { background: #fafafa; }
     <button class="main-tab" onclick="switchTab('worker')" id="tabBtn_worker">👤 작업자 기준정보</button>
     <button class="main-tab" onclick="switchTab('bom')" id="tabBtn_bom">🔩 조립 BOM</button>
     <button class="main-tab" onclick="switchTab('fmb')" id="tabBtn_fmb">🧪 FMB-BOM</button>
+    <button class="main-tab" onclick="switchTab('equip')" id="tabBtn_equip">🏭 설비 관리</button>
   </div>
 
   <!-- 제품 섹션 -->
@@ -374,8 +375,163 @@ tr:hover td { background: #fafafa; }
     </div>
   </div>
 
+  <!-- 설비 관리 섹션 -->
+  <div class="section" id="section_equip">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">🏭 설비 관리</div>
+          <div class="card-sub">공정별 설비 마스터 데이터 관리 (작업일지, 설비점검에서 참조)</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn-add" onclick="toggleForm('equip')">+ 설비 추가</button>
+        </div>
+      </div>
+
+      <!-- 검색/필터 -->
+      <div class="search-bar">
+        <input class="search-input" id="searchEquip" placeholder="🔍 관리번호, 설비명, 호기 검색" oninput="filterEquip()" />
+        <select class="form-select" id="filterEquipProcess" onchange="filterEquip()" style="width:140px;">
+          <option value="">전체 공정</option>
+          <option value="성형">성형</option>
+          <option value="혼련(CMB)">혼련(CMB)</option>
+          <option value="재단">재단</option>
+          <option value="도포">도포</option>
+          <option value="2차가류">2차가류</option>
+          <option value="쇼트">쇼트</option>
+          <option value="조립">조립</option>
+        </select>
+      </div>
+
+      <!-- 추가 폼 -->
+      <div class="form-row" id="form_equip">
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+          <div class="form-group">
+            <span class="form-label">관리번호 *</span>
+            <input class="form-input" id="eq_code" placeholder="예: 생-A-01" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">설비명 *</span>
+            <input class="form-input" id="eq_name" placeholder="예: 성형가류기(인젝션)" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">호기/표시명</span>
+            <input class="form-input" id="eq_no" placeholder="예: A반-03호기" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">공정 *</span>
+            <select class="form-select" id="eq_process">
+              <option value="성형">성형</option>
+              <option value="혼련(CMB)">혼련(CMB)</option>
+              <option value="재단">재단</option>
+              <option value="도포">도포</option>
+              <option value="2차가류">2차가류</option>
+              <option value="쇼트">쇼트</option>
+              <option value="조립">조립</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-top:8px">
+          <div class="form-group">
+            <span class="form-label">설비 유형</span>
+            <input class="form-input" id="eq_type" placeholder="예: injection, vacuum" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">사양/규격</span>
+            <input class="form-input" id="eq_spec" placeholder="예: 350t 1U3P" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">설치 위치</span>
+            <input class="form-input" id="eq_location" placeholder="예: A동 1층" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">비고</span>
+            <input class="form-input" id="eq_note" placeholder="비고 (선택)" />
+          </div>
+        </div>
+        <div class="form-actions" style="margin-top:10px">
+          <button class="btn-cancel-form" onclick="toggleForm('equip')">취소</button>
+          <button class="btn-save" onclick="saveEquip()">저장</button>
+        </div>
+      </div>
+
+      <!-- 설비 목록 -->
+      <div class="table-scroll-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>관리번호</th>
+              <th>설비명</th>
+              <th>호기</th>
+              <th>공정</th>
+              <th>유형</th>
+              <th>사양</th>
+              <th>상태</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="equipTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div><!-- container -->
 </div><!-- main -->
+
+<!-- 설비 수정 모달 -->
+<div class="modal-overlay" id="editEquipModal">
+  <div class="modal-box">
+    <div class="modal-title">✏️ 설비 수정</div>
+    <input type="hidden" id="eeq_id" />
+    <div class="modal-grid" style="grid-template-columns:1fr 1fr">
+      <div>
+        <div class="modal-label">관리번호</div>
+        <input class="modal-input" id="eeq_code" style="background:#f9f9f9;color:#888" disabled />
+      </div>
+      <div>
+        <div class="modal-label">설비명 *</div>
+        <input class="modal-input" id="eeq_name" />
+      </div>
+      <div>
+        <div class="modal-label">호기/표시명</div>
+        <input class="modal-input" id="eeq_no" />
+      </div>
+      <div>
+        <div class="modal-label">공정 *</div>
+        <select class="modal-select" id="eeq_process">
+          <option value="성형">성형</option>
+          <option value="혼련(CMB)">혼련(CMB)</option>
+          <option value="재단">재단</option>
+          <option value="도포">도포</option>
+          <option value="2차가류">2차가류</option>
+          <option value="쇼트">쇼트</option>
+          <option value="조립">조립</option>
+        </select>
+      </div>
+      <div>
+        <div class="modal-label">설비 유형</div>
+        <input class="modal-input" id="eeq_type" />
+      </div>
+      <div>
+        <div class="modal-label">사양/규격</div>
+        <input class="modal-input" id="eeq_spec" />
+      </div>
+      <div>
+        <div class="modal-label">설치 위치</div>
+        <input class="modal-input" id="eeq_location" />
+      </div>
+      <div>
+        <div class="modal-label">비고</div>
+        <input class="modal-input" id="eeq_note" />
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal('editEquipModal')">취소</button>
+      <button class="btn-modal-save" onclick="saveEditEquip()">저장</button>
+    </div>
+  </div>
+</div>
 
 <!-- 제품 수정 모달 -->
 <div class="modal-overlay" id="editProductModal">
@@ -996,6 +1152,149 @@ loadProducts();
 loadWorkers();
 loadBom();
 loadFmb();
+loadEquip();
+
+// ── 설비 관리 ──
+var equipData = [];
+
+async function loadEquip() {
+  var result = await db.from('equipment_master').select('*').order('process').order('sort_order');
+  equipData = result.data || [];
+  renderEquip();
+}
+
+function filterEquip() {
+  var q = document.getElementById('searchEquip').value.trim().toLowerCase();
+  var proc = document.getElementById('filterEquipProcess').value;
+  var filtered = equipData;
+  if (proc) {
+    filtered = filtered.filter(function(r) { return r.process === proc; });
+  }
+  if (q) {
+    filtered = filtered.filter(function(r) {
+      return (r.equip_code || '').toLowerCase().indexOf(q) !== -1 ||
+        (r.equip_name || '').toLowerCase().indexOf(q) !== -1 ||
+        (r.equip_no || '').toLowerCase().indexOf(q) !== -1;
+    });
+  }
+  renderEquip(filtered);
+}
+
+function renderEquip(filtered) {
+  var list = filtered || equipData;
+  var tbody = document.getElementById('equipTable');
+  if (!list.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">등록된 설비가 없어요.</td></tr>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i];
+    var statusClass = r.active ? 'active-y' : 'active-n';
+    var statusText = r.active ? '사용중' : '미사용';
+    html += '<tr>' +
+      '<td style="font-weight:600;font-size:12px">' + r.equip_code + '</td>' +
+      '<td>' + (r.equip_name || '-') + '</td>' +
+      '<td style="color:#555">' + (r.equip_no || '-') + '</td>' +
+      '<td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:#eff6ff;color:#243bb2">' + r.process + '</span></td>' +
+      '<td style="font-size:11px;color:#888">' + (r.equip_type || '-') + '</td>' +
+      '<td style="font-size:11px;color:#888">' + (r.spec || '-') + '</td>' +
+      '<td><span class="active-badge ' + statusClass + '">' + statusText + '</span></td>' +
+      '<td style="white-space:nowrap">' +
+        '<button class="btn-edit-sm" onclick="openEditEquip(' + r.id + ')">수정</button>' +
+        '<button class="btn-edit-sm" style="background:#fef3c7;color:#92400e" onclick="toggleEquipActive(' + r.id + ', ' + r.active + ')">' + (r.active ? '비활성' : '활성') + '</button>' +
+        '<button class="btn-del" onclick="deleteEquip(' + r.id + ')">삭제</button>' +
+      '</td></tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+async function saveEquip() {
+  var code = document.getElementById('eq_code').value.trim();
+  var name = document.getElementById('eq_name').value.trim();
+  var no = document.getElementById('eq_no').value.trim();
+  var process = document.getElementById('eq_process').value;
+  var type = document.getElementById('eq_type').value.trim();
+  var spec = document.getElementById('eq_spec').value.trim();
+  var location = document.getElementById('eq_location').value.trim();
+  var note = document.getElementById('eq_note').value.trim();
+  if (!code) { showToast('관리번호를 입력해주세요.'); return; }
+  if (!name) { showToast('설비명을 입력해주세요.'); return; }
+  var payload = {
+    equip_code: code, equip_name: name, equip_no: no || null,
+    process: process, equip_type: type || null, spec: spec || null,
+    location: location || null, note: note || null
+  };
+  var result = await db.from('equipment_master').insert(payload);
+  if (result.error) {
+    if (result.error.message.indexOf('duplicate') !== -1 || result.error.message.indexOf('unique') !== -1) {
+      showToast('이미 등록된 관리번호입니다.');
+    } else {
+      showToast('저장 실패: ' + result.error.message);
+    }
+    return;
+  }
+  document.getElementById('eq_code').value = '';
+  document.getElementById('eq_name').value = '';
+  document.getElementById('eq_no').value = '';
+  document.getElementById('eq_type').value = '';
+  document.getElementById('eq_spec').value = '';
+  document.getElementById('eq_location').value = '';
+  document.getElementById('eq_note').value = '';
+  toggleForm('equip');
+  showToast('설비가 추가됐어요 ✓');
+  loadEquip();
+}
+
+function openEditEquip(id) {
+  var r = null;
+  for (var i = 0; i < equipData.length; i++) { if (equipData[i].id === id) { r = equipData[i]; break; } }
+  if (!r) return;
+  document.getElementById('eeq_id').value = r.id;
+  document.getElementById('eeq_code').value = r.equip_code;
+  document.getElementById('eeq_name').value = r.equip_name || '';
+  document.getElementById('eeq_no').value = r.equip_no || '';
+  document.getElementById('eeq_process').value = r.process || '성형';
+  document.getElementById('eeq_type').value = r.equip_type || '';
+  document.getElementById('eeq_spec').value = r.spec || '';
+  document.getElementById('eeq_location').value = r.location || '';
+  document.getElementById('eeq_note').value = r.note || '';
+  document.getElementById('editEquipModal').classList.add('open');
+}
+
+async function saveEditEquip() {
+  var id = document.getElementById('eeq_id').value;
+  var name = document.getElementById('eeq_name').value.trim();
+  var no = document.getElementById('eeq_no').value.trim();
+  var process = document.getElementById('eeq_process').value;
+  var type = document.getElementById('eeq_type').value.trim();
+  var spec = document.getElementById('eeq_spec').value.trim();
+  var loc = document.getElementById('eeq_location').value.trim();
+  var note = document.getElementById('eeq_note').value.trim();
+  if (!name) { showToast('설비명을 입력해주세요.'); return; }
+  var result = await db.from('equipment_master').update({
+    equip_name: name, equip_no: no || null, process: process,
+    equip_type: type || null, spec: spec || null,
+    location: loc || null, note: note || null
+  }).eq('id', id);
+  if (result.error) { showToast('수정 실패: ' + result.error.message); return; }
+  showToast('설비 정보가 수정됐어요 ✓');
+  closeModal('editEquipModal');
+  loadEquip();
+}
+
+async function toggleEquipActive(id, current) {
+  await db.from('equipment_master').update({ active: !current }).eq('id', id);
+  showToast(current ? '비활성화됐어요.' : '활성화됐어요.');
+  loadEquip();
+}
+
+async function deleteEquip(id) {
+  if (!confirm('이 설비를 삭제하시겠습니까?')) return;
+  await db.from('equipment_master').delete().eq('id', id);
+  showToast('삭제됐어요.');
+  loadEquip();
+}
 </script>
 <script src="sidebar.js"></script>
 </body>
