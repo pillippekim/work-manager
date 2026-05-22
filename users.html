@@ -6,140 +6,17 @@
 <title>사용자 관리 - HKHT</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="common.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth_guard.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Noto Sans KR','Pretendard',sans-serif; background: #f1f3f9; color: #1e293b; }
-
-.container { padding: 20px 24px; max-width: 1200px; }
-
-/* 페이지 헤더 */
-.page-header { display: flex; align-items: center; justify-content: space-between; background: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(36,59,178,0.08); margin-bottom: 20px; }
-.page-title { font-size: 20px; font-weight: 700; color: #243bb2; display: flex; align-items: center; gap: 8px; }
-
-/* 통계 카드 */
-.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1rem; }
-.stat-card { background: white; border-radius: 10px; border: 1px solid #e5e5e5; padding: 0.85rem 1rem; }
-.stat-icon { font-size: 20px; margin-bottom: 6px; }
-.stat-label { font-size: 11px; color: #888; margin-bottom: 4px; }
-.stat-num { font-size: 22px; font-weight: 600; color: #111; }
-.stat-num.blue { color: #243bb2; }
-.stat-num.green { color: #16a34a; }
-.stat-num.orange { color: #ea580c; }
-.stat-unit { font-size: 12px; color: #aaa; font-weight: 400; }
-
-/* 메인 탭 */
-.main-tabs { display: flex; gap: 0; margin-bottom: 1rem; background: white; border-radius: 12px; border: 1px solid #e5e5e5; overflow: hidden; }
-.main-tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; font-size: 14px; font-weight: 500; color: #888; border: none; background: transparent; font-family: inherit; transition: all 0.15s; border-bottom: 2.5px solid transparent; }
-.main-tab:hover { color: #243bb2; background: #f9f9f9; }
-.main-tab.active { color: #243bb2; border-bottom-color: #243bb2; background: #eef0ff; }
-
-.section { display: none; }
-.section.active { display: block; }
-
-/* 카드 */
-.card { background: white; border-radius: 12px; border: 1px solid #e5e5e5; padding: 1rem 1.25rem; margin-bottom: 1rem; }
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.card-title { font-size: 15px; font-weight: 600; color: #111; }
-
-/* 검색바 */
-.search-bar { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; }
-.search-input { flex: 1; min-width: 180px; font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 12px; outline: none; font-family: inherit; color: #111; }
-.search-input:focus { border-color: #243bb2; }
-.filter-select { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 12px; outline: none; font-family: inherit; color: #111; background: white; cursor: pointer; }
-
-/* 폼 */
-.form-grid { display: grid; gap: 12px; margin-bottom: 1rem; }
-.form-grid-2 { grid-template-columns: 1fr 1fr; }
-.form-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
-.form-group { display: flex; flex-direction: column; gap: 5px; }
-.form-label { font-size: 12px; color: #888; font-weight: 500; }
-.form-label .required { color: #e53e3e; }
-.form-input, .form-select { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 9px 11px; outline: none; font-family: inherit; color: #111; background: white; }
-.form-input:focus, .form-select:focus { border-color: #243bb2; }
-.form-help { font-size: 11px; color: #aaa; margin-top: 4px; }
-
-/* 라디오 */
-.radio-group { display: flex; gap: 8px; }
-.radio-option { flex: 1; padding: 10px; border: 1.5px solid #e5e5e5; border-radius: 8px; text-align: center; cursor: pointer; font-size: 13px; color: #555; }
-.radio-option.active { border-color: #243bb2; background: #eef0ff; color: #243bb2; font-weight: 500; }
-.radio-option input { display: none; }
-
-/* 버튼 */
-.btn-primary { font-size: 13px; padding: 10px 20px; border-radius: 8px; background: #243bb2; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
-.btn-primary:hover:not(:disabled) { opacity: 0.9; }
-.btn-primary:disabled { background: #aaa; cursor: not-allowed; }
-.btn-secondary { font-size: 13px; padding: 10px 16px; border-radius: 8px; background: transparent; color: #555; border: 1px solid #ddd; cursor: pointer; font-family: inherit; }
-
-/* 테이블 */
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th { font-size: 12px; font-weight: 500; color: #888; padding: 9px 12px; background: #f9f9f9; border-bottom: 1px solid #eee; text-align: left; white-space: nowrap; position: sticky; top: 0; z-index: 10; }
-td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; color: #111; vertical-align: middle; }
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: #fafafa; }
-.role-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
-.role-super { background: #fdf4ff; color: #9333ea; }
-.role-admin { background: #eff6ff; color: #243bb2; }
-.role-worker { background: #f0fdf4; color: #16a34a; }
-.status-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
-.status-active { background: #f0fdf4; color: #16a34a; }
-.status-inactive { background: #f9f9f9; color: #aaa; }
-.pwd-pending { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #fef3c7; color: #d97706; font-weight: 500; }
+/* ── users 고유 스타일 ── */
 .action-btns { display: flex; gap: 4px; }
-.btn-sm { font-size: 12px; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-family: inherit; border: none; }
-.btn-edit-sm { background: #eff6ff; color: #243bb2; border: 1px solid #bfdbfe; }
-.btn-reset { background: #fef3c7; color: #d97706; border: 1px solid #fde68a; }
+.btn-reset { background: #fef3c7; color: #d97706; border: 1px solid #fde68a; font-size: 12px; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-family: inherit; }
 .btn-reset:hover { background: #fde68a; }
-.btn-toggle { background: transparent; color: #555; border: 1px solid #ddd; }
+.btn-toggle { background: transparent; color: #555; border: 1px solid #ddd; font-size: 12px; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-family: inherit; }
 .btn-toggle:hover { background: #f5f5f5; }
-.btn-del { background: transparent; color: #e53e3e; border: 1px solid #fca5a5; }
-.btn-del:hover { background: #fff0f0; }
-.empty-row td { text-align: center; color: #aaa; padding: 2rem; }
-
-/* 엑셀 업로드 */
-.excel-zone { border: 1.5px dashed #cbd5e1; border-radius: 8px; padding: 1.5rem; text-align: center; cursor: pointer; background: white; margin-bottom: 12px; }
-.excel-zone:hover, .excel-zone.dragover { border-color: #243bb2; background: #eef0ff; border-style: solid; }
-.preview-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.preview-table th { background: #f9f9f9; padding: 6px 8px; border-bottom: 1px solid #eee; text-align: left; color: #888; }
-.preview-table td { padding: 6px 8px; border-bottom: 1px solid #f5f5f5; }
-
-/* 토스트 */
-.toast { display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #111; color: white; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 999; }
-.toast.show { display: block; }
-
-/* 권한 없음 */
-.no-permission { text-align: center; padding: 4rem 2rem; }
-.no-permission-icon { font-size: 56px; margin-bottom: 1rem; }
-.no-permission-title { font-size: 18px; font-weight: 600; color: #111; margin-bottom: 6px; }
-.no-permission-msg { font-size: 13px; color: #888; }
-.hidden { display: none !important; }
-
-/* 수정 모달 */
-.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; padding: 1rem; }
-.modal-overlay.open { display: flex; }
-.modal-box { background: white; border-radius: 12px; padding: 1.5rem; width: 100%; max-width: 540px; max-height: 90vh; overflow-y: auto; }
-.modal-title { font-size: 16px; font-weight: 600; color: #111; margin-bottom: 1rem; }
-.modal-section { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #f0f0f0; }
-.modal-section:last-of-type { border-bottom: none; }
-.modal-section-title { font-size: 12px; font-weight: 500; color: #888; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-.readonly-input { font-size: 13px; border: 1px solid #f0f0f0; border-radius: 8px; padding: 9px 11px; background: #f9f9f9; color: #888; width: 100%; }
-.modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1rem; }
-
-/* 테이블 헤더 고정 */
-.table-scroll-wrap { max-height: 600px; overflow-y: auto; overflow-x: auto; border-radius: 8px; border: 1px solid #f0f0f0; }
-.table-scroll-wrap table { margin: 0; }
-.table-scroll-wrap thead th { position: sticky; top: 0; z-index: 10; background: #f9f9f9; box-shadow: inset 0 -1px 0 #eee; }
-
-/* 모바일 */
-@media(max-width:768px) {
-  .container { padding: 12px; }
-  .stats-row { grid-template-columns: repeat(2, 1fr); }
-  .main-tabs { flex-direction: column; }
-  .form-grid-2 { grid-template-columns: 1fr; }
-  .search-bar { flex-direction: column; }
-}
 </style>
 </head>
 <body>
@@ -160,8 +37,12 @@ tr:hover td { background: #fafafa; }
 
   <!-- 페이지 헤더 -->
   <div class="page-header">
-    <span class="page-title">👥 사용자 관리</span>
-    <span style="font-size:12px;color:#94a3b8">슈퍼관리자 전용</span>
+    <div class="header-row">
+      <div>
+        <h1>👥 사용자 관리</h1>
+        <div class="sub">계정 생성, 권한 부여, 비밀번호 초기화 (슈퍼관리자 전용)</div>
+      </div>
+    </div>
   </div>
 
   <!-- 권한 없음 화면 -->
