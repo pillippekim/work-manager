@@ -731,7 +731,7 @@ async function loadStatusHistory(moldId, idx) {
     var el = document.getElementById('historyList_' + idx);
     if (!el) return;
     try {
-        var res = await fetch(SB + '/rest/v1/mold_status_logs?mold_id=eq.' + moldId + '&order=changed_at.desc&limit=5', { headers: H });
+        var res = await fetch(SB + '/rest/v1/mold_status_logs?select=*,molds(product_code)&mold_id=eq.' + moldId + '&order=changed_at.desc&limit=5', { headers: H });
         var logs = await res.json();
         if (!Array.isArray(logs) || logs.length === 0) {
             el.innerHTML = '<div style="text-align:center;padding:8px;color:#94a3b8;font-size:12px;">이력이 없습니다</div>';
@@ -742,15 +742,16 @@ async function loadStatusHistory(moldId, idx) {
         var colorMap = { stored: '#22c55e', in_use: '#ef4444', repairing: '#f59e0b' };
         for (var j = 0; j < logs.length; j++) {
             var log = logs[j];
-            var fromText = statusMap[log.from_status] || log.from_status || '?';
-            var toText = statusMap[log.to_status] || log.to_status || '?';
-            var toColor = colorMap[log.to_status] || '#94a3b8';
+            var fromText = statusMap[log.prev_status] || log.prev_status || '?';
+            var toText = statusMap[log.new_status] || log.new_status || '?';
+            var toColor = colorMap[log.new_status] || '#94a3b8';
             var dt = new Date(log.changed_at);
-            var dateStr = (dt.getMonth()+1) + '/' + dt.getDate() + ' ' + String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
-            var reason = log.reason ? ' (' + log.reason + ')' : '';
+            var dateStr = (dt.getMonth()+1) + '/' + dt.getDate();
+            var sabun = (log.molds && log.molds.product_code) ? log.molds.product_code : '';
+            var displayText = sabun ? (sabun + ' / ' + fromText + ' > ' + toText) : (fromText + ' > ' + toText);
             h += '<div class="history-item">';
             h += '<div class="history-dot" style="background:' + toColor + '"></div>';
-            h += '<div class="history-text">' + fromText + ' → ' + toText + reason + '</div>';
+            h += '<div class="history-text">' + displayText + '</div>';
             h += '<div class="history-date">' + dateStr + '</div>';
             h += '</div>';
         }

@@ -54,13 +54,12 @@ function initSidebar() {
     }
 
     // 금형관리 페이지 여부
-    var isMoldPage = ['mold_dashboard.html','mold_layout.html','mold_detail.html','mold_history.html'].indexOf(page) !== -1;
+    var isMoldPage = ['mold_dashboard.html','mold_layout.html','mold_detail.html'].indexOf(page) !== -1;
 
     // 금형관리 하위 페이지 active
     var dashActive = (page === 'mold_dashboard.html') ? ' nav-active' : '';
     var layoutActive = (page === 'mold_layout.html') ? ' nav-active' : '';
     var adminActive = (page === 'mold_detail.html') ? ' nav-active' : '';
-    var historyActive = (page === 'mold_history.html') ? ' nav-active' : '';
 
     // 금형관리 페이지면 생산관리 > 금형관리 자동 펼침
     var prodOpen = isMoldPage ? ' open' : '';
@@ -126,10 +125,9 @@ function initSidebar() {
                             '<span class="s-badge c-badge on">1차</span><span class="s-arrow">▼</span>' +
                         '</button>' +
                         '<div class="sub-body">' +
-                            '<a class="nav-link' + dashActive + '" href="mold_dashboard.html"><span class="n-icon">📊</span>대시보드</a>' +
+                            '<a class="nav-link' + dashActive + '" href="mold_dashboard.html"><span class="n-icon">📊</span>대시보드 / 이력</a>' +
                             '<a class="nav-link' + layoutActive + '" href="mold_layout.html"><span class="n-icon">🗄️</span>적치대 현황</a>' +
                             '<a class="nav-link' + adminActive + '" href="mold_detail.html"><span class="n-icon">📋</span>금형 상세관리</a>' +
-                            '<a class="nav-link' + historyActive + '" href="mold_history.html"><span class="n-icon">🔧</span>이력 관리</a>' +
                         '</div>' +
                     '</div>' +
                     '<div class="sub-item disabled">' +

@@ -778,7 +778,26 @@ async function submitForm() {
 
     try {
         if (editId) {
+            // 수정 시: 기존 상태와 비교하여 변경되었으면 로그 기록
+            var oldMold = allMolds.find(function(x) { return x.id === editId; });
+            var oldStatus = oldMold ? oldMold.status : null;
+
             await supaUpdate('molds', editId, data);
+
+            // 상태가 변경된 경우 mold_status_logs에 기록
+            if (oldMold && oldStatus !== statusVal) {
+                try {
+                    await supaInsert('mold_status_logs', {
+                        mold_id: editId,
+                        prev_status: oldStatus,
+                        new_status: statusVal,
+                        reason: '금형 상세관리에서 변경'
+                    });
+                } catch(logErr) {
+                    console.log('상태 변경 로그 기록 실패:', logErr);
+                }
+            }
+
             showToast('금형 수정 완료: ' + moldCode, 'success');
         } else {
             await supaInsert('molds', data);
