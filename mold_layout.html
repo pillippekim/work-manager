@@ -18,7 +18,8 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
 
 /* 요약 카드 */
 .summary-bar { display:flex; gap:8px; padding:12px 16px; overflow-x:auto; }
-.summary-card { flex-shrink:0; background:#fff; border-radius:10px; padding:10px 14px; min-width:90px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+.summary-card { flex-shrink:0; background:#fff; border-radius:10px; padding:10px 14px; min-width:90px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); transition:all 0.15s; }
+.summary-card:hover { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.12); }
 .summary-card .num { font-size:22px; font-weight:700; }
 .summary-card .label { font-size:11px; color:#64748b; margin-top:2px; }
 .sc-total .num { color:#243bb2; }
@@ -245,11 +246,11 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
 
 <!-- 요약 카드 -->
 <div class="summary-bar" id="summaryBar">
-    <div class="summary-card sc-total"><div class="num" id="cntTotal">-</div><div class="label">전체</div></div>
-    <div class="summary-card sc-stored"><div class="num" id="cntStored">-</div><div class="label">보관중</div></div>
-    <div class="summary-card sc-inuse"><div class="num" id="cntInuse">-</div><div class="label">사용중</div></div>
-    <div class="summary-card sc-repair"><div class="num" id="cntRepair">-</div><div class="label">수리중</div></div>
-    <div class="summary-card sc-retired"><div class="num" id="cntRetired">-</div><div class="label">사용X</div></div>
+    <div class="summary-card sc-total" style="cursor:pointer;" onclick="filterByStatus('')"><div class="num" id="cntTotal">-</div><div class="label">전체</div></div>
+    <div class="summary-card sc-stored" style="cursor:pointer;" onclick="filterByStatus('stored')"><div class="num" id="cntStored">-</div><div class="label">보관중</div></div>
+    <div class="summary-card sc-inuse" style="cursor:pointer;" onclick="filterByStatus('in_use')"><div class="num" id="cntInuse">-</div><div class="label">사용중</div></div>
+    <div class="summary-card sc-repair" style="cursor:pointer;" onclick="filterByStatus('repairing')"><div class="num" id="cntRepair">-</div><div class="label">수리중</div></div>
+    <div class="summary-card sc-retired" style="cursor:pointer;" onclick="filterByStatus('retired')"><div class="num" id="cntRetired">-</div><div class="label">사용X</div></div>
     <div class="summary-card sc-alert" style="cursor:pointer;" onclick="openAlertModal()"><div class="num" id="cntAlert">-</div><div class="label">⚠ 유지보수</div></div>
 </div>
 
@@ -302,18 +303,11 @@ body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif
 <!-- 우측: 금형 상세관리 패널 -->
 <div class="split-right" id="detailPanel">
     <div class="detail-panel-header">
-        <div class="detail-panel-title">📋 금형 상세관리</div>
+        <div class="detail-panel-title" id="detailPanelTitle">📋 전체 금형</div>
         <button class="detail-panel-toggle" onclick="toggleDetailPanel()" title="접기/펼치기">◀</button>
     </div>
-    <div class="detail-panel-toolbar">
-        <input type="text" id="detailSearch" placeholder="사번/금형번호 검색..." oninput="filterDetailTable()">
-        <select id="detailStatusFilter" onchange="filterDetailTable()">
-            <option value="">전체</option>
-            <option value="stored">보관중</option>
-            <option value="in_use">사용중</option>
-            <option value="repairing">수리중</option>
-        </select>
-    </div>
+    <input type="hidden" id="detailSearch" value="">
+    <input type="hidden" id="detailStatusFilter" value="">
     <div class="detail-panel-body">
         <table class="detail-table">
             <thead>
@@ -824,8 +818,12 @@ function renderDetailTable() {
     var statusFilter = document.getElementById('detailStatusFilter').value;
 
     var filtered = molds.filter(function(m) {
-        if (!m.is_active) return false;
-        if (statusFilter && m.status !== statusFilter) return false;
+        if (statusFilter === 'retired') {
+            if (m.is_active) return false;
+        } else {
+            if (!m.is_active) return false;
+            if (statusFilter && m.status !== statusFilter) return false;
+        }
         if (search) {
             var code = (m.mold_code || '').toLowerCase();
             var pcode = (m.product_code || '').toLowerCase();
@@ -864,6 +862,33 @@ function renderDetailTable() {
 }
 
 function filterDetailTable() {
+    renderDetailTable();
+}
+
+// 상단 요약 카드 클릭 → 우측 패널 필터 연동
+function filterByStatus(status) {
+    // 패널이 접혀있으면 펼치기
+    var panel = document.getElementById('detailPanel');
+    if (panel.classList.contains('collapsed')) {
+        panel.classList.remove('collapsed');
+        panel.querySelector('.detail-panel-toggle').textContent = '◀';
+    }
+
+    // 필터 설정
+    document.getElementById('detailStatusFilter').value = status;
+    document.getElementById('detailSearch').value = '';
+
+    // 타이틀 변경
+    var titleMap = { '': '📋 전체 금형', 'stored': '📋 보관중 금형', 'in_use': '📋 사용중 금형', 'repairing': '📋 수리중 금형', 'retired': '📋 사용X 금형' };
+    document.getElementById('detailPanelTitle').textContent = titleMap[status] || '📋 전체 금형';
+
+    // 요약 카드 활성화 표시
+    var cards = document.querySelectorAll('.summary-card');
+    for (var i = 0; i < cards.length; i++) { cards[i].style.outline = 'none'; cards[i].style.outlineOffset = '0'; }
+    var classMap = { '': '.sc-total', 'stored': '.sc-stored', 'in_use': '.sc-inuse', 'repairing': '.sc-repair', 'retired': '.sc-retired' };
+    var activeCard = document.querySelector(classMap[status]);
+    if (activeCard) { activeCard.style.outline = '2px solid #243bb2'; activeCard.style.outlineOffset = '2px'; }
+
     renderDetailTable();
 }
 
@@ -931,6 +956,14 @@ document.getElementById('moldModal').addEventListener('click', function(e) {
 document.getElementById('searchInput').addEventListener('keyup', function(e) {
     if (e.key === 'Enter') {
         doSearch(this.value.trim());
+        // 우측 패널 연동
+        document.getElementById('detailSearch').value = this.value.trim();
+        document.getElementById('detailStatusFilter').value = '';
+        document.getElementById('detailPanelTitle').textContent = this.value.trim() ? '📋 검색: ' + this.value.trim() : '📋 전체 금형';
+        // 요약 카드 활성화 해제
+        var cards = document.querySelectorAll('.summary-card');
+        for (var ci = 0; ci < cards.length; ci++) { cards[ci].style.outline = 'none'; }
+        renderDetailTable();
     }
 });
 
