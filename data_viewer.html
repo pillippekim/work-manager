@@ -1,0 +1,2850 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>데이터 조회 및 추출 - HKHT</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sidebar.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth_guard.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Noto Sans KR','Pretendard',sans-serif; background: #f1f3f9; color: #1e293b; }
+.app { max-width: 1600px; margin: 0 auto; }
+.top-nav { display: flex; align-items: center; justify-content: space-between; background: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(36,59,178,0.08); margin-bottom: 20px; }
+.back-btn { background: #f0f3f9; color: #243bb2; border: none; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; font-family: inherit; }
+.back-btn:hover { background: #e3e8f5; text-decoration: none; }
+.nav-heading { font-size: 20px; font-weight: 700; color: #243bb2; }
+.nav-sep { display: none; }
+.nav-cur { display: none; }
+.card { background: white; border-radius: 12px; border: 1px solid #e5e5e5; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+
+/* 공정 탭 */
+.process-tabs { display: flex; gap: 0; margin-bottom: 1rem; background: white; border-radius: 12px; border: 1px solid #e5e5e5; overflow: hidden; }
+.process-tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; font-size: 14px; font-weight: 500; color: #888; border: none; background: transparent; font-family: inherit; transition: all 0.15s; border-bottom: 2.5px solid transparent; }
+.process-tab:hover { color: #243bb2; background: #f9f9f9; }
+.process-tab.active { color: #243bb2; border-bottom-color: #243bb2; background: #eff6ff; }
+
+/* 필터 바 */
+.filter-bar { display: flex; gap: 10px; margin-bottom: 1rem; align-items: end; flex-wrap: wrap; }
+.filter-group { display: flex; flex-direction: column; gap: 4px; }
+.filter-label { font-size: 11px; color: #888; }
+.filter-input { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 12px; outline: none; font-family: inherit; color: #111; min-width: 140px; }
+.filter-input:focus { border-color: #243bb2; }
+.btn-search { font-size: 13px; padding: 9px 18px; border-radius: 8px; background: #243bb2; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
+.btn-excel { font-size: 13px; padding: 9px 16px; border-radius: 8px; background: #16a34a; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
+.btn-toggle-view { font-size: 12px; padding: 7px 14px; border-radius: 8px; background: white; color: #555; border: 1px solid #ddd; cursor: pointer; font-family: inherit; }
+.btn-toggle-view.active { background: #eff6ff; color: #243bb2; border-color: #243bb2; }
+
+/* 통계 */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1rem; }
+.stat-card { background: white; border-radius: 10px; border: 1px solid #e5e5e5; padding: 0.85rem 1rem; }
+.stat-icon { font-size: 20px; margin-bottom: 6px; }
+.stat-label { font-size: 11px; color: #888; margin-bottom: 4px; }
+.stat-num { font-size: 22px; font-weight: 600; color: #111; }
+.stat-num.blue { color: #243bb2; }
+.stat-num.green { color: #16a34a; }
+.stat-num.orange { color: #ea580c; }
+.stat-num.red { color: #e53e3e; }
+.stat-unit { font-size: 12px; color: #aaa; font-weight: 400; }
+
+/* 테이블 */
+.table-wrap { overflow-x: auto; max-height: 70vh; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1200px; }
+th { font-size: 12px; font-weight: 500; color: #888; padding: 9px 10px; background: #f9f9f9; border-bottom: 1px solid #eee; text-align: left; white-space: nowrap; position: sticky; top: 0; z-index: 10; }
+td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; color: #111; vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #fafafa; }
+.empty-row td { text-align: center; color: #aaa; padding: 2rem; font-size: 14px; }
+.lot-tag { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #fef9c3; color: #ca8a04; margin: 1px; font-weight: 500; }
+.lot-cell { max-width: 420px; min-width: 250px; }
+.col-worker { min-width: 80px; white-space: nowrap; }
+.process-tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+.process-포장 { background: #eff6ff; color: #243bb2; }
+.process-검사 { background: #f0fdf4; color: #16a34a; }
+.process-혼련\(CMB\) { background: #fef3c7; color: #b45309; }
+.process-재단 { background: #f3e8ff; color: #7e22ce; }
+.process-재단 { background: #fff7ed; color: #ea580c; }
+.process-도포 { background: #fdf4ff; color: #9333ea; }
+.process-쇼트 { background: #fef2f2; color: #dc2626; }
+.process-성형 { background: #f0f9ff; color: #0284c7; }
+.defect-cell { color: #e53e3e; font-weight: 500; }
+.pass-cell { color: #16a34a; font-weight: 500; }
+
+/* 섹션 (전체 탭에서 사용) */
+.process-section { margin-bottom: 1.5rem; }
+.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.section-title { font-size: 14px; font-weight: 600; color: #111; }
+.section-count { font-size: 12px; color: #888; background: #f3f4f6; padding: 3px 10px; border-radius: 10px; }
+.section-card { background: white; border-radius: 10px; border: 1px solid #e5e5e5; padding: 1rem 1.25rem; }
+.btn-section-detail { font-size: 12px; color: #243bb2; background: none; border: none; cursor: pointer; font-family: inherit; }
+.btn-section-detail:hover { text-decoration: underline; }
+
+.toast { display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #111; color: white; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 999; }
+.toast.show { display: block; }
+
+.hidden { display: none !important; }
+
+/* 행 액션 버튼 */
+.row-actions { display: flex; gap: 4px; }
+.btn-row { font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-family: inherit; border: none; white-space: nowrap; }
+.btn-row-edit { background: #eff6ff; color: #243bb2; }
+.btn-row-edit:hover { background: #dbeafe; }
+.btn-row-edit:disabled { background: #f5f5f5; color: #ccc; cursor: not-allowed; }
+.btn-row-del { background: transparent; color: #e53e3e; border: 1px solid #fca5a5; }
+.btn-row-del:hover { background: #fff0f0; }
+.btn-row-del:disabled { color: #ccc; border-color: #eee; cursor: not-allowed; }
+
+/* 모달 */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; padding: 1rem; }
+.modal-overlay.open { display: flex; }
+.modal-box { background: white; border-radius: 12px; padding: 1.5rem; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; }
+.modal-title { font-size: 16px; font-weight: 600; color: #111; margin-bottom: 4px; }
+.modal-sub { font-size: 12px; color: #888; margin-bottom: 1rem; }
+.modal-grid { display: grid; gap: 12px; margin-bottom: 1rem; }
+.modal-grid-2 { grid-template-columns: 1fr 1fr; }
+.modal-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+.modal-field { display: flex; flex-direction: column; gap: 4px; }
+.modal-label { font-size: 12px; color: #888; }
+.modal-input { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 10px; outline: none; font-family: inherit; color: #111; }
+.modal-input:focus { border-color: #243bb2; }
+.modal-input.readonly { background: #f9f9f9; color: #888; }
+.modal-textarea { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 10px; outline: none; font-family: inherit; color: #111; resize: none; }
+.modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1rem; }
+.btn-modal-cancel { font-size: 13px; padding: 9px 18px; border-radius: 8px; background: transparent; color: #888; border: 1px solid #ddd; cursor: pointer; font-family: inherit; }
+.btn-modal-save { font-size: 13px; padding: 9px 18px; border-radius: 8px; background: #243bb2; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
+.btn-modal-del { font-size: 13px; padding: 9px 18px; border-radius: 8px; background: #e53e3e; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
+
+/* 삭제됨 표시 */
+.deleted-row { opacity: 0.5; background: #fef2f2 !important; }
+.deleted-badge { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #fef2f2; color: #dc2626; font-weight: 500; margin-left: 4px; }
+.show-deleted-toggle { font-size: 12px; padding: 6px 12px; border-radius: 6px; background: white; color: #555; border: 1px solid #ddd; cursor: pointer; font-family: inherit; }
+.show-deleted-toggle.active { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
+/* 정렬 가능 헤더 */
+th.sortable { cursor:pointer; user-select:none; position:relative; white-space:nowrap; }
+th.sortable:hover { background:#eef0ff; }
+th.sortable::after { content:'⇅'; margin-left:4px; font-size:10px; color:#b0b8c9; }
+th.sortable.asc::after { content:'▲'; color:#243bb2; }
+th.sortable.desc::after { content:'▼'; color:#243bb2; }
+</style>
+</head>
+<body>
+
+<!-- 권한 체크 로딩 화면 -->
+<div id="authCheckOverlay" style="position:fixed;inset:0;background:#f1f3f9;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="width:36px;height:36px;border:3px solid #e5e5e5;border-top-color:#243bb2;border-radius:50%;animation:authSpin 0.8s linear infinite"></div>
+  <div style="font-size:13px;color:#888;font-family:inherit">권한 확인 중...</div>
+  <style>@keyframes authSpin { to { transform: rotate(360deg); } }</style>
+</div>
+
+<!-- WM 레이아웃 -->
+<div id="top-header" class="top-header"></div>
+<nav id="sidebar-nav" class="sidebar"></nav>
+
+<div class="main">
+<div class="app">
+  <div class="top-nav" style="display:flex;align-items:center;justify-content:space-between;background:white;padding:16px 24px;border-radius:12px;box-shadow:0 2px 8px rgba(36,59,178,0.08);margin-bottom:20px;">
+    <span class="nav-heading" style="font-size:20px;font-weight:700;color:#243bb2;">📊 데이터 조회 및 추출</span>
+    <span style="width:100px"></span>
+  </div>
+
+  <!-- 공정 탭 -->
+  <div class="process-tabs">
+    <button class="process-tab active" data-process="all" onclick="switchProcess('all')">📊 전체</button>
+    <button class="process-tab" data-process="포장" onclick="switchProcess('포장')">📦 포장</button>
+    <button class="process-tab" data-process="검사" onclick="switchProcess('검사')">🔬 검사</button>
+    <button class="process-tab" data-process="혼련(CMB)" onclick="switchProcess('혼련(CMB)')">🧪 혼련(CMB)</button>
+    <button class="process-tab" data-process="재단" onclick="switchProcess('재단')">✂️ 재단</button>
+    <button class="process-tab" data-process="도포" onclick="switchProcess('도포')">🎨 도포</button>
+    <button class="process-tab" data-process="2차가류" onclick="switchProcess('2차가류')">🔥 2차가류</button>
+    <button class="process-tab" data-process="쇼트" onclick="switchProcess('쇼트')">💥 쇼트</button>
+    <button class="process-tab" data-process="성형" onclick="switchProcess('성형')">🏭 성형</button>
+    <button class="process-tab" data-process="조립" onclick="switchProcess('조립')">🔩 조립</button>
+  </div>
+
+  <!-- 필터 -->
+  <div class="card">
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label class="filter-label">시작일</label>
+        <input class="filter-input" type="date" id="startDate" />
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">종료일</label>
+        <input class="filter-input" type="date" id="endDate" />
+      </div>
+      <div class="filter-group" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;align-self:end">
+        <button class="btn-period" onclick="setPeriod('today')" style="padding:8px 14px;border:1px solid #243bb2;background:#243bb2;color:white;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">당일</button>
+        <button class="btn-period" onclick="setPeriod('thisMonth')" style="padding:8px 14px;border:1px solid #e0e4ed;background:white;color:#555;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">당월</button>
+        <button class="btn-period" onclick="setPeriod('yesterday')" style="padding:8px 14px;border:1px solid #e0e4ed;background:white;color:#555;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">전일</button>
+        <button class="btn-period" onclick="setPeriod('lastMonth')" style="padding:8px 14px;border:1px solid #e0e4ed;background:white;color:#555;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">전월</button>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">사번</label>
+        <input class="filter-input" type="text" id="filterSabun" placeholder="사번 검색" />
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">작업자</label>
+        <input class="filter-input" type="text" id="filterWorker" placeholder="작업자 이름" />
+      </div>
+      <button class="btn-search" onclick="loadData()">🔍 조회</button>
+      <button class="btn-excel" onclick="downloadExcel()">📥 엑셀 다운로드</button>
+
+      <!-- 전체 탭에서만 보이는 토글 -->
+      <button class="btn-toggle-view hidden" id="toggleViewBtn" onclick="toggleUnifiedView()">
+        👁️ 통합 보기
+      </button>
+
+      <!-- 슈퍼관리자만 보이는 삭제 포함 토글 -->
+      <button class="show-deleted-toggle hidden" id="showDeletedBtn" onclick="toggleShowDeleted()">
+        🗑️ 삭제 포함
+      </button>
+    </div>
+  </div>
+
+  <!-- 통계 -->
+  <div class="stats-row" id="statsRow"></div>
+
+  <!-- 결과 -->
+  <div id="resultArea"></div>
+</div>
+
+<!-- 포장 수정 모달 -->
+<div class="modal-overlay" id="editPackagingModal">
+  <div class="modal-box">
+    <div class="modal-title">📦 포장 작업일지 수정</div>
+    <div class="modal-sub" id="editPackagingMeta">-</div>
+    <input type="hidden" id="ep_id" />
+    <div class="modal-grid modal-grid-2">
+      <div class="modal-field">
+        <span class="modal-label">작업일</span>
+        <input class="modal-input" type="date" id="ep_work_date" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">사번</span>
+        <input class="modal-input" id="ep_worker_id" />
+      </div>
+    </div>
+    <div class="modal-grid modal-grid-2">
+      <div class="modal-field">
+        <span class="modal-label">작업자</span>
+        <input class="modal-input" id="ep_worker_name" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">포장수량</span>
+        <input class="modal-input" type="number" id="ep_quantity" />
+      </div>
+    </div>
+    <div class="modal-grid">
+      <div class="modal-field">
+        <span class="modal-label">성형 LOT No. (쉼표로 구분)</span>
+        <input class="modal-input" id="ep_lot_nos" placeholder="C260424020, C260425010" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">비고</span>
+        <input class="modal-input" id="ep_note" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">특이사항</span>
+        <textarea class="modal-textarea" id="ep_remarks" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal('editPackagingModal')">취소</button>
+      <button class="btn-modal-save" onclick="saveEditPackaging()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 검사 수정 모달 -->
+<div class="modal-overlay" id="editInspectionModal">
+  <div class="modal-box">
+    <div class="modal-title">🔬 검사 작업일지 수정</div>
+    <div class="modal-sub" id="editInspectionMeta">-</div>
+    <input type="hidden" id="ei_id" />
+    <div class="modal-grid modal-grid-2">
+      <div class="modal-field">
+        <span class="modal-label">작업일</span>
+        <input class="modal-input" type="date" id="ei_work_date" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">사번</span>
+        <input class="modal-input" id="ei_worker_id" />
+      </div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field">
+        <span class="modal-label">검사수량</span>
+        <input class="modal-input" type="number" id="ei_inspect_qty" oninput="recalcFail()" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">합격수량</span>
+        <input class="modal-input" type="number" id="ei_pass_qty" oninput="recalcFail()" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">불합격 (자동)</span>
+        <input class="modal-input readonly" type="number" id="ei_fail_qty" readonly />
+      </div>
+    </div>
+    <div class="modal-grid modal-grid-2">
+      <div class="modal-field">
+        <span class="modal-label">작업자</span>
+        <input class="modal-input" id="ei_worker_name" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">불량유형</span>
+        <select class="modal-input" id="ei_defect_type">
+          <option value="">없음</option>
+          <option value="기포">기포</option>
+          <option value="미성형">미성형</option>
+          <option value="형상불량">형상불량</option>
+          <option value="이물질">이물질</option>
+          <option value="찢어짐">찢어짐</option>
+          <option value="깨짐">깨짐</option>
+          <option value="찍힘">찍힘</option>
+          <option value="뜯김">뜯김</option>
+          <option value="사상">사상</option>
+          <option value="미가류">미가류</option>
+          <option value="접착불량">접착불량</option>
+          <option value="Burr">Burr</option>
+          <option value="홀막힘">홀막힘</option>
+          <option value="찐드기">찐드기</option>
+          <option value="기타">기타</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-grid">
+      <div class="modal-field">
+        <span class="modal-label">성형 LOT No. (쉼표로 구분)</span>
+        <input class="modal-input" id="ei_lot_nos" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">비고</span>
+        <input class="modal-input" id="ei_defect_memo" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">특이사항</span>
+        <textarea class="modal-textarea" id="ei_remarks" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal('editInspectionModal')">취소</button>
+      <button class="btn-modal-save" onclick="saveEditInspection()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 혼련(CMB) 수정 모달 -->
+<div class="modal-overlay" id="editCmbModal">
+  <div class="modal-box" style="max-width:720px">
+    <div class="modal-title">🧪 혼련(CMB) 작업일지 수정</div>
+    <div class="modal-sub" id="editCmbMeta">-</div>
+    <input type="hidden" id="ec_id" />
+    <div class="modal-grid modal-grid-2">
+      <div class="modal-field">
+        <span class="modal-label">작업일</span>
+        <input class="modal-input" type="date" id="ec_work_date" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">작업자</span>
+        <input class="modal-input" id="ec_worker_name" />
+      </div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field">
+        <span class="modal-label">BATCH No.</span>
+        <input class="modal-input" id="ec_lot_no" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">사번 (제품코드)</span>
+        <input class="modal-input" id="ec_worker_id" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">재질명</span>
+        <input class="modal-input" id="ec_material_name" />
+      </div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field">
+        <span class="modal-label">중량 (Kg)</span>
+        <input class="modal-input" type="number" step="0.001" id="ec_weight" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">재믹싱</span>
+        <select class="modal-input" id="ec_is_remix">
+          <option value="false">아니오</option>
+          <option value="true">예 (재믹싱)</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">평량 정상투입</span>
+        <select class="modal-input" id="ec_weighing_check">
+          <option value="true">O (정상)</option>
+          <option value="false">X (비정상)</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-grid">
+      <div class="modal-field">
+        <span class="modal-label">비고</span>
+        <input class="modal-input" id="ec_note" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">특이사항</span>
+        <textarea class="modal-textarea" id="ec_remarks" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal('editCmbModal')">취소</button>
+      <button class="btn-modal-save" onclick="saveEditCmb()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 재단 수정 모달 -->
+<div class="modal-overlay" id="editCuttingModal">
+  <div class="modal-box" style="max-width:720px">
+    <div class="modal-title">✂️ 재단 작업일지 수정</div>
+    <div class="modal-sub" id="editCuttingMeta">-</div>
+    <input type="hidden" id="ect_id" />
+    <div class="modal-grid modal-grid-2">
+      <div class="modal-field">
+        <span class="modal-label">작업일</span>
+        <input class="modal-input" type="date" id="ect_work_date" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">작업자</span>
+        <input class="modal-input" id="ect_worker_name" />
+      </div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field">
+        <span class="modal-label">사번 (제품코드)</span>
+        <input class="modal-input" id="ect_worker_id" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">재질명</span>
+        <input class="modal-input" id="ect_material_name" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">뱃지 No</span>
+        <input class="modal-input" id="ect_lot_no" />
+      </div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field">
+        <span class="modal-label">재단박스 수량 (개)</span>
+        <input class="modal-input" type="number" id="ect_box_count" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">총 재단수량 (EA)</span>
+        <input class="modal-input" type="number" id="ect_total_qty" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">자투리 발생량 (g)</span>
+        <input class="modal-input" type="number" step="0.01" id="ect_scrap_weight" />
+      </div>
+    </div>
+    <div class="modal-grid">
+      <div class="modal-field">
+        <span class="modal-label">비고</span>
+        <input class="modal-input" id="ect_note" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">특이사항</span>
+        <textarea class="modal-textarea" id="ect_remarks" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal('editCuttingModal')">취소</button>
+      <button class="btn-modal-save" onclick="saveEditCutting()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 삭제 확인 모달 -->
+
+<!-- 쇼트 수정 모달 -->
+<div class="modal-overlay" id="editShotModal">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-title">💥 쇼트 작업일지 수정</div>
+    <div class="modal-sub" id="editShotMeta">-</div>
+    <input type="hidden" id="esh_id" />
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field"><span class="modal-label">작업일</span><input class="modal-input" type="date" id="esh_work_date" /></div>
+      <div class="modal-field"><span class="modal-label">유형</span><select class="modal-input" id="esh_shot_type"><option value="freeze">냉동</option><option value="auto">자동</option></select></div>
+      <div class="modal-field"><span class="modal-label">설비</span><input class="modal-input" id="esh_equipment" /></div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field"><span class="modal-label">사번</span><input class="modal-input" id="esh_worker_id" /></div>
+      <div class="modal-field"><span class="modal-label">작업수량</span><input class="modal-input" type="number" id="esh_work_qty" /></div>
+      <div class="modal-field"><span class="modal-label">RPM</span><input class="modal-input" type="number" id="esh_rpm" /></div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field"><span class="modal-label">온도/사상시간</span><input class="modal-input" id="esh_col1" /></div>
+      <div class="modal-field"><span class="modal-label">시간/회전시간</span><input class="modal-input" id="esh_col2" /></div>
+      <div class="modal-field"><span class="modal-label">볼크기</span><input class="modal-input" id="esh_ball_size" /></div>
+    </div>
+    <div class="modal-grid modal-grid-2">
+      <div class="modal-field"><span class="modal-label">LOT</span><input class="modal-input" id="esh_lot_no" /></div>
+      <div class="modal-field"><span class="modal-label">비고</span><input class="modal-input" id="esh_note" /></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal('editShotModal')">취소</button>
+      <button class="btn-modal-save" onclick="saveEditShot()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 조립 수정 모달 -->
+<div class="modal-overlay" id="editAssemblyModal">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-title">🔩 조립 작업일지 수정</div>
+    <div class="modal-sub" id="editAssemblyMeta">-</div>
+    <input type="hidden" id="easm_id" />
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field"><span class="modal-label">작업일</span><input class="modal-input" type="date" id="easm_work_date" /></div>
+      <div class="modal-field"><span class="modal-label">근무</span><select class="modal-input" id="easm_shift_type"><option value="주간">주간</option><option value="야간">야간</option></select></div>
+      <div class="modal-field"><span class="modal-label">설비</span><input class="modal-input" id="easm_equipment_no" /></div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field"><span class="modal-label">사번</span><input class="modal-input" id="easm_sabun" /></div>
+      <div class="modal-field"><span class="modal-label">제품명</span><input class="modal-input" id="easm_product_name" /></div>
+      <div class="modal-field"><span class="modal-label">구분</span><input class="modal-input" id="easm_assembly_type" /></div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field"><span class="modal-label">생산수량</span><input class="modal-input" type="number" id="easm_production_qty" /></div>
+      <div class="modal-field"><span class="modal-label">불량수량</span><input class="modal-input" type="number" id="easm_defect_qty" /></div>
+      <div class="modal-field"><span class="modal-label">비고</span><input class="modal-input" id="easm_note" /></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal('editAssemblyModal')">취소</button>
+      <button class="btn-modal-save" onclick="saveEditAssembly()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 성형 수정 모달 -->
+<div class="modal-overlay" id="editMoldingModal">
+  <div class="modal-box" style="max-width:780px">
+    <div class="modal-title">🏭 성형 작업일지 수정</div>
+    <div class="modal-sub" id="editMoldingMeta">-</div>
+    <input type="hidden" id="emld_id" />
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field">
+        <span class="modal-label">작업일</span>
+        <input class="modal-input" type="date" id="emld_work_date" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">근무</span>
+        <select class="modal-input" id="emld_shift_type"><option value="주간">주간</option><option value="야간">야간</option></select>
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">작업자</span>
+        <input class="modal-input" id="emld_worker_name" />
+      </div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field">
+        <span class="modal-label">설비</span>
+        <input class="modal-input" id="emld_equipment_no" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">사번 (제품코드)</span>
+        <input class="modal-input" id="emld_sabun" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">제품명</span>
+        <input class="modal-input" id="emld_product_name" />
+      </div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field">
+        <span class="modal-label">Batch No.</span>
+        <input class="modal-input" id="emld_batch_no" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">C/V (캐비티)</span>
+        <input class="modal-input" type="number" id="emld_cavity" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">Shot 수</span>
+        <input class="modal-input" type="number" id="emld_shot_count" />
+      </div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field">
+        <span class="modal-label">생산수량</span>
+        <input class="modal-input" type="number" id="emld_production_qty" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">불량수량</span>
+        <input class="modal-input" type="number" id="emld_defect_qty" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">작업유형 (면)</span>
+        <select class="modal-input" id="emld_work_type"><option value="가면">가면</option><option value="나면">나면</option><option value="다면">다면</option><option value="표준">표준</option><option value="초품">초품</option><option value="중품">중품</option><option value="종품">종품</option></select>
+      </div>
+    </div>
+    <div class="modal-grid">
+      <div class="modal-field">
+        <span class="modal-label">비고</span>
+        <input class="modal-input" id="emld_note_text" placeholder="비고 내용만 수정됩니다" />
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal('editMoldingModal')">취소</button>
+      <button class="btn-modal-save" onclick="saveEditMolding()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal-box" style="max-width:440px">
+    <div class="modal-title">🗑️ 작업일지 삭제</div>
+    <div class="modal-sub" id="deleteMeta">-</div>
+    <div style="background:#fff5f5;border:1px solid #fca5a5;border-radius:8px;padding:12px;margin-bottom:1rem;font-size:12px;color:#991b1b">
+      ⚠️ 삭제 시 화면에서 숨겨지지만 데이터는 유지돼요.<br>
+      슈퍼관리자만 복구할 수 있어요.
+    </div>
+    <input type="hidden" id="del_table" />
+    <input type="hidden" id="del_id" />
+    <div class="modal-field" style="margin-bottom:1rem">
+      <span class="modal-label">삭제 사유 (필수)</span>
+      <textarea class="modal-textarea" id="del_reason" rows="3" placeholder="예: 중복 입력, 잘못된 사번 등"></textarea>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal('deleteModal')">취소</button>
+      <button class="btn-modal-del" onclick="confirmDelete()">삭제하기</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentProcess = 'all';
+let unifiedView = false;
+let cachedData = { 포장: [], 검사: [], 'CMB': [], 재단: [], 재단점검: [], 도포: [], '2차가류': [], '2차가류점검': [], 쇼트: [] };
+let PRODUCTS = {};
+let myInfo = null;
+let showDeleted = false;
+
+// 부서별 권한 매트릭스 (수정/삭제 가능 부서)
+const FULL_ACCESS_DEPTS = ['생산관리팀','연구개발팀','품질관리팀','경영지원팀','물류관리팀'];
+
+// 24시간 (밀리초)
+const HOURS_24 = 24 * 60 * 60 * 1000;
+
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function firstDayOfMonth() {
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';
+}
+function fmtDate(s) { return s ? s.slice(0,10) : '-'; }
+function fmtDatetime(s) {
+  if (!s) return '-';
+  const d = new Date(s);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+
+    String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+async function loadProducts() {
+  const { data } = await db.from('products').select('sabun, part_no, part_name');
+  if (data) {
+    data.forEach(r => { PRODUCTS[r.sabun] = { partNo: r.part_no || '', partName: r.part_name || '' }; });
+  }
+}
+
+async function loadMyInfo() {
+  // WM에서는 checkAuth()로 이미 인증됨 — sessionStorage에서 가져오기
+  try {
+    const cached = sessionStorage.getItem('userInfo');
+    if (cached) {
+      myInfo = JSON.parse(cached);
+    } else {
+      const { data: { session } } = await db.auth.getSession();
+      if (!session) return;
+      const { data } = await db.from('users').select('*').eq('auth_user_id', session.user.id).single();
+      myInfo = data;
+    }
+  } catch(e) {}
+  // 슈퍼관리자만 "삭제 포함" 토글 표시
+  if (myInfo && myInfo.user_type === 'super') {
+    document.getElementById('showDeletedBtn').classList.remove('hidden');
+  }
+}
+
+// 수정/삭제 권한 판별
+function canEditDelete(record) {
+  if (!myInfo) return false;
+
+  // 슈퍼관리자: 무제한
+  if (myInfo.user_type === 'super') return true;
+
+  // 관리자: 부서 권한 + 무제한
+  if (myInfo.user_type === 'admin' && FULL_ACCESS_DEPTS.includes(myInfo.department)) {
+    return true;
+  }
+
+  // 작업자/일반 관리자: 본인 입력 + 24시간 이내
+  if (record.created_by_emp_code === myInfo.emp_code) {
+    const created = new Date(record.created_at || record.submitted_at).getTime();
+    const now = Date.now();
+    return (now - created) < HOURS_24;
+  }
+  return false;
+}
+
+// 권한 없을 때 사유 텍스트
+function getCannotEditReason(record) {
+  if (!myInfo) return '';
+  if (record.created_by_emp_code !== myInfo.emp_code) {
+    return '본인 입력 데이터만 수정 가능';
+  }
+  return '24시간 경과로 수정 불가';
+}
+
+// 변경 이력 기록
+async function logAudit(action, table, recordId, before, after, reason) {
+  if (!myInfo) return;
+  await db.from('audit_logs').insert({
+    table_name: table,
+    record_id: recordId,
+    action,
+    changed_by_emp_code: myInfo.emp_code,
+    changed_by_name: myInfo.name,
+    changed_by_dept: myInfo.department || (myInfo.user_type === 'super' ? '슈퍼관리자' : myInfo.process || ''),
+    before_data: before,
+    after_data: after,
+    reason: reason || null
+  });
+}
+
+function toggleShowDeleted() {
+  showDeleted = !showDeleted;
+  document.getElementById('showDeletedBtn').classList.toggle('active', showDeleted);
+  loadData();
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function recalcFail() {
+  const ins = parseInt(document.getElementById('ei_inspect_qty').value) || 0;
+  const pas = parseInt(document.getElementById('ei_pass_qty').value) || 0;
+  document.getElementById('ei_fail_qty').value = Math.max(0, ins - pas);
+}
+
+// ── 포장 수정 ──────────────────────────────
+let editingPackagingBefore = null;
+function openEditPackaging(r) {
+  editingPackagingBefore = JSON.parse(JSON.stringify(r));
+  document.getElementById('ep_id').value = r.id;
+  document.getElementById('ep_work_date').value = r.work_date;
+  document.getElementById('ep_worker_id').value = r.worker_id || '';
+  document.getElementById('ep_worker_name').value = r.worker_name || '';
+  document.getElementById('ep_quantity').value = r.quantity || 0;
+  document.getElementById('ep_lot_nos').value = (r.lot_nos || []).join(', ');
+  document.getElementById('ep_note').value = r.note || '';
+  document.getElementById('ep_remarks').value = r.remarks || '';
+  document.getElementById('editPackagingMeta').textContent = `입력자: ${r.created_by_name || '-'} (${r.created_by_emp_code || '-'}) · 작성일: ${r.work_date}`;
+  document.getElementById('editPackagingModal').classList.add('open');
+}
+
+async function saveEditPackaging() {
+  const id = parseInt(document.getElementById('ep_id').value);
+  const before = editingPackagingBefore;
+
+  const lots = document.getElementById('ep_lot_nos').value.split(',').map(s => s.trim()).filter(Boolean);
+  const after = {
+    work_date: document.getElementById('ep_work_date').value,
+    worker_id: document.getElementById('ep_worker_id').value.trim(),
+    worker_name: document.getElementById('ep_worker_name').value.trim(),
+    quantity: parseInt(document.getElementById('ep_quantity').value) || 0,
+    lot_nos: lots,
+    note: document.getElementById('ep_note').value,
+    remarks: document.getElementById('ep_remarks').value,
+    modified_at: new Date().toISOString(),
+    modified_by: myInfo.emp_code + ' (' + myInfo.name + ')'
+  };
+
+  const { error } = await db.from('packaging_reports').update(after).eq('id', id);
+  if (error) { showToast('저장 실패: ' + error.message); return; }
+
+  await logAudit('update', 'packaging_reports', id, before, after, null);
+
+  showToast('수정 완료 ✓');
+  closeModal('editPackagingModal');
+  loadData();
+}
+
+// ── 검사 수정 ──────────────────────────────
+let editingInspectionBefore = null;
+function openEditInspection(r) {
+  editingInspectionBefore = JSON.parse(JSON.stringify(r));
+  document.getElementById('ei_id').value = r.id;
+  document.getElementById('ei_work_date').value = r.work_date;
+  document.getElementById('ei_worker_id').value = r.worker_id || '';
+  document.getElementById('ei_worker_name').value = r.worker_name || '';
+  document.getElementById('ei_inspect_qty').value = r.inspect_qty || 0;
+  document.getElementById('ei_pass_qty').value = r.pass_qty || 0;
+  document.getElementById('ei_fail_qty').value = r.fail_qty || 0;
+  document.getElementById('ei_defect_type').value = r.defect_type || '';
+  document.getElementById('ei_defect_memo').value = r.defect_memo || '';
+  document.getElementById('ei_lot_nos').value = (r.lot_nos || []).join(', ');
+  document.getElementById('ei_remarks').value = r.remarks || '';
+  document.getElementById('editInspectionMeta').textContent = `입력자: ${r.created_by_name || '-'} (${r.created_by_emp_code || '-'}) · 작성일: ${r.work_date}`;
+  document.getElementById('editInspectionModal').classList.add('open');
+}
+
+async function saveEditInspection() {
+  const id = parseInt(document.getElementById('ei_id').value);
+  const before = editingInspectionBefore;
+  const lots = document.getElementById('ei_lot_nos').value.split(',').map(s => s.trim()).filter(Boolean);
+  const inspectQty = parseInt(document.getElementById('ei_inspect_qty').value) || 0;
+  const passQty = parseInt(document.getElementById('ei_pass_qty').value) || 0;
+  const failQty = Math.max(0, inspectQty - passQty);
+  const after = {
+    work_date: document.getElementById('ei_work_date').value,
+    worker_id: document.getElementById('ei_worker_id').value.trim(),
+    worker_name: document.getElementById('ei_worker_name').value.trim(),
+    inspect_qty: inspectQty,
+    pass_qty: passQty,
+    fail_qty: failQty,
+    defect_type: document.getElementById('ei_defect_type').value,
+    defect_memo: document.getElementById('ei_defect_memo').value,
+    lot_nos: lots,
+    remarks: document.getElementById('ei_remarks').value,
+    modified_at: new Date().toISOString(),
+    modified_by: myInfo.emp_code + ' (' + myInfo.name + ')'
+  };
+
+  const { error } = await db.from('inspection_reports').update(after).eq('id', id);
+  if (error) { showToast('저장 실패: ' + error.message); return; }
+
+  await logAudit('update', 'inspection_reports', id, before, after, null);
+
+  showToast('수정 완료 ✓');
+  closeModal('editInspectionModal');
+  loadData();
+}
+
+// ── 삭제 (소프트) ──────────────────────────────
+let deletingRecord = null;
+function openDelete(table, record) {
+  deletingRecord = { table, record };
+  document.getElementById('del_table').value = table;
+  document.getElementById('del_id').value = record.id;
+  document.getElementById('del_reason').value = '';
+  const meta = `작업일: ${record.work_date} · 사번: ${record.worker_id || '-'} · 작업자: ${record.worker_name || '-'}`;
+  document.getElementById('deleteMeta').textContent = meta;
+  document.getElementById('deleteModal').classList.add('open');
+}
+
+async function confirmDelete() {
+  const reason = document.getElementById('del_reason').value.trim();
+  if (!reason) { showToast('삭제 사유를 입력해주세요.'); return; }
+
+  const { table, record } = deletingRecord;
+  const updateData = {
+    deleted_at: new Date().toISOString(),
+    deleted_by: myInfo.emp_code + ' (' + myInfo.name + ')',
+    deleted_reason: reason
+  };
+
+  const { error } = await db.from(table).update(updateData).eq('id', record.id);
+  if (error) { showToast('삭제 실패: ' + error.message); return; }
+
+  await logAudit('delete', table, record.id, record, updateData, reason);
+
+  showToast('삭제 완료');
+  closeModal('deleteModal');
+  loadData();
+}
+
+// 슈퍼관리자: 삭제된 데이터 복구
+async function restoreRecord(table, recordId) {
+  if (!confirm('이 데이터를 복구하시겠어요?')) return;
+  const { error } = await db.from(table).update({
+    deleted_at: null,
+    deleted_by: null,
+    deleted_reason: null
+  }).eq('id', recordId);
+  if (error) { showToast('복구 실패: ' + error.message); return; }
+  await logAudit('restore', table, recordId, null, null, null);
+  showToast('복구 완료 ✓');
+  loadData();
+}
+
+function switchProcess(p) {
+  currentProcess = p;
+  document.querySelectorAll('.process-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`[data-process="${p}"]`).classList.add('active');
+  // 전체 탭에서만 통합 보기 토글 노출
+  document.getElementById('toggleViewBtn').classList.toggle('hidden', p !== 'all');
+  if (p !== 'all') unifiedView = false;
+  loadData();
+}
+
+function toggleUnifiedView() {
+  unifiedView = !unifiedView;
+  document.getElementById('toggleViewBtn').classList.toggle('active', unifiedView);
+  document.getElementById('toggleViewBtn').textContent = unifiedView ? '📋 공정별 보기' : '👁️ 통합 보기';
+  render();
+}
+
+function setPeriod(type) {
+  const now = new Date();
+  let start, end;
+  // 로컬 날짜를 YYYY-MM-DD 형식으로 (UTC 변환 없이)
+  function fmtLocal(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  if (type === 'today') {
+    start = end = fmtLocal(now);
+  } else if (type === 'yesterday') {
+    const y = new Date(now); y.setDate(y.getDate() - 1);
+    start = end = fmtLocal(y);
+  } else if (type === 'thisMonth') {
+    start = fmtLocal(new Date(now.getFullYear(), now.getMonth(), 1));
+    end = fmtLocal(now);
+  } else if (type === 'lastMonth') {
+    start = fmtLocal(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    end = fmtLocal(new Date(now.getFullYear(), now.getMonth(), 0));
+  }
+  document.getElementById('startDate').value = start;
+  document.getElementById('endDate').value = end;
+  // 버튼 스타일
+  document.querySelectorAll('.btn-period').forEach(b => { b.style.background = 'white'; b.style.color = '#555'; b.style.borderColor = '#e0e4ed'; });
+  event.target.style.background = '#eef0ff'; event.target.style.color = '#243bb2'; event.target.style.borderColor = '#243bb2';
+  loadData();
+}
+
+async function loadData() {
+  const start = document.getElementById('startDate').value;
+  const end   = document.getElementById('endDate').value;
+  if (!start || !end) { showToast('기간을 선택해주세요.'); return; }
+
+  const fSabun  = document.getElementById('filterSabun').value.trim();
+  const fWorker = document.getElementById('filterWorker').value.trim();
+
+  // 포장 데이터 로드 (필요 시)
+  if (currentProcess === 'all' || currentProcess === '포장') {
+    let q = db.from('packaging_reports').select('*').gte('work_date', start).lte('work_date', end);
+    if (!showDeleted) q = q.is('deleted_at', null);
+    if (fSabun)  q = q.ilike('worker_id', `%${fSabun}%`);
+    if (fWorker) q = q.ilike('worker_name', `%${fWorker}%`);
+    const { data } = await q.order('work_date', { ascending: false });
+    cachedData.포장 = data || [];
+  }
+
+  // 검사 데이터 로드 (필요 시)
+  if (currentProcess === 'all' || currentProcess === '검사') {
+    let q = db.from('inspection_reports').select('*').gte('work_date', start).lte('work_date', end);
+    if (!showDeleted) q = q.is('deleted_at', null);
+    if (fSabun)  q = q.ilike('worker_id', `%${fSabun}%`);
+    if (fWorker) q = q.ilike('worker_name', `%${fWorker}%`);
+    const { data } = await q.order('work_date', { ascending: false });
+    cachedData.검사 = data || [];
+  }
+
+  // 혼련(CMB) 데이터 로드 (필요 시)
+  if (currentProcess === 'all' || currentProcess === '혼련(CMB)') {
+    let q = db.from('cmb_reports').select('*').gte('work_date', start).lte('work_date', end);
+    if (!showDeleted) q = q.is('deleted_at', null);
+    if (fSabun)  q = q.ilike('worker_id', `%${fSabun}%`);
+    if (fWorker) q = q.ilike('worker_name', `%${fWorker}%`);
+    const { data } = await q.order('work_date', { ascending: false });
+    cachedData.CMB = data || [];
+  }
+
+  // 재단 데이터 로드 (필요 시)
+  if (currentProcess === 'all' || currentProcess === '재단') {
+    let q = db.from('cutting_reports').select('*').gte('work_date', start).lte('work_date', end);
+    if (!showDeleted) q = q.is('deleted_at', null);
+    if (fSabun)  q = q.ilike('worker_id', `%${fSabun}%`);
+    if (fWorker) q = q.ilike('worker_name', `%${fWorker}%`);
+    const { data } = await q.order('work_date', { ascending: false });
+    cachedData.재단 = data || [];
+    
+    // 재단 안전 점검 데이터 별도 로드
+    const { data: safetyData } = await db.from('cutting_safety_check')
+      .select('*')
+      .gte('check_date', start).lte('check_date', end)
+      .order('check_date', { ascending: false });
+    cachedData.재단점검 = safetyData || [];
+  }
+
+  // 도포
+  {
+    let q = db.from('coating_reports').select('*').gte('work_date', start).lte('work_date', end);
+    if (!showDeleted) q = q.is('deleted_at', null);
+    if (fSabun)  q = q.ilike('worker_id', `%${fSabun}%`);
+    if (fWorker) q = q.ilike('worker_name', `%${fWorker}%`);
+    const { data } = await q.order('work_date', { ascending: false });
+    cachedData.도포 = data || [];
+  }
+
+  // 2차가류
+  {
+    let q = db.from('postcure_reports').select('*').gte('work_date', start).lte('work_date', end);
+    if (!showDeleted) q = q.is('deleted_at', null);
+    if (fSabun)  q = q.ilike('worker_id', `%${fSabun}%`);
+    if (fWorker) q = q.ilike('worker_name', `%${fWorker}%`);
+    const { data } = await q.order('work_date', { ascending: false });
+    cachedData['2차가류'] = data || [];
+
+    const { data: pcSafety } = await db.from('postcure_safety_check')
+      .select('*').gte('check_date', start).lte('check_date', end)
+      .order('check_date', { ascending: false });
+    cachedData['2차가류점검'] = pcSafety || [];
+  }
+
+  // 쇼트
+  {
+    let q = db.from('shot_reports').select('*').gte('work_date', start).lte('work_date', end);
+    if (!showDeleted) q = q.is('deleted_at', null);
+    if (fSabun)  q = q.ilike('worker_id', `%${fSabun}%`);
+    if (fWorker) q = q.ilike('worker_name', `%${fWorker}%`);
+    const { data } = await q.order('work_date', { ascending: false });
+    cachedData.쇼트 = data || [];
+  }
+
+  // 성형
+  if (currentProcess === 'all' || currentProcess === '성형') {
+    let q = db.from('molding_reports').select('*').gte('work_date', start).lte('work_date', end);
+    if (!showDeleted) q = q.is('deleted_at', null);
+    if (fSabun)  q = q.ilike('sabun', `%${fSabun}%`);
+    if (fWorker) q = q.ilike('worker_name', `%${fWorker}%`);
+    const { data } = await q.order('work_date', { ascending: false });
+    cachedData.성형 = data || [];
+  }
+
+  // 조립
+  if (currentProcess === 'all' || currentProcess === '조립') {
+    let q = db.from('assembly_reports').select('*').gte('work_date', start).lte('work_date', end);
+    if (!showDeleted) q = q.is('deleted_at', null);
+    if (fSabun)  q = q.ilike('sabun', `%${fSabun}%`);
+    if (fWorker) q = q.ilike('worker_name', `%${fWorker}%`);
+    const { data } = await q.order('work_date', { ascending: false });
+    cachedData.조립 = data || [];
+  }
+
+  render();
+}
+
+// ═══ 테이블 정렬 시스템 ═══
+var currentSortCol = '';
+var currentSortDir = 'asc';
+
+function sortTableData(data, col, dir) {
+    return data.slice().sort(function(a, b) {
+        var va = a[col], vb = b[col];
+        if (va == null) va = '';
+        if (vb == null) vb = '';
+        // 숫자 비교
+        if (typeof va === 'number' && typeof vb === 'number') {
+            return dir === 'asc' ? va - vb : vb - va;
+        }
+        // 문자열 비교
+        va = String(va); vb = String(vb);
+        if (dir === 'asc') return va.localeCompare(vb, 'ko');
+        return vb.localeCompare(va, 'ko');
+    });
+}
+
+function handleSort(col) {
+    if (currentSortCol === col) {
+        currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSortCol = col;
+        currentSortDir = 'asc';
+    }
+    render();
+}
+
+function makeSortTh(label, col, extra) {
+    var cls = 'sortable';
+    if (currentSortCol === col) cls += ' ' + currentSortDir;
+    return '<th class="' + cls + '" onclick="handleSort(\'' + col + '\')" ' + (extra||'') + '>' + label + '</th>';
+}
+
+function applySortIfNeeded(data) {
+    if (currentSortCol && data.length > 0 && data[0].hasOwnProperty(currentSortCol)) {
+        return sortTableData(data, currentSortCol, currentSortDir);
+    }
+    return data;
+}
+
+function render() {
+  renderStats();
+  if (currentProcess === 'all') {
+    if (unifiedView) renderUnifiedTable();
+    else renderAllSections();
+  } else if (currentProcess === '포장') {
+    renderPackagingTable(cachedData.포장);
+  } else if (currentProcess === '검사') {
+    renderInspectionTable(cachedData.검사);
+  } else if (currentProcess === '혼련(CMB)') {
+    renderCmbTable(cachedData.CMB);
+  } else if (currentProcess === '재단') {
+    renderCuttingTable(cachedData.재단);
+  } else if (currentProcess === '도포') {
+    renderCoatingTable(cachedData.도포);
+  } else if (currentProcess === '2차가류') {
+    renderPostcureTable(cachedData['2차가류']);
+  } else if (currentProcess === '쇼트') {
+    renderShotTable(cachedData.쇼트);
+  } else if (currentProcess === '성형') {
+    renderMoldingTable(cachedData.성형);
+  } else if (currentProcess === '조립') {
+    renderAssemblyTable(cachedData.조립);
+  }
+}
+
+function renderStats() {
+  const statsEl = document.getElementById('statsRow');
+  const pkg = cachedData.포장 || [];
+  const ins = cachedData.검사 || [];
+  const cmb = cachedData.CMB || [];
+  const cut = cachedData.재단 || [];
+  const coat = cachedData.도포 || [];
+  const pc = cachedData['2차가류'] || [];
+  const shot = cachedData.쇼트 || [];
+  const mold = cachedData.성형 || [];
+  const asm = cachedData.조립 || [];
+
+  if (currentProcess === 'all') {
+    const totalCount = pkg.length + ins.length + cmb.length + cut.length + coat.length + pc.length + shot.length + mold.length + asm.length;
+    const totalQty = pkg.reduce((s,r)=>s+(r.quantity||0),0);
+    const totalInspect = ins.reduce((s,r)=>s+(r.inspect_qty||0),0);
+    const totalCmbWeight = cmb.filter(r => !r.is_remix).reduce((s,r)=>s+(parseFloat(r.weight)||0),0);
+    const totalCutBoxes = cut.reduce((s,r)=>s+(r.box_count||0),0);
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">전체 작업일지</div><div class="stat-num blue">${totalCount} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">📦</div><div class="stat-label">포장수량</div><div class="stat-num green">${totalQty.toLocaleString()} <span class="stat-unit">EA</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🧪</div><div class="stat-label">혼련 사용량</div><div class="stat-num" style="color:#b45309">${totalCmbWeight.toFixed(3)} <span class="stat-unit">Kg</span></div></div>
+      <div class="stat-card"><div class="stat-icon">✂️</div><div class="stat-label">재단 박스</div><div class="stat-num" style="color:#7e22ce">${totalCutBoxes.toLocaleString()} <span class="stat-unit">개</span></div></div>
+    `;
+  } else if (currentProcess === '포장') {
+    const totalQty = pkg.reduce((s,r)=>s+(r.quantity||0),0);
+    const workers = new Set(pkg.map(r=>r.worker_name).filter(Boolean)).size;
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">작업일지 건수</div><div class="stat-num blue">${pkg.length} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">📦</div><div class="stat-label">총 포장수량</div><div class="stat-num green">${totalQty.toLocaleString()} <span class="stat-unit">EA</span></div></div>
+      <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">작업자 수</div><div class="stat-num orange">${workers} <span class="stat-unit">명</span></div></div>
+      <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-label">조회 기간</div><div class="stat-num" style="font-size:14px">${document.getElementById('startDate').value} ~<br>${document.getElementById('endDate').value}</div></div>
+    `;
+  } else if (currentProcess === '검사') {
+    const totalInspect = ins.reduce((s,r)=>s+(r.inspect_qty||0),0);
+    const totalPass = ins.reduce((s,r)=>s+(r.pass_qty||0),0);
+    const totalFail = ins.reduce((s,r)=>s+(r.fail_qty||0),0);
+    const passRate = totalInspect > 0 ? ((totalPass/totalInspect)*100).toFixed(1) : '0.0';
+
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">검사 건수</div><div class="stat-num blue">${ins.length} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🔬</div><div class="stat-label">총 검사수량</div><div class="stat-num orange">${totalInspect.toLocaleString()} <span class="stat-unit">EA</span></div></div>
+      <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-label">합격 / 불합격</div><div class="stat-num green">${totalPass.toLocaleString()}<span class="stat-unit"> / </span><span style="color:#e53e3e">${totalFail.toLocaleString()}</span></div></div>
+      <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-label">합격률</div><div class="stat-num green">${passRate} <span class="stat-unit">%</span></div></div>
+    `;
+    // 불량유형 집계 카드 (사번별 × 유형별 피벗)
+    // 1단계: 전체 불량유형 목록 수집 + 사번별 집계
+    const defectMap = {};      // { 사번: { 유형: 수량 } }
+    const allTypes = new Set(); // 전체 유형 목록
+    const sabunNames = {};     // { 사번: 작업자명 }
+
+    ins.forEach(function(r) {
+      if (!r.defect_type) return;
+      var sabun = r.worker_id || '미지정';
+      if (!defectMap[sabun]) defectMap[sabun] = {};
+      if (r.worker_name) sabunNames[sabun] = r.worker_name;
+      var parts = r.defect_type.split(',');
+      parts.forEach(function(p) {
+        p = p.trim();
+        var m = p.match(/^(.+?)\((\d+)\)$/);
+        if (m) {
+          var typeName = m[1].trim();
+          var qty = parseInt(m[2]) || 0;
+          allTypes.add(typeName);
+          defectMap[sabun][typeName] = (defectMap[sabun][typeName] || 0) + qty;
+        } else if (p) {
+          allTypes.add(p);
+          defectMap[sabun][p] = (defectMap[sabun][p] || 0) + 1;
+        }
+      });
+    });
+
+    var typeList = Array.from(allTypes).sort();
+    var sabunList = Object.keys(defectMap).sort();
+
+    var defectHtml = '';
+    if (sabunList.length > 0 && typeList.length > 0) {
+      // 피벗 테이블
+      defectHtml = '<div style="overflow-x:auto;margin-top:4px;"><table style="width:100%;border-collapse:collapse;font-size:12px;">';
+      // 헤더
+      defectHtml += '<thead><tr style="background:#f8f9fc;">';
+      defectHtml += '<th style="padding:8px 10px;border:1px solid #e8ecf3;text-align:left;font-weight:700;color:#243bb2;min-width:70px;">사번</th>';
+      defectHtml += '<th style="padding:8px 10px;border:1px solid #e8ecf3;text-align:left;font-weight:600;color:#64748b;min-width:60px;">작업자</th>';
+      typeList.forEach(function(t) {
+        defectHtml += '<th style="padding:8px 10px;border:1px solid #e8ecf3;text-align:center;font-weight:600;color:#dc2626;min-width:55px;">' + t + '</th>';
+      });
+      defectHtml += '<th style="padding:8px 10px;border:1px solid #e8ecf3;text-align:center;font-weight:700;color:#1e293b;background:#fef2f2;min-width:50px;">합계</th>';
+      defectHtml += '</tr></thead><tbody>';
+
+      // 유형별 총합 (하단 합계용)
+      var typeTotals = {};
+      typeList.forEach(function(t) { typeTotals[t] = 0; });
+      var grandTotal = 0;
+
+      // 데이터 행
+      sabunList.forEach(function(sabun) {
+        var rowTotal = 0;
+        defectHtml += '<tr>';
+        defectHtml += '<td style="padding:6px 10px;border:1px solid #e8ecf3;font-weight:600;">' + sabun + '</td>';
+        defectHtml += '<td style="padding:6px 10px;border:1px solid #e8ecf3;color:#64748b;">' + (sabunNames[sabun] || '-') + '</td>';
+        typeList.forEach(function(t) {
+          var val = defectMap[sabun][t] || 0;
+          rowTotal += val;
+          typeTotals[t] += val;
+          var cellStyle = val > 0 ? 'color:#dc2626;font-weight:700;background:#fef2f2;' : 'color:#d1d5db;';
+          defectHtml += '<td style="padding:6px 10px;border:1px solid #e8ecf3;text-align:center;' + cellStyle + '">' + (val || '-') + '</td>';
+        });
+        grandTotal += rowTotal;
+        defectHtml += '<td style="padding:6px 10px;border:1px solid #e8ecf3;text-align:center;font-weight:700;background:#fef2f2;color:#dc2626;">' + rowTotal + '</td>';
+        defectHtml += '</tr>';
+      });
+
+      // 합계 행
+      defectHtml += '<tr style="background:#f1f5f9;font-weight:700;">';
+      defectHtml += '<td style="padding:8px 10px;border:1px solid #e8ecf3;" colspan="2">합계</td>';
+      typeList.forEach(function(t) {
+        var val = typeTotals[t];
+        defectHtml += '<td style="padding:8px 10px;border:1px solid #e8ecf3;text-align:center;color:#dc2626;">' + (val || '-') + '</td>';
+      });
+      defectHtml += '<td style="padding:8px 10px;border:1px solid #e8ecf3;text-align:center;color:#dc2626;font-size:14px;">' + grandTotal + '</td>';
+      defectHtml += '</tr></tbody></table></div>';
+    } else {
+      defectHtml = '<div style="text-align:center;color:#94a3b8;font-size:12px;padding:12px;">조회 기간 내 불량 데이터가 없습니다</div>';
+    }
+
+    statsEl.innerHTML += `
+      <div class="stat-card" style="grid-column:1/-1;padding:14px 18px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+          <span style="font-size:16px;">🔴</span>
+          <span style="font-size:14px;font-weight:700;color:#1e293b;">사번별 불량유형 집계</span>
+          <span style="font-size:11px;color:#94a3b8;margin-left:auto;">${sabunList.length}명 / ${typeList.length}개 유형 / 총 ${totalFail}건</span>
+        </div>
+        ${defectHtml}
+      </div>
+    `;
+  } else if (currentProcess === '혼련(CMB)') {
+    const totalWeight = cmb.filter(r => !r.is_remix).reduce((s,r)=>s+(parseFloat(r.weight)||0),0);
+    const remixCount = cmb.filter(r => r.is_remix).length;
+    const workers = new Set(cmb.map(r=>r.worker_name).filter(Boolean)).size;
+    const weighingNG = cmb.filter(r => r.weighing_check === false).length;
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">혼련 건수</div><div class="stat-num blue">${cmb.length} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🧪</div><div class="stat-label">총 사용량 (재믹싱 제외)</div><div class="stat-num" style="color:#b45309">${totalWeight.toFixed(3)} <span class="stat-unit">Kg</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🔄</div><div class="stat-label">재믹싱 건수</div><div class="stat-num orange">${remixCount} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-label">평량 비정상</div><div class="stat-num red">${weighingNG} <span class="stat-unit">건</span></div></div>
+    `;
+  } else if (currentProcess === '재단') {
+    const totalBoxes = cut.reduce((s,r)=>s+(r.box_count||0),0);
+    const totalCutQty = cut.reduce((s,r)=>s+(r.total_qty||0),0);
+    const totalScrap = cut.reduce((s,r)=>s+(parseFloat(r.scrap_weight)||0),0);
+    const workers = new Set(cut.map(r=>r.worker_name).filter(Boolean)).size;
+    
+    // 안전점검에서 사용불가/수리요망 카운트
+    const safety = cachedData.재단점검 || [];
+    let unusableCount = 0;
+    let repairCount = 0;
+    safety.forEach(s => {
+      if (s.check_data) {
+        Object.values(s.check_data).forEach(eq => {
+          Object.entries(eq).forEach(([k, v]) => {
+            if (k !== 'remarks') {
+              if (v === '×') unusableCount++;
+              if (v === '△') repairCount++;
+            }
+          });
+        });
+      }
+    });
+    
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">재단 건수</div><div class="stat-num blue">${cut.length} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">📦</div><div class="stat-label">총 재단박스</div><div class="stat-num" style="color:#7e22ce">${totalBoxes.toLocaleString()} <span class="stat-unit">개</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🔢</div><div class="stat-label">총 재단수량</div><div class="stat-num blue">${totalCutQty.toLocaleString()} <span class="stat-unit">EA</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🗑️</div><div class="stat-label">총 자투리</div><div class="stat-num orange">${totalScrap.toFixed(2)} <span class="stat-unit">g</span></div></div>
+      <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-label">설비 이상 (△/×)</div><div class="stat-num red">${repairCount}/${unusableCount} <span class="stat-unit">건</span></div></div>
+    `;
+  } else if (currentProcess === '도포') {
+    const coat = cachedData.도포 || [];
+    const totalQty = coat.reduce((s,r)=>s+(r.total_qty||0),0);
+    const totalDefect = coat.reduce((s,r)=>s+(r.defect_qty||0),0);
+    const defectRate = totalQty > 0 ? ((totalDefect/totalQty)*100).toFixed(1) : '0.0';
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">도포 건수</div><div class="stat-num blue">${coat.length} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🎨</div><div class="stat-label">총 작업수량</div><div class="stat-num green">${totalQty.toLocaleString()} <span class="stat-unit">EA</span></div></div>
+      <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-label">불량수량</div><div class="stat-num red">${totalDefect.toLocaleString()} <span class="stat-unit">EA</span></div></div>
+      <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-label">불량률</div><div class="stat-num">${defectRate} <span class="stat-unit">%</span></div></div>
+    `;
+  } else if (currentProcess === '2차가류') {
+    const totalInput = pc.reduce((s,r)=>s+(r.input_qty||0),0);
+    const workers = new Set(pc.map(r=>r.worker_name).filter(Boolean)).size;
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">2차가류 건수</div><div class="stat-num blue">${pc.length} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🔥</div><div class="stat-label">총 투입량</div><div class="stat-num green">${totalInput.toLocaleString()} <span class="stat-unit">EA</span></div></div>
+      <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">작업자 수</div><div class="stat-num orange">${workers} <span class="stat-unit">명</span></div></div>
+      <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-label">조회 기간</div><div class="stat-num" style="font-size:14px">${document.getElementById('startDate').value} ~<br>${document.getElementById('endDate').value}</div></div>
+    `;
+  } else if (currentProcess === '쇼트') {
+    const totalQty = shot.reduce((s,r)=>s+(r.work_qty||0),0);
+    const freezeCount = shot.filter(r=>r.shot_type==='freeze').length;
+    const autoCount = shot.filter(r=>r.shot_type==='auto').length;
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">쇼트 건수</div><div class="stat-num blue">${shot.length} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">💥</div><div class="stat-label">총 작업수량</div><div class="stat-num green">${totalQty.toLocaleString()} <span class="stat-unit">EA</span></div></div>
+      <div class="stat-card"><div class="stat-icon">❄️</div><div class="stat-label">냉동 / 자동</div><div class="stat-num">${freezeCount} <span class="stat-unit">/ </span>${autoCount}</div></div>
+      <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-label">조회 기간</div><div class="stat-num" style="font-size:14px">${document.getElementById('startDate').value} ~<br>${document.getElementById('endDate').value}</div></div>
+    `;
+  } else if (currentProcess === '성형') {
+    const totalQty = mold.reduce((s,r)=>s+(r.production_qty||0),0);
+    const totalDefect = mold.reduce((s,r)=>s+(r.defect_qty||0),0);
+    const workers = new Set(mold.map(r=>r.worker_name).filter(Boolean)).size;
+    const teams = new Set(mold.map(r=>r.team).filter(Boolean));
+    const teamStr = [...teams].join(', ') || '-';
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">성형 건수</div><div class="stat-num blue">${mold.length} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🔧</div><div class="stat-label">총 생산수량</div><div class="stat-num green">${totalQty.toLocaleString()} <span class="stat-unit">EA</span></div></div>
+      <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-label">총 불량수량</div><div class="stat-num" style="color:#dc2626">${totalDefect.toLocaleString()} <span class="stat-unit">EA</span></div></div>
+      <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">작업자 / 반</div><div class="stat-num orange">${workers} <span class="stat-unit">명</span><span style="font-size:12px;color:#888"> (${teamStr})</span></div></div>
+    `;
+  } else if (currentProcess === '조립') {
+    const totalQty = asm.reduce((s,r)=>s+(r.production_qty||0),0);
+    const totalDefect = asm.reduce((s,r)=>s+(r.defect_qty||0),0);
+    const workers = new Set(asm.map(r=>r.worker_name).filter(Boolean)).size;
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">조립 건수</div><div class="stat-num blue">${asm.length} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🔩</div><div class="stat-label">총 생산수량</div><div class="stat-num green">${totalQty.toLocaleString()} <span class="stat-unit">EA</span></div></div>
+      <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-label">총 불량수량</div><div class="stat-num" style="color:#dc2626">${totalDefect.toLocaleString()} <span class="stat-unit">EA</span></div></div>
+      <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">작업자 수</div><div class="stat-num orange">${workers} <span class="stat-unit">명</span></div></div>
+    `;
+  }
+}
+
+function renderAllSections() {
+  const pkg = cachedData.포장 || [];
+  const ins = cachedData.검사 || [];
+  const cmb = cachedData.CMB || [];
+  const cut = cachedData.재단 || [];
+  const coat = cachedData.도포 || [];
+  const pc = cachedData['2차가류'] || [];
+  const shot = cachedData.쇼트 || [];
+  const mold = cachedData.성형 || [];
+  const asm = cachedData.조립 || [];
+  const html = `
+    <div class="process-section">
+      <div class="section-header">
+        <span class="section-title">📦 포장 작업일지</span>
+        <span class="section-count">${pkg.length}건</span>
+      </div>
+      <div class="section-card">
+        ${pkg.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
+          : pkg.slice(0, 5).map(r => `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.worker_id} · ${r.worker_name||'-'}</span><span style="color:#243bb2;font-weight:500">${(r.quantity||0).toLocaleString()} EA</span></div>`).join('')
+          + (pkg.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('포장')">전체 ${pkg.length}건 보기 →</button></div>` : '')}
+      </div>
+    </div>
+    <div class="process-section">
+      <div class="section-header">
+        <span class="section-title">🔬 검사 작업일지</span>
+        <span class="section-count">${ins.length}건</span>
+      </div>
+      <div class="section-card">
+        ${ins.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
+          : ins.slice(0, 5).map(r => {
+              const fail = r.fail_qty || 0;
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.worker_id} · ${r.worker_name||'-'}</span><span><span style="color:#16a34a">합격 ${(r.pass_qty||0).toLocaleString()}</span> / <span style="color:#e53e3e">불합 ${fail.toLocaleString()}</span></span></div>`;
+            }).join('')
+          + (ins.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('검사')">전체 ${ins.length}건 보기 →</button></div>` : '')}
+      </div>
+    </div>
+    <div class="process-section">
+      <div class="section-header">
+        <span class="section-title">🧪 혼련(CMB) 작업일지</span>
+        <span class="section-count">${cmb.length}건</span>
+      </div>
+      <div class="section-card">
+        ${cmb.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
+          : cmb.slice(0, 5).map(r => {
+              const remixTag = r.is_remix ? '<span style="background:#fff4e6;color:#b45309;padding:1px 6px;border-radius:4px;font-size:10px;margin-left:4px">재믹싱</span>' : '';
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.lot_no||'-'} · ${r.material_name||'-'}${remixTag}</span><span style="color:#b45309;font-weight:500">${(parseFloat(r.weight)||0).toFixed(3)} Kg</span></div>`;
+            }).join('')
+          + (cmb.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('혼련(CMB)')">전체 ${cmb.length}건 보기 →</button></div>` : '')}
+      </div>
+    </div>
+    <div class="process-section">
+      <div class="section-header">
+        <span class="section-title">✂️ 재단 작업일지</span>
+        <span class="section-count">${cut.length}건</span>
+      </div>
+      <div class="section-card">
+        ${cut.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
+          : cut.slice(0, 5).map(r => {
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.worker_id||'-'} · ${r.material_name||'-'}</span><span style="color:#7e22ce;font-weight:500">${(r.box_count||0).toLocaleString()} 박스 / ${(r.total_qty||0).toLocaleString()} EA</span></div>`;
+            }).join('')
+          + (cut.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('재단')">전체 ${cut.length}건 보기 →</button></div>` : '')}
+      </div>
+    </div>
+    <div class="process-section">
+      <div class="section-header">
+        <span class="section-title">🎨 도포 작업일지</span>
+        <span class="section-count">${coat.length}건</span>
+      </div>
+      <div class="section-card">
+        ${coat.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
+          : coat.slice(0, 5).map(r => {
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.worker_id||'-'} · ${r.work_type||'-'}</span><span style="color:#243bb2;font-weight:500">${(r.total_qty||0).toLocaleString()} EA</span></div>`;
+            }).join('')
+          + (coat.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('도포')">전체 ${coat.length}건 보기 →</button></div>` : '')}
+      </div>
+    </div>
+    <div class="process-section">
+      <div class="section-header">
+        <span class="section-title">🔥 2차가류 작업일지</span>
+        <span class="section-count">${pc.length}건</span>
+      </div>
+      <div class="section-card">
+        ${pc.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
+          : pc.slice(0, 5).map(r => {
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.worker_id||'-'} · ${r.material_name||'-'}</span><span style="color:#243bb2;font-weight:500">${(r.input_qty||0).toLocaleString()} EA</span></div>`;
+            }).join('')
+          + (pc.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('2차가류')">전체 ${pc.length}건 보기 →</button></div>` : '')}
+      </div>
+    </div>
+    <div class="process-section">
+      <div class="section-header">
+        <span class="section-title">💥 쇼트 작업일지</span>
+        <span class="section-count">${shot.length}건</span>
+      </div>
+      <div class="section-card">
+        ${shot.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
+          : shot.slice(0, 5).map(r => {
+              const typeTag = r.shot_type==='freeze' ? '❄️냉동' : '⚙️자동';
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${typeTag} · ${r.worker_id||'-'}</span><span style="color:#243bb2;font-weight:500">${(r.work_qty||0).toLocaleString()} EA</span></div>`;
+            }).join('')
+          + (shot.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('쇼트')">전체 ${shot.length}건 보기 →</button></div>` : '')}
+      </div>
+    </div>
+    <div class="process-section">
+      <div class="section-header">
+        <span class="section-title">🔧 성형 작업일지</span>
+        <span class="section-count">${mold.length}건</span>
+      </div>
+      <div class="section-card">
+        ${mold.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
+          : mold.slice(0, 5).map(r => {
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.equipment_no||'-'} · ${r.sabun||'-'}</span><span style="color:#243bb2;font-weight:500">${(r.production_qty||0).toLocaleString()} EA</span></div>`;
+            }).join('')
+          + (mold.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('성형')">전체 ${mold.length}건 보기 →</button></div>` : '')}
+      </div>
+    </div>
+  `;
+  document.getElementById('resultArea').innerHTML = html;
+}
+
+function renderUnifiedTable() {
+  const pkg = (cachedData.포장 || []).map(r => ({...r, _proc: '포장', _qty: r.quantity}));
+  const ins = (cachedData.검사 || []).map(r => ({...r, _proc: '검사', _qty: r.inspect_qty}));
+  const all = [...pkg, ...ins].sort((a,b) => (b.work_date||'').localeCompare(a.work_date||''));
+  if (!all.length) {
+    document.getElementById('resultArea').innerHTML = '<div class="card"><div class="empty-row" style="padding:2rem;text-align:center;color:#aaa">데이터가 없어요.</div></div>';
+    return;
+  }
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>NO</th><th>작업일</th><th>공정</th><th>사번</th><th>품명</th><th>작업자</th><th style="text-align:right">수량</th><th>비고</th></tr>
+          </thead>
+          <tbody>
+            ${all.map((r, i) => {
+              const prod = PRODUCTS[r.worker_id] || {};
+              return `<tr>
+                <td style="color:#bbb;font-size:12px">${i+1}</td>
+                <td>${r.work_date}</td>
+                <td><span class="process-tag process-${r._proc}">${r._proc}</span></td>
+                <td style="font-weight:500">${r.worker_id||'-'}</td>
+                <td style="font-size:12px;color:#555">${prod.partName||'-'}</td>
+                <td style="min-width:80px">${r.worker_name||'-'}</td>
+                <td style="text-align:right;font-weight:500;color:#243bb2">${(r._qty||0).toLocaleString()}</td>
+                <td style="font-size:12px;color:#888">${r.note || r.remarks || '-'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function renderPackagingTable(data) {
+  if (!data.length) {
+    document.getElementById('resultArea').innerHTML = '<div class="card"><div class="empty-row" style="padding:2rem;text-align:center;color:#aaa">조회된 데이터가 없어요.</div></div>';
+    return;
+  }
+  data = applySortIfNeeded(data);
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>NO</th>${makeSortTh('작업일','work_date')}${makeSortTh('사번','worker_id')}${makeSortTh('고객품번','_partNo')}${makeSortTh('품명','_partName')}${makeSortTh('작업자','worker_name')}<th class="lot-cell">성형 LOT No.</th>${makeSortTh('포장수량','total_qty','style="text-align:right"')}<th>비고</th><th>특이사항</th>${makeSortTh('입력자','created_by_name')}${makeSortTh('제출일시','submitted_at')}<th>작업</th></tr>
+          </thead>
+          <tbody>
+            ${data.map((r, i) => {
+              const prod = PRODUCTS[r.worker_id] || {};
+              const lots = (r.lot_nos||[]).map(l => `<span class="lot-tag">${l}</span>`).join('') || '-';
+              const isDeleted = !!r.deleted_at;
+              const canEdit = canEditDelete(r) && !isDeleted;
+              const reason = canEdit ? '' : (isDeleted ? '삭제됨' : getCannotEditReason(r));
+              const actionsHtml = isDeleted
+                ? (myInfo && myInfo.user_type === 'super' ? `<button class="btn-row btn-row-edit" onclick="restoreRecord('packaging_reports', ${r.id})">복구</button>` : '<span style="color:#aaa;font-size:11px">삭제됨</span>')
+                : `<div class="row-actions">
+                    <button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditPackaging(${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">수정</button>
+                    <button class="btn-row btn-row-del" ${canEdit ? `onclick='openDelete("packaging_reports", ${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">삭제</button>
+                  </div>`;
+              return `<tr class="${isDeleted ? 'deleted-row' : ''}">
+                <td style="color:#bbb;font-size:12px">${i+1}</td>
+                <td>${r.work_date}${isDeleted ? '<span class="deleted-badge">삭제됨</span>' : ''}</td>
+                <td style="font-weight:500">${r.worker_id||'-'}</td>
+                <td style="font-size:12px;color:#555">${prod.partNo||'-'}</td>
+                <td style="font-size:12px;color:#555">${prod.partName||'-'}</td>
+                <td style="min-width:80px">${r.worker_name||'-'}</td>
+                <td class="lot-cell">${lots}</td>
+                <td style="text-align:right;font-weight:500;color:#243bb2">${(r.quantity||0).toLocaleString()}</td>
+                <td style="font-size:12px;color:#888">${r.note||'-'}</td>
+                <td style="font-size:12px;color:#888">${r.remarks||'-'}</td>
+                <td style="font-size:11px;color:#888">${r.created_by_name||'-'}</td>
+                <td style="font-size:11px;color:#aaa">${fmtDatetime(r.submitted_at)}</td>
+                <td>${actionsHtml}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function renderInspectionTable(data) {
+  if (!data.length) {
+    document.getElementById('resultArea').innerHTML = '<div class="card"><div class="empty-row" style="padding:2rem;text-align:center;color:#aaa">조회된 데이터가 없어요.</div></div>';
+    return;
+  }
+  data = applySortIfNeeded(data);
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>NO</th>${makeSortTh('작업일','work_date')}${makeSortTh('사번','worker_id')}${makeSortTh('고객품번','_partNo')}${makeSortTh('품명','_partName')}${makeSortTh('작업자','worker_name')}<th class="lot-cell">성형 LOT No.</th>${makeSortTh('검사','inspect_qty','style="text-align:right"')}${makeSortTh('합격','pass_qty','style="text-align:right"')}${makeSortTh('불합격','fail_qty','style="text-align:right"')}<th style="max-width:200px">불량유형</th><th>비고</th><th>재검</th><th>특이사항</th>${makeSortTh('입력자','created_by_name')}${makeSortTh('제출일시','submitted_at')}<th>작업</th></tr>
+          </thead>
+          <tbody>
+            ${data.map((r, i) => {
+              const prod = PRODUCTS[r.worker_id] || {};
+              const lots = (r.lot_nos||[]).map(l => `<span class="lot-tag">${l}</span>`).join('') || '-';
+              const isDeleted = !!r.deleted_at;
+              const canEdit = canEditDelete(r) && !isDeleted;
+              const reason = canEdit ? '' : (isDeleted ? '삭제됨' : getCannotEditReason(r));
+              const actionsHtml = isDeleted
+                ? (myInfo && myInfo.user_type === 'super' ? `<button class="btn-row btn-row-edit" onclick="restoreRecord('inspection_reports', ${r.id})">복구</button>` : '<span style="color:#aaa;font-size:11px">삭제됨</span>')
+                : `<div class="row-actions">
+                    <button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditInspection(${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">수정</button>
+                    <button class="btn-row btn-row-del" ${canEdit ? `onclick='openDelete("inspection_reports", ${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">삭제</button>
+                  </div>`;
+              return `<tr class="${isDeleted ? 'deleted-row' : ''}">
+                <td style="color:#bbb;font-size:12px">${i+1}</td>
+                <td>${r.work_date}${isDeleted ? '<span class="deleted-badge">삭제됨</span>' : ''}</td>
+                <td style="font-weight:500">${r.worker_id||'-'}</td>
+                <td style="font-size:12px;color:#555">${prod.partNo||'-'}</td>
+                <td style="font-size:12px;color:#555">${prod.partName||'-'}</td>
+                <td style="min-width:80px">${r.worker_name||'-'}</td>
+                <td class="lot-cell">${lots}</td>
+                <td style="text-align:right;font-weight:500;color:#243bb2">${(r.inspect_qty||0).toLocaleString()}</td>
+                <td class="pass-cell" style="text-align:right">${(r.pass_qty||0).toLocaleString()}</td>
+                <td class="defect-cell" style="text-align:right">${(r.fail_qty||0).toLocaleString()}</td>
+                <td style="font-size:12px;max-width:200px;white-space:normal;word-break:break-all">${r.defect_type||'-'}</td>
+                <td style="font-size:12px;color:#888">${r.defect_memo||'-'}</td>
+                <td style="text-align:center;font-size:11px">${r.recheck ? '<span style="color:#7c3aed;font-weight:700">✓</span>' : '-'}</td>
+                <td style="font-size:12px;color:#888">${r.remarks||'-'}</td>
+                <td style="font-size:11px;color:#888">${r.created_by_name||'-'}</td>
+                <td style="font-size:11px;color:#aaa">${fmtDatetime(r.submitted_at)}</td>
+                <td>${actionsHtml}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ── 혼련(CMB) 테이블 렌더링 ──────────────────────────────
+function renderCmbTable(data) {
+  if (!data.length) {
+    document.getElementById('resultArea').innerHTML = '<div class="card"><div class="empty-row" style="padding:2rem;text-align:center;color:#aaa">조회된 데이터가 없어요.</div></div>';
+    return;
+  }
+  data = applySortIfNeeded(data);
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>NO</th>${makeSortTh('작업일','work_date')}${makeSortTh('BATCH No.','batch_no')}${makeSortTh('사번<br>(제품코드)','worker_id')}
+              ${makeSortTh('품명','_partName')}${makeSortTh('재질명','material_name')}${makeSortTh('중량(Kg)','weight','style="text-align:right"')}
+              <th>재믹싱</th><th>평량투입</th>${makeSortTh('작업자','worker_name')}
+              <th>비고</th><th>점검</th><th>특이사항</th>
+              ${makeSortTh('입력자','created_by_name')}${makeSortTh('제출일시','submitted_at')}<th>작업</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map((r, i) => {
+              const prod = PRODUCTS[r.worker_id] || {};
+              const isDeleted = !!r.deleted_at;
+              const canEdit = canEditDelete(r) && !isDeleted;
+              const reason = canEdit ? '' : (isDeleted ? '삭제됨' : getCannotEditReason(r));
+              const actionsHtml = isDeleted
+                ? (myInfo && myInfo.user_type === 'super' ? `<button class="btn-row btn-row-edit" onclick="restoreRecord('cmb_reports', ${r.id})">복구</button>` : '<span style="color:#aaa;font-size:11px">삭제됨</span>')
+                : `<div class="row-actions">
+                    <button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditCmb(${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">수정</button>
+                    <button class="btn-row btn-row-del" ${canEdit ? `onclick='openDelete("cmb_reports", ${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">삭제</button>
+                  </div>`;
+              const remixBadge = r.is_remix 
+                ? '<span style="background:#fff4e6;color:#b45309;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">재믹싱</span>'
+                : '<span style="color:#aaa;font-size:11px">-</span>';
+              const weighingBadge = r.weighing_check === false
+                ? '<span style="background:#fee2e2;color:#c92a2a;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">X</span>'
+                : '<span style="background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">O</span>';
+              // 점검 데이터 요약 (펼치기 가능)
+              let checkSummary = '-';
+              if (r.check_data && typeof r.check_data === 'object') {
+                const times = Object.keys(r.check_data);
+                const filledCount = times.filter(t => {
+                  const v = r.check_data[t];
+                  return v && Object.values(v).some(x => x !== null && x !== '');
+                }).length;
+                if (filledCount > 0) {
+                  checkSummary = `<button class="btn-row" style="background:#f0f3f9;color:#243bb2;font-size:11px;padding:3px 8px" onclick='showCheckData(${JSON.stringify(r.check_data).replace(/'/g, "&#39;")})'>${filledCount}/4 보기</button>`;
+                }
+              }
+              return `<tr class="${isDeleted ? 'deleted-row' : ''}">
+                <td style="color:#bbb;font-size:12px">${i+1}</td>
+                <td>${r.work_date}${isDeleted ? '<span class="deleted-badge">삭제됨</span>' : ''}</td>
+                <td style="font-weight:500;color:#b45309">${r.lot_no||'-'}</td>
+                <td style="font-weight:500">${r.worker_id||'-'}</td>
+                <td style="font-size:12px;color:#555">${prod.partName||'-'}</td>
+                <td style="font-weight:500;color:#243bb2">${r.material_name||'-'}</td>
+                <td style="text-align:right;font-weight:500">${(parseFloat(r.weight)||0).toFixed(3)}</td>
+                <td style="text-align:center">${remixBadge}</td>
+                <td style="text-align:center">${weighingBadge}</td>
+                <td style="min-width:80px">${r.worker_name||'-'}</td>
+                <td style="font-size:12px;color:#888">${r.note||'-'}</td>
+                <td style="text-align:center">${checkSummary}</td>
+                <td style="font-size:12px;color:#888">${r.remarks||'-'}</td>
+                <td style="font-size:11px;color:#888">${r.created_by_name||'-'}</td>
+                <td style="font-size:11px;color:#aaa">${fmtDatetime(r.submitted_at)}</td>
+                <td>${actionsHtml}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// 점검 데이터 팝업으로 보여주기
+function showCheckData(checkData) {
+  const times = ['09:00', '11:00', '14:00', '16:00'];
+  const labels = {
+    airPressure: '에어압력',
+    kneaderIn: '니다 입수',
+    kneaderOut: '니다 출수',
+    rollerIn: '로라 입수',
+    rollerOut: '로라 출수'
+  };
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+  html += '<thead><tr><th style="background:#f0f3f9;padding:8px;border:1px solid #ddd">시간</th>';
+  Object.values(labels).forEach(l => {
+    html += `<th style="background:#f0f3f9;padding:8px;border:1px solid #ddd">${l}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+  times.forEach(time => {
+    const d = checkData[time] || {};
+    html += `<tr><td style="padding:6px;border:1px solid #ddd;background:#fafbfd;font-weight:600">${time}</td>`;
+    Object.keys(labels).forEach(k => {
+      html += `<td style="padding:6px;border:1px solid #ddd;text-align:center">${d[k] || '-'}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  
+  // 간단한 alert 대신 모달로
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:white;border-radius:12px;padding:24px;max-width:700px;width:100%;max-height:80vh;overflow-y:auto';
+  box.innerHTML = `
+      <h3 style="margin:0 0 16px;color:#243bb2">🌡️ 시간대별 점검 데이터</h3>
+      ${html}
+      <div style="text-align:right;margin-top:16px">
+        <button id="__checkPopupClose" style="padding:8px 20px;background:#243bb2;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">닫기</button>
+      </div>
+  `;
+  overlay.appendChild(box);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+  document.getElementById('__checkPopupClose').onclick = () => overlay.remove();
+}
+
+// ── 혼련(CMB) 수정 ──────────────────────────────
+let editingCmbBefore = null;
+function openEditCmb(r) {
+  editingCmbBefore = JSON.parse(JSON.stringify(r));
+  document.getElementById('ec_id').value = r.id;
+  document.getElementById('ec_work_date').value = r.work_date;
+  document.getElementById('ec_worker_name').value = r.worker_name || '';
+  document.getElementById('ec_lot_no').value = r.lot_no || '';
+  document.getElementById('ec_worker_id').value = r.worker_id || '';
+  document.getElementById('ec_material_name').value = r.material_name || '';
+  document.getElementById('ec_weight').value = r.weight || 0;
+  document.getElementById('ec_is_remix').value = r.is_remix ? 'true' : 'false';
+  document.getElementById('ec_weighing_check').value = (r.weighing_check === false) ? 'false' : 'true';
+  document.getElementById('ec_note').value = r.note || '';
+  document.getElementById('ec_remarks').value = r.remarks || '';
+  document.getElementById('editCmbMeta').textContent = `입력자: ${r.created_by_name || '-'} (${r.created_by_emp_code || '-'}) · 작성일: ${r.work_date}`;
+  document.getElementById('editCmbModal').classList.add('open');
+}
+
+async function saveEditCmb() {
+  const id = parseInt(document.getElementById('ec_id').value);
+  const before = editingCmbBefore;
+  const after = {
+    work_date: document.getElementById('ec_work_date').value,
+    worker_name: document.getElementById('ec_worker_name').value.trim(),
+    lot_no: document.getElementById('ec_lot_no').value.trim(),
+    worker_id: document.getElementById('ec_worker_id').value.trim(),
+    material_name: document.getElementById('ec_material_name').value.trim(),
+    weight: parseFloat(document.getElementById('ec_weight').value) || 0,
+    is_remix: document.getElementById('ec_is_remix').value === 'true',
+    weighing_check: document.getElementById('ec_weighing_check').value === 'true',
+    note: document.getElementById('ec_note').value,
+    remarks: document.getElementById('ec_remarks').value,
+    modified_at: new Date().toISOString(),
+    modified_by: myInfo.emp_code + ' (' + myInfo.name + ')'
+  };
+
+  const { error } = await db.from('cmb_reports').update(after).eq('id', id);
+  if (error) { showToast('저장 실패: ' + error.message); return; }
+
+  await logAudit('update', 'cmb_reports', id, before, after, null);
+
+  showToast('수정 완료 ✓');
+  closeModal('editCmbModal');
+  loadData();
+}
+
+// ── 재단 테이블 렌더링 ──────────────────────────────
+function renderCuttingTable(data) {
+  if (!data.length) {
+    document.getElementById('resultArea').innerHTML = '<div class="card"><div class="empty-row" style="padding:2rem;text-align:center;color:#aaa">조회된 데이터가 없어요.</div></div>';
+    return;
+  }
+  data = applySortIfNeeded(data);
+  
+  // 날짜별 안전점검 매핑
+  const safetyByDate = {};
+  (cachedData.재단점검 || []).forEach(s => {
+    safetyByDate[s.check_date] = s;
+  });
+  
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>NO</th>${makeSortTh('작업일','work_date')}${makeSortTh('사번<br>(제품코드)','worker_id')}
+              ${makeSortTh('품명','_partName')}${makeSortTh('재질명','material_name')}${makeSortTh('뱃지 No','lot_no')}
+              ${makeSortTh('박스수량(개)','box_count','style="text-align:right"')}
+              ${makeSortTh('재단수량(EA)','total_qty','style="text-align:right"')}
+              ${makeSortTh('자투리(g)','scrap_weight','style="text-align:right"')}
+              ${makeSortTh('작업자','worker_name')}<th>비고</th><th>특이사항</th>
+              <th>안전점검</th>${makeSortTh('입력자','created_by_name')}${makeSortTh('제출일시','submitted_at')}<th>작업</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map((r, i) => {
+              const prod = PRODUCTS[r.worker_id] || {};
+              const isDeleted = !!r.deleted_at;
+              const canEdit = canEditDelete(r) && !isDeleted;
+              const reason = canEdit ? '' : (isDeleted ? '삭제됨' : getCannotEditReason(r));
+              const actionsHtml = isDeleted
+                ? (myInfo && myInfo.user_type === 'super' ? `<button class="btn-row btn-row-edit" onclick="restoreRecord('cutting_reports', ${r.id})">복구</button>` : '<span style="color:#aaa;font-size:11px">삭제됨</span>')
+                : `<div class="row-actions">
+                    <button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditCutting(${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">수정</button>
+                    <button class="btn-row btn-row-del" ${canEdit ? `onclick='openDelete("cutting_reports", ${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">삭제</button>
+                  </div>`;
+              
+              // 해당 날짜의 안전점검 데이터
+              const safety = safetyByDate[r.work_date];
+              let safetyBtn = '<span style="color:#aaa;font-size:11px">점검 없음</span>';
+              if (safety) {
+                let abnormalCount = 0;
+                Object.values(safety.check_data || {}).forEach(eq => {
+                  Object.entries(eq).forEach(([k, v]) => {
+                    if (k !== 'remarks' && (v === '×' || v === '△')) abnormalCount++;
+                  });
+                });
+                const color = abnormalCount > 0 ? '#dc2626' : '#10b981';
+                const bgColor = abnormalCount > 0 ? '#fee2e2' : '#d1fae5';
+                safetyBtn = `<button class="btn-row" style="background:${bgColor};color:${color};font-size:11px;padding:3px 8px;font-weight:600" onclick='showSafetyData(${JSON.stringify(safety).replace(/'/g, "&#39;")})'>${abnormalCount > 0 ? '⚠️ ' : '✓ '}${abnormalCount === 0 ? '정상' : abnormalCount + '건 이상'}</button>`;
+              }
+              
+              return `<tr class="${isDeleted ? 'deleted-row' : ''}">
+                <td style="color:#bbb;font-size:12px">${i+1}</td>
+                <td>${r.work_date}${isDeleted ? '<span class="deleted-badge">삭제됨</span>' : ''}</td>
+                <td style="font-weight:500">${r.worker_id||'-'}</td>
+                <td style="font-size:12px;color:#555">${prod.partName||'-'}</td>
+                <td style="font-weight:500;color:#7e22ce">${r.material_name||'-'}</td>
+                <td style="color:#7e22ce;font-size:12px">${r.lot_no||'-'}</td>
+                <td style="text-align:right;font-weight:500">${(r.box_count||0).toLocaleString()}</td>
+                <td style="text-align:right;font-weight:500;color:#243bb2">${(r.total_qty||0).toLocaleString()}</td>
+                <td style="text-align:right">${(parseFloat(r.scrap_weight)||0).toFixed(2)}</td>
+                <td style="min-width:80px">${r.worker_name||'-'}</td>
+                <td style="font-size:12px;color:#888">${r.note||'-'}</td>
+                <td style="font-size:12px;color:#888">${r.remarks||'-'}</td>
+                <td style="text-align:center">${safetyBtn}</td>
+                <td style="font-size:11px;color:#888">${r.created_by_name||'-'}</td>
+                <td style="font-size:11px;color:#aaa">${fmtDatetime(r.submitted_at)}</td>
+                <td>${actionsHtml}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// 안전점검 데이터 팝업으로 보여주기
+function showSafetyData(safety) {
+  const EQUIPMENTS = [
+    { key: 'sharing_1', name: '샤링 1호', sub: '자동재단기 1' },
+    { key: 'sharing_2', name: '샤링 2호', sub: '자동재단기 2' },
+    { key: 'sharing_3', name: '샤링 3호', sub: '폭재단기 1' },
+    { key: 'sharing_4', name: '샤링 4호', sub: '폭재단기 2' }
+  ];
+  const ITEMS = [
+    { num: 1, label: '스위치 작동' },
+    { num: 2, label: '칼날 상태' },
+    { num: 3, label: '모터 이상음' },
+    { num: 4, label: '작동유 충만' },
+    { num: 5, label: '안전커버 작동' },
+    { num: 6, label: '에어압력' },
+    { num: 7, label: '청결 상태' },
+    { num: 8, label: '비상정지 버튼' }
+  ];
+  
+  // 축 전환: 점검항목=세로(행), 설비=가로(열) — cutting.html과 동일
+  let html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
+  // thead: 점검항목 | 설비1 | 설비2 | ...
+  html += '<thead><tr><th style="background:#dc2626;color:white;padding:10px 12px;border:1px solid #ddd;text-align:center;min-width:130px">점검항목</th>';
+  EQUIPMENTS.forEach(eq => {
+    html += `<th style="background:#fef2f2;color:#991b1b;padding:8px 6px;border:1px solid #ddd;font-size:11px;min-width:140px">${eq.name}<br><span style="font-size:10px;font-weight:400;color:#b91c1c">${eq.sub}</span></th>`;
+  });
+  html += '</tr></thead><tbody>';
+  
+  // 점검항목별 행
+  ITEMS.forEach(item => {
+    html += `<tr><td style="padding:8px 12px;border:1px solid #ddd;background:#fef2f2;font-weight:600;color:#991b1b;white-space:nowrap"><span style="display:inline-block;background:#dc2626;color:white;border-radius:50%;width:18px;height:18px;line-height:18px;text-align:center;font-size:10px;margin-right:4px">${item.num}</span>${item.label}</td>`;
+    EQUIPMENTS.forEach(eq => {
+      const data = safety.check_data?.[eq.key] || {};
+      const v = data[item.num] || '-';
+      let bg = 'white', color = '#666';
+      if (v === '○') { bg = '#10b981'; color = 'white'; }
+      else if (v === '△') { bg = '#f59e0b'; color = 'white'; }
+      else if (v === '×') { bg = '#ef4444'; color = 'white'; }
+      else if (v === '│') { bg = '#6b7280'; color = 'white'; }
+      html += `<td style="padding:6px;border:1px solid #ddd;text-align:center;background:${bg};color:${color};font-weight:700;font-size:16px">${v}</td>`;
+    });
+    html += '</tr>';
+  });
+  
+  // 특이사항 행
+  html += '<tr><td style="padding:8px 12px;border:1px solid #ddd;background:#fef2f2;font-weight:600;color:#991b1b">📝 특이사항</td>';
+  EQUIPMENTS.forEach(eq => {
+    const data = safety.check_data?.[eq.key] || {};
+    html += `<td style="padding:6px;border:1px solid #ddd;font-size:11px">${data.remarks || '-'}</td>`;
+  });
+  html += '</tr></tbody></table></div>';
+  
+  // 범례
+  html += '<div style="display:flex;gap:12px;justify-content:center;margin-top:12px;font-size:11px;font-weight:600">';
+  html += '<span><span style="display:inline-block;width:18px;height:18px;background:#10b981;color:white;border-radius:4px;text-align:center;line-height:18px;font-size:10px;margin-right:3px">○</span>정상</span>';
+  html += '<span><span style="display:inline-block;width:18px;height:18px;background:#f59e0b;color:white;border-radius:4px;text-align:center;line-height:18px;font-size:10px;margin-right:3px">△</span>수리요망</span>';
+  html += '<span><span style="display:inline-block;width:18px;height:18px;background:#ef4444;color:white;border-radius:4px;text-align:center;line-height:18px;font-size:10px;margin-right:3px">×</span>사용불가</span>';
+  html += '<span><span style="display:inline-block;width:18px;height:18px;background:#6b7280;color:white;border-radius:4px;text-align:center;line-height:18px;font-size:10px;margin-right:3px">│</span>미가동</span>';
+  html += '</div>';
+  
+  if (safety.overall_remarks) {
+    html += `<div style="margin-top:14px;padding:12px;background:#fef2f2;border-left:4px solid #dc2626;border-radius:6px"><strong style="color:#991b1b">전체 특이사항:</strong><br>${safety.overall_remarks}</div>`;
+  }
+  
+  html += `<div style="margin-top:10px;font-size:11px;color:#888;text-align:right">점검자: ${safety.checked_by_name || '-'} · ${fmtDatetime(safety.checked_at)}</div>`;
+  
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:white;border-radius:12px;padding:24px;max-width:900px;width:100%;max-height:85vh;overflow-y:auto';
+  box.innerHTML = `
+    <h3 style="margin:0 0 16px;color:#dc2626">🔒 일일 안전 점검 (${safety.check_date})</h3>
+    ${html}
+    <div style="text-align:right;margin-top:16px">
+      <button id="__safetyPopupClose" style="padding:8px 20px;background:#243bb2;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">닫기</button>
+    </div>
+  `;
+  overlay.appendChild(box);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+  document.getElementById('__safetyPopupClose').onclick = () => overlay.remove();
+}
+
+// ── 재단 수정 ──────────────────────────────
+let editingCuttingBefore = null;
+function openEditCutting(r) {
+  editingCuttingBefore = JSON.parse(JSON.stringify(r));
+  document.getElementById('ect_id').value = r.id;
+  document.getElementById('ect_work_date').value = r.work_date;
+  document.getElementById('ect_worker_name').value = r.worker_name || '';
+  document.getElementById('ect_worker_id').value = r.worker_id || '';
+  document.getElementById('ect_material_name').value = r.material_name || '';
+  document.getElementById('ect_lot_no').value = r.lot_no || '';
+  document.getElementById('ect_box_count').value = r.box_count || 0;
+  document.getElementById('ect_total_qty').value = r.total_qty || 0;
+  document.getElementById('ect_scrap_weight').value = r.scrap_weight || 0;
+  document.getElementById('ect_note').value = r.note || '';
+  document.getElementById('ect_remarks').value = r.remarks || '';
+  document.getElementById('editCuttingMeta').textContent = `입력자: ${r.created_by_name || '-'} (${r.created_by_emp_code || '-'}) · 작성일: ${r.work_date}`;
+  document.getElementById('editCuttingModal').classList.add('open');
+}
+
+async function saveEditCutting() {
+  const id = parseInt(document.getElementById('ect_id').value);
+  const before = editingCuttingBefore;
+  const after = {
+    work_date: document.getElementById('ect_work_date').value,
+    worker_name: document.getElementById('ect_worker_name').value.trim(),
+    worker_id: document.getElementById('ect_worker_id').value.trim(),
+    material_name: document.getElementById('ect_material_name').value.trim(),
+    lot_no: document.getElementById('ect_lot_no').value.trim() || null,
+    box_count: parseInt(document.getElementById('ect_box_count').value) || 0,
+    total_qty: parseInt(document.getElementById('ect_total_qty').value) || 0,
+    scrap_weight: parseFloat(document.getElementById('ect_scrap_weight').value) || 0,
+    note: document.getElementById('ect_note').value,
+    remarks: document.getElementById('ect_remarks').value,
+    modified_at: new Date().toISOString(),
+    modified_by: myInfo.emp_code + ' (' + myInfo.name + ')'
+  };
+
+  const { error } = await db.from('cutting_reports').update(after).eq('id', id);
+  if (error) { showToast('저장 실패: ' + error.message); return; }
+
+  await logAudit('update', 'cutting_reports', id, before, after, null);
+
+  showToast('수정 완료 ✓');
+  closeModal('editCuttingModal');
+  loadData();
+}
+
+// ── 도포 테이블 렌더링 ──────────────────────────────
+function renderCoatingTable(data) {
+  if (!data.length) {
+    document.getElementById('resultArea').innerHTML = '<div class="card"><div style="padding:2rem;text-align:center;color:#aaa;font-size:13px">데이터가 없어요.</div></div>';
+    return;
+  }
+  data = applySortIfNeeded(data);
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>NO</th>${makeSortTh('작업일','work_date')}${makeSortTh('사번','worker_id')}${makeSortTh('작업종류','work_type')}
+              ${makeSortTh('줄당EA','qty_per_line')}${makeSortTh('줄수','line_count')}${makeSortTh('총수량','total_qty')}${makeSortTh('불량','defect_qty')}
+              ${makeSortTh('작업자','worker_name')}<th>비고</th><th>특이사항</th>
+              ${makeSortTh('입력자','created_by_name')}${makeSortTh('제출일시','submitted_at')}<th>작업</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map((r, i) => {
+              const isDeleted = r.deleted_at;
+              const rowStyle = isDeleted ? 'background:#f9f9f9;opacity:0.5;text-decoration:line-through' : '';
+              const defectStyle = (r.defect_qty||0) > 0 ? 'color:#e53e3e;font-weight:600' : '';
+              return `<tr style="${rowStyle}">
+                <td>${i+1}</td>
+                <td>${r.work_date}</td>
+                <td>${r.worker_id||'-'}</td>
+                <td><span style="background:#e8ecfa;color:#243bb2;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">${r.work_type||'-'}</span></td>
+                <td>${r.qty_per_line||0}</td>
+                <td>${r.line_count||0}</td>
+                <td style="font-weight:600;color:#243bb2">${(r.total_qty||0).toLocaleString()}</td>
+                <td style="${defectStyle}">${(r.defect_qty||0).toLocaleString()}</td>
+                <td style="min-width:80px">${r.worker_name||'-'}</td>
+                <td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.note||'-'}</td>
+                <td style="font-size:11px">${r.remarks||'-'}</td>
+                <td style="font-size:11px">${r.created_by_name||'-'}</td>
+                <td style="font-size:11px">${r.created_at ? new Date(r.created_at).toLocaleString('ko-KR') : '-'}</td>
+                <td>${isDeleted ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : `<div class="row-actions"><button class="btn-row btn-row-edit" onclick='openEditCoating(${JSON.stringify(r).replace(/'/g, "&#39;")})'>수정</button><button class="btn-row btn-row-del" onclick="deleteCoating(${r.id})">삭제</button></div>`}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ── 도포 수정 ──────────────────────────────
+let editingCoatingBefore = null;
+function openEditCoating(r) {
+  editingCoatingBefore = JSON.parse(JSON.stringify(r));
+  // 간단한 프롬프트 방식 수정 (모달 없이)
+  const newWorkType = prompt('작업종류:', r.work_type || '');
+  if (newWorkType === null) return;
+  const newPerLine = prompt('줄당EA:', r.qty_per_line || '0');
+  if (newPerLine === null) return;
+  const newLines = prompt('줄수:', r.line_count || '0');
+  if (newLines === null) return;
+  const newDefect = prompt('불량수량:', r.defect_qty || '0');
+  if (newDefect === null) return;
+  const newNote = prompt('비고:', r.note || '');
+  if (newNote === null) return;
+
+  const pl = parseInt(newPerLine) || 0;
+  const lc = parseInt(newLines) || 0;
+
+  saveEditCoating(r.id, {
+    work_type: newWorkType,
+    qty_per_line: pl,
+    line_count: lc,
+    total_qty: pl * lc,
+    defect_qty: parseInt(newDefect) || 0,
+    note: newNote,
+    updated_at: new Date().toISOString()
+  });
+}
+
+async function saveEditCoating(id, updates) {
+  const { error } = await db.from('coating_reports').update(updates).eq('id', id);
+  if (error) { alert('수정 실패: ' + error.message); return; }
+
+  // 감사 로그
+  try {
+    await db.from('audit_logs').insert({
+      table_name: 'coating_reports',
+      record_id: id,
+      action: 'UPDATE',
+      before_data: editingCoatingBefore,
+      after_data: updates,
+      performed_by: currentUser?.name || '-',
+      performed_at: new Date().toISOString()
+    });
+  } catch(e) {}
+
+  alert('수정 완료!');
+  loadData();
+}
+
+async function deleteCoating(id) {
+  if (!confirm('이 기록을 삭제할까요? (복구 가능)')) return;
+  const { error } = await db.from('coating_reports').update({
+    deleted_at: new Date().toISOString()
+  }).eq('id', id);
+  if (error) { alert('삭제 실패: ' + error.message); return; }
+
+  try {
+    await db.from('audit_logs').insert({
+      table_name: 'coating_reports',
+      record_id: id,
+      action: 'DELETE',
+      performed_by: currentUser?.name || '-',
+      performed_at: new Date().toISOString()
+    });
+  } catch(e) {}
+
+  alert('삭제 완료!');
+  loadData();
+}
+
+// ── 2차가류 테이블 렌더링 ──────────────────────────────
+function renderPostcureTable(data) {
+  if (!data.length) {
+    document.getElementById('resultArea').innerHTML = '<div class="card"><div style="padding:2rem;text-align:center;color:#aaa;font-size:13px">데이터가 없어요.</div></div>';
+    return;
+  }
+  data = applySortIfNeeded(data);
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>NO</th>${makeSortTh('작업일','work_date')}${makeSortTh('사번','worker_id')}${makeSortTh('재질명','material_name')}
+              ${makeSortTh('온도(℃)','temperature')}${makeSortTh('시간(분)','duration_min')}${makeSortTh('투입량','input_qty')}${makeSortTh('성형작업자','molding_worker')}
+              ${makeSortTh('경도','hardness')}${makeSortTh('생산LOT','lot_no')}${makeSortTh('작업자','worker_name')}<th>비고</th>
+              <th>특이사항</th>${makeSortTh('입력자','created_by_name')}${makeSortTh('제출일시','submitted_at')}<th>작업</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map((r, i) => {
+              const isDeleted = r.deleted_at;
+              const rowStyle = isDeleted ? 'background:#f9f9f9;opacity:0.5;text-decoration:line-through' : '';
+              return `<tr style="${rowStyle}">
+                <td>${i+1}</td>
+                <td>${r.work_date}</td>
+                <td>${r.worker_id||'-'}</td>
+                <td>${r.material_name||'-'}</td>
+                <td>${r.temperature != null ? r.temperature : '-'}</td>
+                <td>${r.duration_min != null ? r.duration_min : '-'}</td>
+                <td style="font-weight:600;color:#243bb2">${(r.input_qty||0).toLocaleString()}</td>
+                <td>${r.molding_worker||'-'}</td>
+                <td>${r.hardness||'-'}</td>
+                <td style="font-size:11px">${r.lot_no||'-'}</td>
+                <td style="min-width:80px">${r.worker_name||'-'}</td>
+                <td style="font-size:11px">${r.note||'-'}</td>
+                <td style="font-size:11px">${r.remarks||'-'}</td>
+                <td style="font-size:11px">${r.created_by_name||'-'}</td>
+                <td style="font-size:11px">${r.created_at ? new Date(r.created_at).toLocaleString('ko-KR') : '-'}</td>
+                <td>${isDeleted ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : `<div class="row-actions"><button class="btn-row btn-row-edit" onclick='openEditPostcure(${JSON.stringify(r).replace(/'/g, "&#39;")})'>수정</button><button class="btn-row btn-row-del" onclick="deletePostcure(${r.id})">삭제</button></div>`}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+let editingPostcureBefore = null;
+function openEditPostcure(r) {
+  editingPostcureBefore = JSON.parse(JSON.stringify(r));
+  const newTemp = prompt('온도(℃):', r.temperature || '');
+  if (newTemp === null) return;
+  const newDur = prompt('시간(분):', r.duration_min || '');
+  if (newDur === null) return;
+  const newInput = prompt('투입량:', r.input_qty || '0');
+  if (newInput === null) return;
+  const newHardness = prompt('경도:', r.hardness || '');
+  if (newHardness === null) return;
+  const newNote = prompt('비고:', r.note || '');
+  if (newNote === null) return;
+
+  saveEditPostcure(r.id, {
+    temperature: parseFloat(newTemp) || null,
+    duration_min: parseInt(newDur) || null,
+    input_qty: parseInt(newInput) || 0,
+    hardness: newHardness,
+    note: newNote,
+    updated_at: new Date().toISOString()
+  });
+}
+
+async function saveEditPostcure(id, updates) {
+  const { error } = await db.from('postcure_reports').update(updates).eq('id', id);
+  if (error) { alert('수정 실패: ' + error.message); return; }
+  try {
+    await db.from('audit_logs').insert({ table_name: 'postcure_reports', record_id: id, action: 'UPDATE', before_data: editingPostcureBefore, after_data: updates, performed_by: currentUser?.name || '-', performed_at: new Date().toISOString() });
+  } catch(e) {}
+  alert('수정 완료!');
+  loadData();
+}
+
+async function deletePostcure(id) {
+  if (!confirm('이 기록을 삭제할까요? (복구 가능)')) return;
+  const { error } = await db.from('postcure_reports').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  if (error) { alert('삭제 실패: ' + error.message); return; }
+  try {
+    await db.from('audit_logs').insert({ table_name: 'postcure_reports', record_id: id, action: 'DELETE', performed_by: currentUser?.name || '-', performed_at: new Date().toISOString() });
+  } catch(e) {}
+  alert('삭제 완료!');
+  loadData();
+}
+
+// ── 쇼트 테이블 렌더링 ──────────────────────────────
+function renderShotTable(data) {
+  if (!data.length) { document.getElementById('resultArea').innerHTML = '<div class="card"><div style="padding:2rem;text-align:center;color:#aaa;font-size:13px">데이터가 없어요.</div></div>'; return; }
+  data = applySortIfNeeded(data);
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card" style="padding:0"><div class="table-wrap"><table><thead><tr>
+      <th>NO</th><th>작업일</th><th>유형</th><th>설비</th><th>사번</th>
+      <th>온도/사상시간</th><th>시간/회전시간</th><th>수량</th><th>볼크기</th><th>RPM</th>
+      <th>LOT</th><th>작업자</th><th>비고</th><th>입력자</th><th>제출일시</th><th>작업</th>
+    </tr></thead><tbody>
+    ${data.map((r,i) => {
+      const del = r.deleted_at;
+      const st = del ? 'background:#f9f9f9;opacity:0.5;text-decoration:line-through' : '';
+      const typeTag = r.shot_type==='freeze' ? '<span style="background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:4px;font-size:11px">❄️ 냉동</span>' : '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px">⚙️ 자동</span>';
+      const col1 = r.shot_type==='freeze' ? (r.temperature != null ? r.temperature+'℃' : '-') : (r.grinding_time_sec != null ? r.grinding_time_sec+'초' : '-');
+      const col2 = r.shot_type==='freeze' ? (r.duration_min != null ? r.duration_min+'분' : '-') : (r.rotation_time_sec != null ? r.rotation_time_sec+'초' : '-');
+      return `<tr style="${st}"><td>${i+1}</td><td>${r.work_date}</td><td>${typeTag}</td><td style="font-size:11px">${r.equipment||'-'}</td><td>${r.worker_id||'-'}</td>
+        <td>${col1}</td><td>${col2}</td><td style="font-weight:600;color:#243bb2">${(r.work_qty||0).toLocaleString()}</td><td>${r.ball_size||'-'}</td><td>${r.rpm||'-'}</td>
+        <td style="font-size:11px">${r.lot_no||'-'}</td><td style="min-width:80px">${r.worker_name||'-'}</td><td style="font-size:11px">${r.note||'-'}</td>
+        <td style="font-size:11px">${r.created_by_name||'-'}</td><td style="font-size:11px">${r.created_at?new Date(r.created_at).toLocaleString('ko-KR'):'-'}</td>
+        <td>${del?'<span style="color:#aaa;font-size:11px">삭제됨</span>':`<div class="row-actions"><button class="btn-row btn-row-edit" onclick='openEditShot(${JSON.stringify(r).replace(/'/g, "&#39;")})'>수정</button><button class="btn-row btn-row-del" onclick="deleteShot(${r.id})">삭제</button></div>`}</td></tr>`;
+    }).join('')}
+    </tbody></table></div></div>`;
+}
+
+let editingShotBefore = null;
+function openEditShot(r) {
+  editingShotBefore = JSON.parse(JSON.stringify(r));
+  document.getElementById('esh_id').value = r.id;
+  document.getElementById('esh_work_date').value = r.work_date || '';
+  document.getElementById('esh_shot_type').value = r.shot_type || 'freeze';
+  document.getElementById('esh_equipment').value = r.equipment || '';
+  document.getElementById('esh_worker_id').value = r.worker_id || '';
+  document.getElementById('esh_work_qty').value = r.work_qty || 0;
+  document.getElementById('esh_rpm').value = r.rpm || '';
+  document.getElementById('esh_ball_size').value = r.ball_size || '';
+  document.getElementById('esh_lot_no').value = r.lot_no || '';
+  document.getElementById('esh_note').value = r.note || '';
+  // 유형에 따라 col1/col2 설정
+  if (r.shot_type === 'freeze') {
+    document.getElementById('esh_col1').value = r.temperature || '';
+    document.getElementById('esh_col2').value = r.duration_min || '';
+  } else {
+    document.getElementById('esh_col1').value = r.grinding_time_sec || '';
+    document.getElementById('esh_col2').value = r.rotation_time_sec || '';
+  }
+  document.getElementById('editShotMeta').textContent = '설비: ' + (r.equipment||'-') + ' · 작업자: ' + (r.worker_name||'-');
+  document.getElementById('editShotModal').classList.add('open');
+}
+
+async function saveEditShot() {
+  var id = parseInt(document.getElementById('esh_id').value);
+  var shotType = document.getElementById('esh_shot_type').value;
+  var after = {
+    work_date: document.getElementById('esh_work_date').value,
+    shot_type: shotType,
+    equipment: document.getElementById('esh_equipment').value.trim(),
+    worker_id: document.getElementById('esh_worker_id').value.trim(),
+    work_qty: parseInt(document.getElementById('esh_work_qty').value) || 0,
+    rpm: parseInt(document.getElementById('esh_rpm').value) || null,
+    ball_size: document.getElementById('esh_ball_size').value.trim() || null,
+    lot_no: document.getElementById('esh_lot_no').value.trim() || null,
+    note: document.getElementById('esh_note').value.trim() || null,
+    modified_at: new Date().toISOString(),
+    modified_by: myInfo.emp_code + ' (' + myInfo.name + ')'
+  };
+  if (shotType === 'freeze') {
+    after.temperature = parseFloat(document.getElementById('esh_col1').value) || null;
+    after.duration_min = parseInt(document.getElementById('esh_col2').value) || null;
+  } else {
+    after.grinding_time_sec = parseInt(document.getElementById('esh_col1').value) || null;
+    after.rotation_time_sec = parseInt(document.getElementById('esh_col2').value) || null;
+  }
+  var { error } = await db.from('shot_reports').update(after).eq('id', id);
+  if (error) { showToast('저장 실패: ' + error.message); return; }
+  await logAudit('update', 'shot_reports', id, editingShotBefore, after, null);
+  showToast('수정 완료 ✓');
+  closeModal('editShotModal');
+  loadData();
+}
+
+async function deleteShot(id) {
+  if (!confirm('이 기록을 삭제할까요?')) return;
+  await db.from('shot_reports').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  try { await db.from('audit_logs').insert({ table_name:'shot_reports', record_id:id, action:'DELETE', performed_by:currentUser?.name||'-', performed_at:new Date().toISOString() }); } catch(e){}
+  alert('삭제 완료!'); loadData();
+}
+
+// ── 성형 ──────────────────────────────
+function renderMoldingTable(data) {
+  if (!data.length) { document.getElementById('resultArea').innerHTML = '<div class="card"><div style="padding:2rem;text-align:center;color:#aaa;font-size:13px">데이터가 없어요.</div></div>'; return; }
+  data = applySortIfNeeded(data);
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card" style="padding:0"><div class="table-wrap"><table><thead><tr>
+      <th>NO</th>${makeSortTh('작업일','work_date')}${makeSortTh('근무','shift')}${makeSortTh('반','team')}${makeSortTh('설비','equipment_no')}${makeSortTh('사번','worker_id')}${makeSortTh('제품명','_partName')}
+      ${makeSortTh('Batch','batch_no')}${makeSortTh('C/V','cavity')}${makeSortTh('Shot','shot_count')}${makeSortTh('생산','total_qty','style="text-align:right"')}${makeSortTh('불량','defect_qty','style="text-align:right"')}
+      ${makeSortTh('유형','work_type')}${makeSortTh('압력','pressure')}${makeSortTh('상판℃','temp_upper')}${makeSortTh('하판℃','temp_lower')}<th>비가동</th>${makeSortTh('작업자','worker_name')}<th>비고</th>${makeSortTh('제출일시','submitted_at')}<th>작업</th>
+    </tr></thead><tbody>
+    ${data.map((r,i) => {
+      const del = r.deleted_at;
+      const st = del ? 'background:#f9f9f9;opacity:0.5;text-decoration:line-through' : '';
+      const typeColors = { '표준':'#243bb2', '초품':'#059669', '중품':'#d97706', '종품':'#7c3aed' };
+      const tc = typeColors[r.work_type] || '#666';
+      // note 필드: JSON인 경우 text만 추출, 아니면 그대로 표시
+      let noteText = '';
+      try {
+        const noteObj = JSON.parse(r.note);
+        noteText = noteObj.text || '';
+      } catch(e) {
+        noteText = r.note || '';
+      }
+      // 비가동코드: note JSON에서 추출 또는 downtime_code 사용
+      let dtCode = r.downtime_code || '';
+      if (!dtCode) {
+        try {
+          const noteObj = JSON.parse(r.note);
+          if (noteObj.downtime && noteObj.downtime.length > 0) {
+            dtCode = noteObj.downtime.map(d => d.code).filter(Boolean).join(', ');
+          }
+        } catch(e) {}
+      }
+      return `<tr style="${st}">
+        <td>${i+1}</td><td>${r.work_date||''}</td><td>${r.shift_type||''}</td>
+        <td>${r.team||''}</td><td style="font-size:11px">${r.equipment_no||''}</td>
+        <td>${r.sabun||''}</td><td style="font-size:11px">${r.product_name||''}</td>
+        <td style="font-size:11px">${r.batch_no||''}</td><td>${r.cavity||''}</td><td>${r.shot_count||''}</td>
+        <td style="text-align:right;font-weight:600">${(r.production_qty||0).toLocaleString()}</td>
+        <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${r.defect_qty||0}</td>
+        <td><span style="background:${tc}15;color:${tc};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">${r.work_type||'표준'}</span></td>
+        <td>${r.molding_pressure||''}</td><td>${r.upper_temp||''}</td><td>${r.lower_temp||''}</td>
+        <td style="font-size:11px;color:#e67e22">${dtCode}</td>
+        <td style="min-width:80px">${r.worker_name||''}</td><td style="font-size:11px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${noteText}">${noteText||'-'}</td>
+        <td style="font-size:11px;color:#999">${fmtDatetime(r.created_at)}</td>
+        <td>${del ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : `<div class="row-actions"><button class="btn-row btn-row-edit" onclick='openEditMolding(${JSON.stringify(r).replace(/'/g, "&#39;")})'>수정</button><button class="btn-row btn-row-del" onclick="deleteMolding('${r.id}')">삭제</button></div>`}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table></div></div>`;
+}
+
+async function deleteMolding(id) {
+  if (!confirm('이 기록을 삭제할까요?')) return;
+  await db.from('molding_reports').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  try { await db.from('audit_logs').insert({ table_name:'molding_reports', record_id:id, action:'DELETE', performed_by:currentUser?.name||'-', performed_at:new Date().toISOString() }); } catch(e){}
+  alert('삭제 완료!'); loadData();
+}
+
+let editingMoldingBefore = null;
+function openEditMolding(r) {
+  editingMoldingBefore = JSON.parse(JSON.stringify(r));
+  document.getElementById('emld_id').value = r.id;
+  document.getElementById('emld_work_date').value = r.work_date || '';
+  document.getElementById('emld_shift_type').value = r.shift_type || '주간';
+  document.getElementById('emld_worker_name').value = r.worker_name || '';
+  document.getElementById('emld_equipment_no').value = r.equipment_no || '';
+  document.getElementById('emld_sabun').value = r.sabun || '';
+  document.getElementById('emld_product_name').value = r.product_name || '';
+  document.getElementById('emld_batch_no').value = r.batch_no || '';
+  document.getElementById('emld_cavity').value = r.cavity || '';
+  document.getElementById('emld_shot_count').value = r.shot_count || '';
+  document.getElementById('emld_production_qty').value = r.production_qty || 0;
+  document.getElementById('emld_defect_qty').value = r.defect_qty || 0;
+  document.getElementById('emld_work_type').value = r.work_type || '표준';
+  // note에서 text만 추출
+  var noteText = '';
+  try { noteText = JSON.parse(r.note).text || ''; } catch(e) { noteText = r.note || ''; }
+  document.getElementById('emld_note_text').value = noteText;
+  document.getElementById('editMoldingMeta').textContent = '설비: ' + (r.equipment_no||'-') + ' · 반: ' + (r.team||'-') + ' · 입력자: ' + (r.created_by_name||'-');
+  document.getElementById('editMoldingModal').classList.add('open');
+}
+
+async function saveEditMolding() {
+  var id = parseInt(document.getElementById('emld_id').value);
+  var before = editingMoldingBefore;
+  var noteText = document.getElementById('emld_note_text').value.trim();
+  // 기존 note JSON 구조 유지하면서 text만 업데이트
+  var noteVal = noteText;
+  try {
+    var existingNote = JSON.parse(before.note);
+    existingNote.text = noteText;
+    noteVal = JSON.stringify(existingNote);
+  } catch(e) {
+    noteVal = noteText;
+  }
+
+  var after = {
+    work_date: document.getElementById('emld_work_date').value,
+    shift_type: document.getElementById('emld_shift_type').value,
+    worker_name: document.getElementById('emld_worker_name').value.trim(),
+    equipment_no: document.getElementById('emld_equipment_no').value.trim(),
+    sabun: document.getElementById('emld_sabun').value.trim(),
+    product_name: document.getElementById('emld_product_name').value.trim(),
+    batch_no: document.getElementById('emld_batch_no').value.trim() || null,
+    cavity: parseInt(document.getElementById('emld_cavity').value) || null,
+    shot_count: parseInt(document.getElementById('emld_shot_count').value) || null,
+    production_qty: parseInt(document.getElementById('emld_production_qty').value) || 0,
+    defect_qty: parseInt(document.getElementById('emld_defect_qty').value) || 0,
+    work_type: document.getElementById('emld_work_type').value,
+    note: noteVal,
+    modified_at: new Date().toISOString(),
+    modified_by: myInfo.emp_code + ' (' + myInfo.name + ')'
+  };
+
+  var { error } = await db.from('molding_reports').update(after).eq('id', id);
+  if (error) { showToast('저장 실패: ' + error.message); return; }
+
+  await logAudit('update', 'molding_reports', id, before, after, null);
+
+  showToast('수정 완료 ✓');
+  closeModal('editMoldingModal');
+  loadData();
+}
+
+// ── 조립 ──────────────────────────────
+function renderAssemblyTable(data) {
+  if (!data.length) { document.getElementById('resultArea').innerHTML = '<div class="card"><div style="padding:2rem;text-align:center;color:#aaa;font-size:13px">데이터가 없어요.</div></div>'; return; }
+  data = applySortIfNeeded(data);
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card" style="padding:0"><div class="table-wrap"><table><thead><tr>
+      <th>NO</th>${makeSortTh('작업일','work_date')}${makeSortTh('근무','shift_type')}${makeSortTh('설비','equipment_no')}${makeSortTh('사번','sabun')}${makeSortTh('제품명','product_name')}
+      ${makeSortTh('구분','assembly_type')}${makeSortTh('방식','work_method')}${makeSortTh('생산','production_qty','style="text-align:right"')}${makeSortTh('불량','defect_qty','style="text-align:right"')}
+      ${makeSortTh('작업자','worker_name')}<th>비고</th>${makeSortTh('제출일시','created_at')}<th>작업</th>
+    </tr></thead><tbody>
+    ${data.map((r,i) => {
+      const del = r.deleted_at;
+      const st = del ? 'background:#f9f9f9;opacity:0.5;text-decoration:line-through' : '';
+      const methodColor = r.work_method === '수작업' ? 'background:#fef3c7;color:#92400e' : 'background:#dbeafe;color:#1e40af';
+      return `<tr style="${st}">
+        <td>${i+1}</td><td>${r.work_date||''}</td><td>${r.shift_type||''}</td>
+        <td style="font-size:11px">${r.equipment_no||''}</td>
+        <td>${r.sabun||''}</td><td style="font-size:11px">${r.product_name||''}</td>
+        <td style="font-size:11px">${r.assembly_type||''}</td>
+        <td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;${methodColor}">${r.work_method||''}</span></td>
+        <td style="text-align:right;font-weight:600">${(r.production_qty||0).toLocaleString()}</td>
+        <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${r.defect_qty||0}</td>
+        <td style="min-width:80px">${r.worker_name||''}</td><td style="font-size:11px">${r.note||''}</td>
+        <td style="font-size:11px;color:#999">${fmtDatetime(r.created_at)}</td>
+        <td>${del ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : `<div class="row-actions"><button class="btn-row btn-row-edit" onclick='openEditAssembly(${JSON.stringify(r).replace(/'/g, "&#39;")})'>수정</button><button class="btn-row btn-row-del" onclick="deleteAssembly('${r.id}')">삭제</button></div>`}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table></div></div>`;
+}
+
+let editingAssemblyBefore = null;
+function openEditAssembly(r) {
+  editingAssemblyBefore = JSON.parse(JSON.stringify(r));
+  document.getElementById('easm_id').value = r.id;
+  document.getElementById('easm_work_date').value = r.work_date || '';
+  document.getElementById('easm_shift_type').value = r.shift_type || '주간';
+  document.getElementById('easm_equipment_no').value = r.equipment_no || '';
+  document.getElementById('easm_sabun').value = r.sabun || '';
+  document.getElementById('easm_product_name').value = r.product_name || '';
+  document.getElementById('easm_assembly_type').value = r.assembly_type || '';
+  document.getElementById('easm_production_qty').value = r.production_qty || 0;
+  document.getElementById('easm_defect_qty').value = r.defect_qty || 0;
+  document.getElementById('easm_note').value = r.note || '';
+  document.getElementById('editAssemblyMeta').textContent = '설비: ' + (r.equipment_no||'-') + ' · 작업자: ' + (r.worker_name||'-');
+  document.getElementById('editAssemblyModal').classList.add('open');
+}
+
+async function saveEditAssembly() {
+  var id = parseInt(document.getElementById('easm_id').value);
+  var after = {
+    work_date: document.getElementById('easm_work_date').value,
+    shift_type: document.getElementById('easm_shift_type').value,
+    equipment_no: document.getElementById('easm_equipment_no').value.trim(),
+    sabun: document.getElementById('easm_sabun').value.trim(),
+    product_name: document.getElementById('easm_product_name').value.trim(),
+    assembly_type: document.getElementById('easm_assembly_type').value.trim(),
+    production_qty: parseInt(document.getElementById('easm_production_qty').value) || 0,
+    defect_qty: parseInt(document.getElementById('easm_defect_qty').value) || 0,
+    note: document.getElementById('easm_note').value.trim() || null,
+    modified_at: new Date().toISOString(),
+    modified_by: myInfo.emp_code + ' (' + myInfo.name + ')'
+  };
+  var { error } = await db.from('assembly_reports').update(after).eq('id', id);
+  if (error) { showToast('저장 실패: ' + error.message); return; }
+  await logAudit('update', 'assembly_reports', id, editingAssemblyBefore, after, null);
+  showToast('수정 완료 ✓');
+  closeModal('editAssemblyModal');
+  loadData();
+}
+
+async function deleteAssembly(id) {
+  if (!confirm('이 기록을 삭제할까요?')) return;
+  await db.from('assembly_reports').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  try { await db.from('audit_logs').insert({ table_name:'assembly_reports', record_id:id, action:'DELETE', performed_by:currentUser?.name||'-', performed_at:new Date().toISOString() }); } catch(e){}
+  alert('삭제 완료!'); loadData();
+}
+
+// ── 엑셀 다운로드 ──────────────────────────────
+function downloadExcel() {
+  const wb = XLSX.utils.book_new();
+  let added = 0;
+
+  // 포장 데이터
+  if ((currentProcess === 'all' || currentProcess === '포장') && cachedData.포장.length > 0) {
+    const rows = cachedData.포장.map((r, i) => {
+      const prod = PRODUCTS[r.worker_id] || {};
+      return {
+        'NO': i + 1,
+        '작업일': r.work_date || '',
+        '사번': r.worker_id || '',
+        '고객 품번': prod.partNo || '',
+        '품명': prod.partName || '',
+        '작업자': r.worker_name || '',
+        '성형 LOT No.': (r.lot_nos || []).join(', '),
+        '포장수량': r.quantity || 0,
+        '비고': r.note || '',
+        '특이사항': r.remarks || '',
+        '제출일시': fmtDatetime(r.submitted_at)
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:5},{wch:11},{wch:10},{wch:15},{wch:25},{wch:10},{wch:18},{wch:10},{wch:18},{wch:18},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, ws, '포장 작업일지');
+    added++;
+  }
+
+  // 검사 데이터
+  if ((currentProcess === 'all' || currentProcess === '검사') && cachedData.검사.length > 0) {
+    // 전체 불량유형 목록 수집
+    var allDefectTypes = new Set();
+    cachedData.검사.forEach(function(r) {
+      if (!r.defect_type) return;
+      r.defect_type.split(',').forEach(function(p) {
+        p = p.trim();
+        var m = p.match(/^(.+?)\((\d+)\)$/);
+        if (m) allDefectTypes.add(m[1].trim());
+        else if (p) allDefectTypes.add(p);
+      });
+    });
+    var defectTypeList = Array.from(allDefectTypes).sort();
+
+    const rows = cachedData.검사.map((r, i) => {
+      const prod = PRODUCTS[r.worker_id] || {};
+
+      // 기본 컬럼
+      var row = {
+        'NO': i + 1,
+        '작업일': r.work_date || '',
+        '사번': r.worker_id || '',
+        '고객 품번': prod.partNo || '',
+        '품명': prod.partName || '',
+        '작업자': r.worker_name || '',
+        '성형 LOT No.': (r.lot_nos || []).join(', '),
+        '검사수량': r.inspect_qty || 0,
+        '합격수량': r.pass_qty || 0,
+        '불합격수량': r.fail_qty || 0,
+        '불량유형(원본)': r.defect_type || ''
+      };
+
+      // 불량유형별 개별 컬럼 추가
+      var parsed = {};
+      if (r.defect_type) {
+        r.defect_type.split(',').forEach(function(p) {
+          p = p.trim();
+          var m = p.match(/^(.+?)\((\d+)\)$/);
+          if (m) parsed[m[1].trim()] = parseInt(m[2]) || 0;
+          else if (p) parsed[p] = 1;
+        });
+      }
+      defectTypeList.forEach(function(t) {
+        row['[불량]' + t] = parsed[t] || 0;
+      });
+
+      row['비고'] = r.defect_memo || '';
+      row['재검'] = r.recheck ? 'Y' : '';
+      row['특이사항'] = r.remarks || '';
+      row['입력자'] = r.created_by_name || '';
+      row['제출일시'] = fmtDatetime(r.submitted_at);
+      return row;
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    // 컬럼 너비 설정
+    var colWidths = [{wch:5},{wch:11},{wch:10},{wch:15},{wch:25},{wch:10},{wch:18},{wch:9},{wch:9},{wch:9},{wch:20}];
+    defectTypeList.forEach(function() { colWidths.push({wch:8}); });
+    colWidths.push({wch:15},{wch:5},{wch:15},{wch:10},{wch:18});
+    ws['!cols'] = colWidths;
+    XLSX.utils.book_append_sheet(wb, ws, '검사 작업일지');
+    added++;
+  }
+
+  // 혼련(CMB) 데이터
+  if ((currentProcess === 'all' || currentProcess === '혼련(CMB)') && cachedData.CMB.length > 0) {
+    const rows = cachedData.CMB.map((r, i) => {
+      const prod = PRODUCTS[r.worker_id] || {};
+      return {
+        'NO': i + 1,
+        '작업일': r.work_date || '',
+        'BATCH No.': r.lot_no || '',
+        '사번(제품코드)': r.worker_id || '',
+        '고객 품번': prod.partNo || '',
+        '품명': prod.partName || '',
+        '재질명': r.material_name || '',
+        '중량(Kg)': parseFloat(r.weight) || 0,
+        '재믹싱': r.is_remix ? 'O' : 'X',
+        '평량 정상투입': r.weighing_check === false ? 'X' : 'O',
+        '작업자': r.worker_name || '',
+        '비고': r.note || '',
+        '특이사항': r.remarks || '',
+        '입력자': r.created_by_name || '',
+        '제출일시': fmtDatetime(r.submitted_at)
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:5},{wch:11},{wch:14},{wch:12},{wch:15},{wch:25},{wch:12},{wch:10},{wch:8},{wch:10},{wch:10},{wch:18},{wch:18},{wch:10},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, ws, '혼련(CMB) 작업일지');
+    
+    // 점검 데이터 (별도 시트)
+    const checkRows = [];
+    cachedData.CMB.forEach(r => {
+      if (r.check_data && typeof r.check_data === 'object') {
+        Object.entries(r.check_data).forEach(([time, vals]) => {
+          if (vals && Object.values(vals).some(v => v !== null && v !== '')) {
+            checkRows.push({
+              '작업일': r.work_date || '',
+              'BATCH No.': r.lot_no || '',
+              '작업자': r.worker_name || '',
+              '점검 시간': time,
+              '에어압력(Kg/㎠)': vals.airPressure || '',
+              '니다 입수(℃)': vals.kneaderIn || '',
+              '니다 출수(℃)': vals.kneaderOut || '',
+              '로라 입수(℃)': vals.rollerIn || '',
+              '로라 출수(℃)': vals.rollerOut || ''
+            });
+          }
+        });
+      }
+    });
+    if (checkRows.length > 0) {
+      const wsCheck = XLSX.utils.json_to_sheet(checkRows);
+      wsCheck['!cols'] = [{wch:11},{wch:14},{wch:10},{wch:10},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12}];
+      XLSX.utils.book_append_sheet(wb, wsCheck, '혼련(CMB) 점검데이터');
+    }
+    added++;
+  }
+
+  // 재단 데이터
+  if ((currentProcess === 'all' || currentProcess === '재단') && cachedData.재단.length > 0) {
+    const rows = cachedData.재단.map((r, i) => {
+      const prod = PRODUCTS[r.worker_id] || {};
+      return {
+        'NO': i + 1,
+        '작업일': r.work_date || '',
+        '사번(제품코드)': r.worker_id || '',
+        '고객 품번': prod.partNo || '',
+        '품명': prod.partName || '',
+        '재질명': r.material_name || '',
+        '뱃지 No': r.lot_no || '',
+        '재단박스 수량(개)': r.box_count || 0,
+        '총 재단수량(EA)': r.total_qty || 0,
+        '자투리 발생량(g)': parseFloat(r.scrap_weight) || 0,
+        '작업자': r.worker_name || '',
+        '비고': r.note || '',
+        '특이사항': r.remarks || '',
+        '입력자': r.created_by_name || '',
+        '제출일시': fmtDatetime(r.submitted_at)
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:5},{wch:11},{wch:12},{wch:15},{wch:25},{wch:12},{wch:14},{wch:12},{wch:14},{wch:12},{wch:10},{wch:18},{wch:18},{wch:10},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, ws, '재단 작업일지');
+    
+    // 안전 점검 데이터 (별도 시트)
+    if (cachedData.재단점검.length > 0) {
+      const ITEMS = [
+        '1.스위치 작동', '2.칼날 상태', '3.모터 이상음', '4.작동유 충만',
+        '5.안전커버 작동', '6.에어압력', '7.청결 상태', '8.비상정지 버튼'
+      ];
+      const EQUIPS = [
+        { key: 'sharing_1', name: '샤링 1호 (자동재단기 1)' },
+        { key: 'sharing_2', name: '샤링 2호 (자동재단기 2)' },
+        { key: 'sharing_3', name: '샤링 3호 (폭재단기 1)' },
+        { key: 'sharing_4', name: '샤링 4호 (폭재단기 2)' }
+      ];
+      const safetyRows = [];
+      cachedData.재단점검.forEach(s => {
+        EQUIPS.forEach(eq => {
+          const data = s.check_data?.[eq.key] || {};
+          const row = {
+            '점검일자': s.check_date,
+            '설비명': eq.name,
+            '점검자': s.checked_by_name || ''
+          };
+          for (let i = 1; i <= 8; i++) {
+            row[ITEMS[i-1]] = data[i] || '';
+          }
+          row['설비별 특이사항'] = data.remarks || '';
+          row['전체 특이사항'] = s.overall_remarks || '';
+          safetyRows.push(row);
+        });
+      });
+      const wsSafety = XLSX.utils.json_to_sheet(safetyRows);
+      wsSafety['!cols'] = [{wch:11},{wch:22},{wch:10},{wch:14},{wch:12},{wch:14},{wch:14},{wch:14},{wch:12},{wch:12},{wch:14},{wch:20},{wch:25}];
+      XLSX.utils.book_append_sheet(wb, wsSafety, '재단 안전점검');
+    }
+    added++;
+  }
+
+  // 도포 데이터
+  if ((currentProcess === 'all' || currentProcess === '도포') && cachedData.도포.length > 0) {
+    const coatRows = cachedData.도포.filter(r => !r.deleted_at).map(r => ({
+      '작업일': r.work_date,
+      '사번': r.worker_id || '',
+      '작업종류': r.work_type || '',
+      '줄당EA': r.qty_per_line || 0,
+      '줄수': r.line_count || 0,
+      '총작업수량': r.total_qty || 0,
+      '불량수량': r.defect_qty || 0,
+      '작업자': r.worker_name || '',
+      '비고': r.note || '',
+      '특이사항': r.remarks || '',
+      '입력자': r.created_by_name || '',
+      '제출일시': r.created_at ? new Date(r.created_at).toLocaleString('ko-KR') : ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(coatRows);
+    ws['!cols'] = [{wch:11},{wch:10},{wch:20},{wch:8},{wch:6},{wch:10},{wch:8},{wch:10},{wch:15},{wch:15},{wch:10},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, ws, '도포 작업일지');
+    added++;
+  }
+
+  // 2차가류 데이터
+  if ((currentProcess === 'all' || currentProcess === '2차가류') && cachedData['2차가류'].length > 0) {
+    const pcRows = cachedData['2차가류'].filter(r => !r.deleted_at).map(r => ({
+      '작업일': r.work_date,
+      '사번': r.worker_id || '',
+      '재질명': r.material_name || '',
+      '온도(℃)': r.temperature || '',
+      '시간(분)': r.duration_min || '',
+      '투입량': r.input_qty || 0,
+      '성형작업자': r.molding_worker || '',
+      '경도': r.hardness || '',
+      '생산LOT': r.lot_no || '',
+      '작업자': r.worker_name || '',
+      '비고': r.note || '',
+      '특이사항': r.remarks || '',
+      '입력자': r.created_by_name || '',
+      '제출일시': r.created_at ? new Date(r.created_at).toLocaleString('ko-KR') : ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(pcRows);
+    ws['!cols'] = [{wch:11},{wch:10},{wch:12},{wch:8},{wch:8},{wch:8},{wch:10},{wch:8},{wch:12},{wch:10},{wch:15},{wch:15},{wch:10},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, ws, '2차가류 작업일지');
+    added++;
+  }
+
+  // 쇼트 데이터
+  if ((currentProcess === 'all' || currentProcess === '쇼트') && cachedData.쇼트.length > 0) {
+    const shotRows = cachedData.쇼트.filter(r => !r.deleted_at).map(r => ({
+      '작업일': r.work_date,
+      '유형': r.shot_type === 'freeze' ? '냉동쇼트' : '자동사상',
+      '설비명': r.equipment || '',
+      '사번': r.worker_id || '',
+      '온도(℃)': r.temperature || '',
+      '시간(분)': r.duration_min || '',
+      '사상시간(초)': r.grinding_time_sec || '',
+      '회전시간(초)': r.rotation_time_sec || '',
+      '작업수량': r.work_qty || 0,
+      '볼크기': r.ball_size || '',
+      'RPM': r.rpm || '',
+      '생산LOT': r.lot_no || '',
+      '작업자': r.worker_name || '',
+      '비고': r.note || '',
+      '입력자': r.created_by_name || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(shotRows);
+    XLSX.utils.book_append_sheet(wb, ws, '쇼트 작업일지');
+    added++;
+  }
+
+  // 성형
+  if ((currentProcess === 'all' || currentProcess === '성형') && (cachedData.성형||[]).length > 0) {
+    const moldRows = cachedData.성형.filter(r => !r.deleted_at).map(r => ({
+      '작업일': r.work_date,
+      '근무': r.shift_type || '',
+      '반': r.team || '',
+      '설비': r.equipment_no || '',
+      '관리번호': r.equipment_id || '',
+      '사번': r.sabun || '',
+      '제품명': r.product_name || '',
+      'Batch No.': r.batch_no || '',
+      'C/V': r.cavity || '',
+      'Shot': r.shot_count || '',
+      '생산수량': r.production_qty || 0,
+      '불량수량': r.defect_qty || 0,
+      '작업유형': r.work_type || '',
+      '성형압력': r.molding_pressure || '',
+      '상판온도': r.upper_temp || '',
+      '하판온도': r.lower_temp || '',
+      '비가동코드': r.downtime_code || '',
+      '비가동시간(분)': r.downtime_minutes || '',
+      '문제점': r.problem || '',
+      '작업자': r.worker_name || '',
+      '비고': (() => { try { return JSON.parse(r.note).text || ''; } catch(e) { return r.note || ''; } })(),
+      '입력자': r.created_by_name || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(moldRows);
+    XLSX.utils.book_append_sheet(wb, ws, '성형 작업일지');
+    added++;
+  }
+
+  // 조립
+  if ((currentProcess === 'all' || currentProcess === '조립') && (cachedData.조립||[]).length > 0) {
+    const asmRows = cachedData.조립.filter(r => !r.deleted_at).map(r => ({
+      '작업일': r.work_date,
+      '근무': r.shift_type || '',
+      '설비': r.equipment_no || '',
+      '사번': r.sabun || '',
+      '제품명': r.product_name || '',
+      '구분': r.assembly_type || '',
+      '작업방식': r.work_method || '',
+      '생산수량': r.production_qty || 0,
+      '불량수량': r.defect_qty || 0,
+      '작업자': r.worker_name || '',
+      '비고': r.note || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(asmRows);
+    XLSX.utils.book_append_sheet(wb, ws, '조립 작업일지');
+    added++;
+  }
+
+  if (added === 0) { showToast('다운로드할 데이터가 없어요.'); return; }
+
+  const start = document.getElementById('startDate').value;
+  const end   = document.getElementById('endDate').value;
+  const procName = currentProcess === 'all' ? '전체' : currentProcess;
+  XLSX.writeFile(wb, `${procName}_작업일지_${start}_${end}.xlsx`);
+  showToast('엑셀 다운로드 완료 ✓');
+}
+
+// 초기화
+window.onload = async () => {
+  const user = await checkAuth();
+  if (!user) return;
+  document.getElementById('authCheckOverlay').style.display = 'none';
+  
+  document.getElementById('startDate').value = firstDayOfMonth();
+  document.getElementById('endDate').value = todayStr();
+  await loadMyInfo();
+  await loadProducts();
+  loadData();
+};
+</script>
+<script src="sidebar.js"></script>
+</div><!-- main -->
+</body>
+</html>
