@@ -6,22 +6,15 @@
 <title>데이터 조회 및 추출 - HKHT</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="common.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="auth_guard.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Noto Sans KR','Pretendard',sans-serif; background: #f1f3f9; color: #1e293b; }
+/* ── data_viewer 고유 스타일 ── */
 .app { max-width: 1600px; margin: 0 auto; }
-.top-nav { display: flex; align-items: center; justify-content: space-between; background: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(36,59,178,0.08); margin-bottom: 20px; }
-.back-btn { background: #f0f3f9; color: #243bb2; border: none; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; font-family: inherit; }
-.back-btn:hover { background: #e3e8f5; text-decoration: none; }
-.nav-heading { font-size: 20px; font-weight: 700; color: #243bb2; }
-.nav-sep { display: none; }
-.nav-cur { display: none; }
-.card { background: white; border-radius: 12px; border: 1px solid #e5e5e5; padding: 1rem 1.25rem; margin-bottom: 1rem; }
 
-/* 공정 탭 */
+/* 공정 탭 (main-tabs와 동일 패턴이지만 클래스명이 다름) */
 .process-tabs { display: flex; gap: 0; margin-bottom: 1rem; background: white; border-radius: 12px; border: 1px solid #e5e5e5; overflow: hidden; }
 .process-tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; font-size: 14px; font-weight: 500; color: #888; border: none; background: transparent; font-family: inherit; transition: all 0.15s; border-bottom: 2.5px solid transparent; }
 .process-tab:hover { color: #243bb2; background: #f9f9f9; }
@@ -33,39 +26,23 @@ body { font-family: 'Noto Sans KR','Pretendard',sans-serif; background: #f1f3f9;
 .filter-label { font-size: 11px; color: #888; }
 .filter-input { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 12px; outline: none; font-family: inherit; color: #111; min-width: 140px; }
 .filter-input:focus { border-color: #243bb2; }
-.btn-search { font-size: 13px; padding: 9px 18px; border-radius: 8px; background: #243bb2; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
 .btn-excel { font-size: 13px; padding: 9px 16px; border-radius: 8px; background: #16a34a; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
 .btn-toggle-view { font-size: 12px; padding: 7px 14px; border-radius: 8px; background: white; color: #555; border: 1px solid #ddd; cursor: pointer; font-family: inherit; }
 .btn-toggle-view.active { background: #eff6ff; color: #243bb2; border-color: #243bb2; }
 
-/* 통계 */
-.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1rem; }
-.stat-card { background: white; border-radius: 10px; border: 1px solid #e5e5e5; padding: 0.85rem 1rem; }
-.stat-icon { font-size: 20px; margin-bottom: 6px; }
-.stat-label { font-size: 11px; color: #888; margin-bottom: 4px; }
-.stat-num { font-size: 22px; font-weight: 600; color: #111; }
-.stat-num.blue { color: #243bb2; }
-.stat-num.green { color: #16a34a; }
-.stat-num.orange { color: #ea580c; }
-.stat-num.red { color: #e53e3e; }
-.stat-unit { font-size: 12px; color: #aaa; font-weight: 400; }
-
-/* 테이블 */
+/* 테이블 (이 페이지는 min-width + 70vh 필요) */
 .table-wrap { overflow-x: auto; max-height: 70vh; overflow-y: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1200px; }
-th { font-size: 12px; font-weight: 500; color: #888; padding: 9px 10px; background: #f9f9f9; border-bottom: 1px solid #eee; text-align: left; white-space: nowrap; position: sticky; top: 0; z-index: 10; }
-td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; color: #111; vertical-align: middle; }
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: #fafafa; }
-.empty-row td { text-align: center; color: #aaa; padding: 2rem; font-size: 14px; }
+.table-wrap table { min-width: 1200px; }
+
+/* LOT/작업자 셀 */
 .lot-tag { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: #fef9c3; color: #ca8a04; margin: 1px; font-weight: 500; }
 .lot-cell { max-width: 420px; min-width: 250px; }
 .col-worker { min-width: 80px; white-space: nowrap; }
-.process-tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+
+/* 공정별 색상 */
 .process-포장 { background: #eff6ff; color: #243bb2; }
 .process-검사 { background: #f0fdf4; color: #16a34a; }
 .process-혼련\(CMB\) { background: #fef3c7; color: #b45309; }
-.process-재단 { background: #f3e8ff; color: #7e22ce; }
 .process-재단 { background: #fff7ed; color: #ea580c; }
 .process-도포 { background: #fdf4ff; color: #9333ea; }
 .process-쇼트 { background: #fef2f2; color: #dc2626; }
@@ -73,7 +50,7 @@ tr:hover td { background: #fafafa; }
 .defect-cell { color: #e53e3e; font-weight: 500; }
 .pass-cell { color: #16a34a; font-weight: 500; }
 
-/* 섹션 (전체 탭에서 사용) */
+/* 전체 탭 섹션 */
 .process-section { margin-bottom: 1.5rem; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .section-title { font-size: 14px; font-weight: 600; color: #111; }
@@ -82,39 +59,19 @@ tr:hover td { background: #fafafa; }
 .btn-section-detail { font-size: 12px; color: #243bb2; background: none; border: none; cursor: pointer; font-family: inherit; }
 .btn-section-detail:hover { text-decoration: underline; }
 
-.toast { display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #111; color: white; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 999; }
-.toast.show { display: block; }
-
-.hidden { display: none !important; }
-
-/* 행 액션 버튼 */
+/* 행 액션 버튼 (이 페이지 고유 스타일 확장) */
 .row-actions { display: flex; gap: 4px; }
-.btn-row { font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-family: inherit; border: none; white-space: nowrap; }
-.btn-row-edit { background: #eff6ff; color: #243bb2; }
-.btn-row-edit:hover { background: #dbeafe; }
 .btn-row-edit:disabled { background: #f5f5f5; color: #ccc; cursor: not-allowed; }
-.btn-row-del { background: transparent; color: #e53e3e; border: 1px solid #fca5a5; }
-.btn-row-del:hover { background: #fff0f0; }
 .btn-row-del:disabled { color: #ccc; border-color: #eee; cursor: not-allowed; }
 
-/* 모달 */
-.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; padding: 1rem; }
-.modal-overlay.open { display: flex; }
-.modal-box { background: white; border-radius: 12px; padding: 1.5rem; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; }
-.modal-title { font-size: 16px; font-weight: 600; color: #111; margin-bottom: 4px; }
+/* 모달 확장 (이 페이지 고유) */
 .modal-sub { font-size: 12px; color: #888; margin-bottom: 1rem; }
-.modal-grid { display: grid; gap: 12px; margin-bottom: 1rem; }
 .modal-grid-2 { grid-template-columns: 1fr 1fr; }
 .modal-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
 .modal-field { display: flex; flex-direction: column; gap: 4px; }
-.modal-label { font-size: 12px; color: #888; }
-.modal-input { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 10px; outline: none; font-family: inherit; color: #111; }
-.modal-input:focus { border-color: #243bb2; }
 .modal-input.readonly { background: #f9f9f9; color: #888; }
 .modal-textarea { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 10px; outline: none; font-family: inherit; color: #111; resize: none; }
-.modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1rem; }
-.btn-modal-cancel { font-size: 13px; padding: 9px 18px; border-radius: 8px; background: transparent; color: #888; border: 1px solid #ddd; cursor: pointer; font-family: inherit; }
-.btn-modal-save { font-size: 13px; padding: 9px 18px; border-radius: 8px; background: #243bb2; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
+.modal-textarea:focus { border-color: #243bb2; }
 .btn-modal-del { font-size: 13px; padding: 9px 18px; border-radius: 8px; background: #e53e3e; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
 
 /* 삭제됨 표시 */
@@ -122,6 +79,7 @@ tr:hover td { background: #fafafa; }
 .deleted-badge { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #fef2f2; color: #dc2626; font-weight: 500; margin-left: 4px; }
 .show-deleted-toggle { font-size: 12px; padding: 6px 12px; border-radius: 6px; background: white; color: #555; border: 1px solid #ddd; cursor: pointer; font-family: inherit; }
 .show-deleted-toggle.active { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
+
 /* 정렬 가능 헤더 */
 th.sortable { cursor:pointer; user-select:none; position:relative; white-space:nowrap; }
 th.sortable:hover { background:#eef0ff; }
@@ -145,10 +103,18 @@ th.sortable.desc::after { content:'▼'; color:#243bb2; }
 
 <div class="main">
 <div class="app">
-  <div class="top-nav" style="display:flex;align-items:center;justify-content:space-between;background:white;padding:16px 24px;border-radius:12px;box-shadow:0 2px 8px rgba(36,59,178,0.08);margin-bottom:20px;">
-    <span class="nav-heading" style="font-size:20px;font-weight:700;color:#243bb2;">📊 데이터 조회 및 추출</span>
-    <span style="width:100px"></span>
-  </div>
+<div class="page-header">
+    <div class="header-row">
+        <div>
+            <h1>📊 데이터 조회 및 추출</h1>
+            <div class="sub">기간별 작업일지 조회, 엑셀 다운로드</div>
+        </div>
+        <div class="header-actions">
+            <button class="btn-excel" onclick="downloadAllExcel()">📥 엑셀 다운로드</button>
+            <button class="show-deleted-toggle hidden" id="showDeletedBtn" onclick="toggleShowDeleted()">🗑 삭제 포함</button>
+        </div>
+    </div>
+</div>
 
   <!-- 공정 탭 -->
   <div class="process-tabs">
@@ -195,11 +161,6 @@ th.sortable.desc::after { content:'▼'; color:#243bb2; }
       <!-- 전체 탭에서만 보이는 토글 -->
       <button class="btn-toggle-view hidden" id="toggleViewBtn" onclick="toggleUnifiedView()">
         👁️ 통합 보기
-      </button>
-
-      <!-- 슈퍼관리자만 보이는 삭제 포함 토글 -->
-      <button class="show-deleted-toggle hidden" id="showDeletedBtn" onclick="toggleShowDeleted()">
-        🗑️ 삭제 포함
       </button>
     </div>
   </div>
