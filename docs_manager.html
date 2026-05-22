@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>문서 관리 - HKHT</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sidebar.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth_guard.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Noto Sans KR','Pretendard',sans-serif; background: #f1f3f9; color: #1e293b; }
+.app { max-width: 980px; margin: 0 auto; }
+.top-nav { display: flex; align-items: center; justify-content: space-between; background: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(36,59,178,0.08); margin-bottom: 20px; }
+.back-btn { background: #f0f3f9; color: #243bb2; border: none; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; font-family: inherit; }
+.back-btn:hover { background: #e3e8f5; text-decoration: none; }
+.nav-title { font-size: 20px; font-weight: 700; color: #243bb2; }
+.nav-sep { display: none; }
+.nav-cur { display: none; }
+.card { background: white; border-radius: 12px; border: 1px solid #e5e5e5; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+
+/* 업로드 */
+.upload-toggle { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.upload-toggle-title { font-size: 14px; color: #888; }
+.btn-toggle-upload { font-size: 13px; padding: 8px 18px; border-radius: 8px; background: #2563eb; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
+.upload-area { display: none; background: #f9f9f9; border: 1.5px dashed #ddd; border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
+.upload-area.open { display: block; }
+
+/* 파일명 규칙 안내 */
+.rule-box { background: #eff6ff; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 12px; color: #2563eb; line-height: 1.7; }
+.rule-box strong { font-weight: 600; }
+
+/* 다중 파일 드롭존 */
+.file-zone { border: 1.5px dashed #cbd5e1; border-radius: 8px; padding: 1.5rem; text-align: center; cursor: pointer; background: white; transition: border-color 0.15s; margin-bottom: 12px; }
+.file-zone:hover, .file-zone.dragover { border-color: #2563eb; background: #eff6ff; }
+.file-zone-icon { font-size: 28px; margin-bottom: 6px; }
+.file-zone-text { font-size: 13px; color: #888; }
+
+/* 파일 파싱 결과 */
+.parsed-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.parsed-item { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 10px 14px; }
+.parsed-item.error { border-color: #fca5a5; background: #fff5f5; }
+.parsed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.parsed-filename { font-size: 13px; font-weight: 500; color: #111; }
+.parsed-error { font-size: 12px; color: #e53e3e; }
+.parsed-fields { display: grid; grid-template-columns: repeat(4, 1fr) 1fr; gap: 8px; align-items: end; }
+.pf-group { display: flex; flex-direction: column; gap: 4px; }
+.pf-label { font-size: 11px; color: #888; }
+.pf-input, .pf-select { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 6px; padding: 6px 8px; outline: none; font-family: inherit; color: #111; background: white; width: 100%; }
+.pf-input:focus, .pf-select:focus { border-color: #2563eb; }
+.upload-mode { display: flex; gap: 8px; }
+.mode-btn { flex: 1; font-size: 12px; padding: 6px; border-radius: 6px; border: 1.5px solid #e5e5e5; background: white; cursor: pointer; font-family: inherit; color: #555; text-align: center; }
+.mode-btn.selected { border-color: #2563eb; background: #eff6ff; color: #2563eb; font-weight: 500; }
+.btn-remove-file { background: none; border: none; cursor: pointer; color: #aaa; font-size: 18px; padding: 0 4px; }
+.btn-remove-file:hover { color: #e53e3e; }
+
+.upload-footer { display: flex; justify-content: space-between; align-items: center; }
+.upload-info { font-size: 12px; color: #aaa; }
+.btn-upload-all { font-size: 13px; padding: 9px 24px; border-radius: 8px; background: #2563eb; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
+.btn-upload-all:disabled { background: #aaa; cursor: not-allowed; }
+.progress-bar { width: 100%; height: 4px; background: #e5e5e5; border-radius: 2px; margin-top: 10px; display: none; }
+.progress-fill { height: 100%; background: #2563eb; border-radius: 2px; transition: width 0.3s; }
+
+/* 탭 */
+.tab-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1rem; }
+.tab-btn { display: flex; flex-direction: column; align-items: center; padding: 10px 16px; border-radius: 10px; border: 1.5px solid #e5e5e5; background: white; cursor: pointer; font-family: inherit; transition: all 0.15s; min-width: 100px; }
+.tab-btn:hover { border-color: #2563eb; }
+.tab-btn.active { border-color: #2563eb; background: #eff6ff; }
+.tab-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+.tab-btn.active .tab-label { color: #2563eb; }
+.tab-count { font-size: 20px; font-weight: 700; color: #111; }
+.tab-btn.active .tab-count { color: #2563eb; }
+.tab-unit { font-size: 11px; color: #aaa; }
+
+/* 검색 */
+.search-bar { display: flex; gap: 10px; margin-bottom: 1rem; align-items: center; }
+.search-input { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 12px; outline: none; font-family: inherit; color: #111; width: 180px; }
+.search-input:focus { border-color: #2563eb; }
+.filter-toggle { font-size: 12px; padding: 7px 12px; border-radius: 8px; border: 1px solid #e5e5e5; background: white; cursor: pointer; font-family: inherit; color: #555; }
+.filter-toggle.active { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+
+/* 테이블 */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { font-size: 12px; font-weight: 500; color: #888; padding: 9px 12px; background: #f9f9f9; border-bottom: 1px solid #eee; text-align: left; white-space: nowrap; ; position: sticky; top: 0; z-index: 10; }
+td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; color: #111; vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #fafafa; }
+.doc-type-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+.type-검사기준서 { background: #eff6ff; color: #2563eb; }
+.type-작업표준서 { background: #f0fdf4; color: #16a34a; }
+.type-검사협정서 { background: #fff7ed; color: #ea580c; }
+.type-관리계획서 { background: #fdf4ff; color: #9333ea; }
+.type-외관검사기준서 { background: #fef9c3; color: #ca8a04; }
+.version-badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 6px; background: #f3f4f6; color: #555; font-weight: 500; }
+.current-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #f0fdf4; color: #16a34a; font-weight: 500; }
+.old-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #f9f9f9; color: #aaa; }
+.action-btns { display: flex; gap: 4px; }
+.btn-view { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: #eff6ff; color: #2563eb; border: none; cursor: pointer; font-family: inherit; }
+.btn-edit { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: #f0fdf4; color: #16a34a; border: none; cursor: pointer; font-family: inherit; }
+.btn-del { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: transparent; color: #e53e3e; border: 1px solid #fca5a5; cursor: pointer; font-family: inherit; }
+.btn-del:hover { background: #fff0f0; }
+.empty-row td { text-align: center; color: #aaa; padding: 2.5rem; font-size: 14px; }
+
+/* 수정 모달 */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal-box { background: white; border-radius: 12px; padding: 1.5rem; width: 480px; }
+.modal-title { font-size: 16px; font-weight: 600; color: #111; margin-bottom: 1rem; }
+.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
+.modal-field { display: flex; flex-direction: column; gap: 5px; }
+.modal-label { font-size: 12px; color: #888; }
+.modal-input, .modal-select { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 10px; outline: none; font-family: inherit; color: #111; }
+.modal-input:focus, .modal-select:focus { border-color: #2563eb; }
+.modal-file-zone { border: 1.5px dashed #cbd5e1; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; background: #f9f9f9; margin-bottom: 1rem; font-size: 13px; color: #888; }
+.modal-file-zone:hover { border-color: #2563eb; }
+.modal-file-selected { font-size: 13px; color: #2563eb; font-weight: 500; margin-top: 4px; }
+.modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
+.btn-modal-cancel { font-size: 13px; padding: 9px 18px; border-radius: 8px; background: transparent; color: #888; border: 1px solid #ddd; cursor: pointer; font-family: inherit; }
+.btn-modal-save { font-size: 13px; padding: 9px 18px; border-radius: 8px; background: #2563eb; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
+
+.toast { display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #111; color: white; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 999; white-space: nowrap; }
+.toast.show { display: block; }
+
+/* 테이블 헤더 고정 */
+.table-scroll-wrap { max-height: 600px; overflow-y: auto; overflow-x: auto; border-radius: 8px; border: 1px solid #f0f0f0; }
+.table-scroll-wrap table { margin: 0; }
+.table-scroll-wrap thead th { position: sticky; top: 0; z-index: 10; background: #f9f9f9; box-shadow: inset 0 -1px 0 #eee; }
+
+</style>
+</head>
+<body>
+<!-- 권한 체크 로딩 화면 -->
+<div id="authCheckOverlay" style="position:fixed;inset:0;background:#f1f3f9;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="width:36px;height:36px;border:3px solid #e5e5e5;border-top-color:#243bb2;border-radius:50%;animation:authSpin 0.8s linear infinite"></div>
+  <div style="font-size:13px;color:#888;font-family:inherit">권한 확인 중...</div>
+  <style>@keyframes authSpin { to { transform: rotate(360deg); } }</style>
+</div>
+<script>
+(async function() {
+  var user = await checkAuth();
+  if (!user) return;
+  // worker는 문서 관리 접근 불가
+  if (user.user_type === 'worker') {
+    location.href = 'mold_dashboard.html';
+    return;
+  }
+  document.getElementById('authCheckOverlay').style.display = 'none';
+})();
+</script>
+
+<!-- WM 레이아웃 -->
+<div id="top-header" class="top-header"></div>
+<nav id="sidebar-nav" class="sidebar"></nav>
+
+<div class="main">
+<div class="app">
+
+  <div class="top-nav">
+    <span class="nav-title">📄 문서 관리</span>
+    <span style="width:100px"></span>
+  </div>
+
+  <!-- 업로드 토글 -->
+  <div class="upload-toggle">
+    <span class="upload-toggle-title">📌 파일명 규칙: <strong>[문서유형]_[사번].pdf</strong> &nbsp;예) 검사기준서_502284.pdf</span>
+    <button class="btn-toggle-upload" onclick="toggleUpload()">+ 문서 업로드</button>
+  </div>
+
+  <!-- 업로드 영역 -->
+  <div class="upload-area" id="uploadArea">
+    <div class="rule-box">
+      📋 <strong>파일명 규칙에 맞게 저장하면 자동으로 정보가 입력돼요!</strong><br>
+      형식: <strong>[문서유형]_[사번].pdf</strong><br>
+      문서유형: 검사기준서 · 외관검사기준서 · 작업표준서 · 검사협정서 · 관리계획서<br>
+      예시: 검사기준서_502284.pdf · 작업표준서_502284.pdf<br>
+      <span style="color:#666;font-size:11px">※ 담당자는 로그인한 사용자로 자동 입력됩니다</span>
+    </div>
+
+    <div class="file-zone" id="fileZone"
+      onclick="document.getElementById('fileInput').click()"
+      ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+      <div class="file-zone-icon">📎</div>
+      <div class="file-zone-text">PDF 파일을 여러 개 한꺼번에 드래그하거나 클릭해서 선택하세요</div>
+    </div>
+    <input type="file" id="fileInput" accept=".pdf" multiple style="display:none" onchange="onFilesSelect(event)" />
+
+    <div class="parsed-list" id="parsedList"></div>
+
+    <div class="upload-footer">
+      <span class="upload-info">PDF 파일만 가능 · 최대 50MB · 다중 선택 가능</span>
+      <button class="btn-upload-all" id="uploadAllBtn" onclick="uploadAll()" disabled>전체 업로드</button>
+    </div>
+    <div class="progress-bar" id="progressBar">
+      <div class="progress-fill" id="progressFill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- 탭 -->
+  <div class="tab-row">
+    <button class="tab-btn active" onclick="setTab('')" id="tab_all">
+      <span class="tab-label">전체</span>
+      <span class="tab-count" id="cnt_all">0</span>
+      <span class="tab-unit">건</span>
+    </button>
+    <button class="tab-btn" onclick="setTab('검사기준서')" id="tab_검사기준서">
+      <span class="tab-label">검사기준서</span>
+      <span class="tab-count" id="cnt_검사기준서">0</span>
+      <span class="tab-unit">건</span>
+    </button>
+    <button class="tab-btn" onclick="setTab('외관검사기준서')" id="tab_외관검사기준서">
+      <span class="tab-label">외관검사기준서</span>
+      <span class="tab-count" id="cnt_외관검사기준서">0</span>
+      <span class="tab-unit">건</span>
+    </button>
+    <button class="tab-btn" onclick="setTab('작업표준서')" id="tab_작업표준서">
+      <span class="tab-label">작업표준서</span>
+      <span class="tab-count" id="cnt_작업표준서">0</span>
+      <span class="tab-unit">건</span>
+    </button>
+    <button class="tab-btn" onclick="setTab('검사협정서')" id="tab_검사협정서">
+      <span class="tab-label">검사협정서</span>
+      <span class="tab-count" id="cnt_검사협정서">0</span>
+      <span class="tab-unit">건</span>
+    </button>
+    <button class="tab-btn" onclick="setTab('관리계획서')" id="tab_관리계획서">
+      <span class="tab-label">관리계획서</span>
+      <span class="tab-count" id="cnt_관리계획서">0</span>
+      <span class="tab-unit">건</span>
+    </button>
+  </div>
+
+  <!-- 검색 -->
+  <div class="search-bar">
+    <input class="search-input" id="filterSabun" placeholder="🔍 사번 검색" oninput="renderTable()" />
+    <button class="filter-toggle" id="toggleOld" onclick="toggleOldDocs()">구버전 포함</button>
+  </div>
+
+  <!-- 목록 -->
+  <div class="card">
+    <div class="table-wrap table-scroll-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>사번</th>
+            <th>문서유형</th>
+            <th>문서명</th>
+            <th>버전</th>
+            <th>상태</th>
+            <th>담당자</th>
+            <th>등록일</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="docTable">
+          <tr class="empty-row"><td colspan="8">로딩 중...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- 수정 모달 -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-box">
+    <div class="modal-title">📝 문서 수정</div>
+    <input type="hidden" id="edit_id" />
+    <input type="hidden" id="edit_filepath" />
+    <input type="hidden" id="edit_version" />
+    <div class="modal-grid">
+      <div class="modal-field">
+        <span class="modal-label">사번</span>
+        <input class="modal-input" id="edit_sabun" placeholder="502284" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">문서유형</span>
+        <select class="modal-select" id="edit_doctype">
+          <option value="검사기준서">검사기준서</option>
+          <option value="외관검사기준서">외관검사기준서</option>
+          <option value="작업표준서">작업표준서</option>
+          <option value="검사협정서">검사협정서</option>
+          <option value="관리계획서">관리계획서</option>
+        </select>
+      </div>
+      <div class="modal-field" style="grid-column:span 2">
+        <span class="modal-label">문서명</span>
+        <input class="modal-input" id="edit_docname" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">담당자</span>
+        <input class="modal-input" id="edit_uploader" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">버전 변경</span>
+        <input class="modal-input" id="edit_newversion" placeholder="비워두면 버전 유지" />
+      </div>
+    </div>
+    <div class="modal-file-zone" onclick="document.getElementById('replaceFileInput').click()">
+      📎 파일 교체 (선택사항) — 클릭해서 새 PDF 선택
+      <div class="modal-file-selected" id="replaceFileSelected"></div>
+    </div>
+    <input type="file" id="replaceFileInput" accept=".pdf" style="display:none" onchange="onReplaceFileSelect(event)" />
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeEditModal()">취소</button>
+      <button class="btn-modal-save" onclick="saveEdit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const TYPES = ['검사기준서','외관검사기준서','작업표준서','검사협정서','관리계획서'];
+let allDocs = [];
+let MY_NAME = '';
+let activeTab = '';
+let showOld = false;
+let parsedFiles = [];
+let replaceFile = null;
+
+function fmtDate(str) { return str ? str.slice(0,10) : '-'; }
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function toggleUpload() {
+  document.getElementById('uploadArea').classList.toggle('open');
+}
+
+// 파일명 파싱: 문서유형_사번.pdf
+function parseFileName(name) {
+  const base = name.replace(/\.pdf$/i, '');
+  const parts = base.split('_');
+  if (parts.length < 2) return null;
+  const sabun   = parts[parts.length - 1];
+  const docType = parts[parts.length - 2];
+  if (!TYPES.includes(docType)) return null;
+  return { sabun, docType, docName: base };
+}
+
+// 다음 버전 계산
+async function getNextVersion(sabun, docType) {
+  const { data } = await db.from('documents')
+    .select('version')
+    .eq('sabun', sabun)
+    .eq('doc_type', docType)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (!data || !data.length) return 'v1.0';
+  const cur = data[0].version || 'v1.0';
+  const match = cur.match(/v(\d+)\.(\d+)/);
+  if (!match) return 'v1.0';
+  return `v${match[1]}.${parseInt(match[2])+1}`;
+}
+
+function onDragOver(e) { e.preventDefault(); document.getElementById('fileZone').classList.add('dragover'); }
+function onDragLeave()  { document.getElementById('fileZone').classList.remove('dragover'); }
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('fileZone').classList.remove('dragover');
+  handleFiles(Array.from(e.dataTransfer.files));
+}
+function onFilesSelect(e) { handleFiles(Array.from(e.target.files)); }
+
+function handleFiles(files) {
+  const pdfs = files.filter(f => f.name.toLowerCase().endsWith('.pdf'));
+  if (!pdfs.length) { showToast('PDF 파일만 가능해요.'); return; }
+
+  pdfs.forEach(file => {
+    const parsed = parseFileName(file.name);
+    parsedFiles.push({
+      file,
+      sabun:    parsed ? parsed.sabun    : '',
+      docType:  parsed ? parsed.docType  : '검사기준서',
+      uploader: MY_NAME, // 로그인한 사용자로 자동 세팅
+      docName:  parsed ? parsed.docName  : file.name.replace(/\.pdf$/i,''),
+      mode:     'new', // 'new' or 'overwrite'
+      ok:       !!parsed
+    });
+  });
+  renderParsedList();
+  document.getElementById('uploadAllBtn').disabled = false;
+}
+
+function renderParsedList() {
+  const el = document.getElementById('parsedList');
+  if (!parsedFiles.length) { el.innerHTML = ''; return; }
+
+  el.innerHTML = parsedFiles.map((p, i) => `
+    <div class="parsed-item ${p.ok ? '' : 'error'}">
+      <div class="parsed-header">
+        <span class="parsed-filename">📄 ${p.file.name} (${(p.file.size/1024/1024).toFixed(1)}MB)</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${!p.ok ? '<span class="parsed-error">⚠️ 파일명 규칙 불일치 — 직접 입력해주세요</span>' : ''}
+          <button class="btn-remove-file" onclick="removeFile(${i})">×</button>
+        </div>
+      </div>
+      <div class="parsed-fields" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+        <div class="pf-group">
+          <span class="pf-label">사번</span>
+          <input class="pf-input" value="${p.sabun}" oninput="updateParsed(${i},'sabun',this.value)" placeholder="502284" />
+        </div>
+        <div class="pf-group">
+          <span class="pf-label">문서유형</span>
+          <select class="pf-select" onchange="updateParsed(${i},'docType',this.value)">
+            ${TYPES.map(t => `<option value="${t}" ${p.docType===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="pf-group">
+          <span class="pf-label">담당자 (자동)</span>
+          <input class="pf-input" value="${p.uploader}" disabled style="background:#f9f9f9;color:#888" />
+        </div>
+        <div class="pf-group">
+          <span class="pf-label">업로드 방식</span>
+          <div class="upload-mode">
+            <button class="mode-btn ${p.mode==='new'?'selected':''}" onclick="updateParsed(${i},'mode','new')">신규 버전</button>
+            <button class="mode-btn ${p.mode==='overwrite'?'selected':''}" onclick="updateParsed(${i},'mode','overwrite')">덮어쓰기</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateParsed(i, field, val) {
+  parsedFiles[i][field] = val;
+  renderParsedList();
+}
+
+function removeFile(i) {
+  parsedFiles.splice(i, 1);
+  renderParsedList();
+  if (!parsedFiles.length) document.getElementById('uploadAllBtn').disabled = true;
+}
+
+async function uploadAll() {
+  if (!parsedFiles.length) return;
+  const btn = document.getElementById('uploadAllBtn');
+  btn.disabled = true; btn.textContent = '업로드 중...';
+  document.getElementById('progressBar').style.display = 'block';
+
+  let done = 0;
+  for (const p of parsedFiles) {
+    if (!p.sabun) { showToast('사번을 입력해주세요.'); continue; }
+
+    let version;
+    if (p.mode === 'overwrite') {
+      // 덮어쓰기: 기존 버전 유지
+      const { data } = await db.from('documents').select('version')
+        .eq('sabun', p.sabun).eq('doc_type', p.docType).eq('is_current', true).limit(1);
+      version = data && data.length ? data[0].version : 'v1.0';
+      // 기존 파일 구버전 처리
+      await db.from('documents').update({ is_current: false })
+        .eq('sabun', p.sabun).eq('doc_type', p.docType);
+    } else {
+      // 신규 버전: 버전 자동 증가
+      version = await getNextVersion(p.sabun, p.docType);
+      await db.from('documents').update({ is_current: false })
+        .eq('sabun', p.sabun).eq('doc_type', p.docType);
+    }
+
+    const safeFileName = p.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const safeDocType  = p.docType.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `${p.sabun}/${safeDocType}/${version}_${Date.now()}_${safeFileName}`;
+
+    const { error: upErr } = await db.storage.from('documents')
+      .upload(filePath, p.file, { contentType: 'application/pdf' });
+    if (upErr) { showToast(`${p.file.name} 업로드 실패`); continue; }
+
+    const { data: urlData } = db.storage.from('documents').getPublicUrl(filePath);
+    await db.from('documents').insert({
+      sabun: p.sabun, doc_type: p.docType, doc_name: p.docName,
+      version, file_url: urlData.publicUrl, file_path: filePath,
+      is_current: true, uploaded_by: p.uploader || '관리자'
+    });
+
+    done++;
+    document.getElementById('progressFill').style.width = Math.round((done/parsedFiles.length)*100) + '%';
+  }
+
+  showToast(`${done}건 업로드 완료! ✓`);
+  parsedFiles = [];
+  renderParsedList();
+  document.getElementById('fileInput').value = '';
+  document.getElementById('uploadArea').classList.remove('open');
+  setTimeout(() => {
+    document.getElementById('progressBar').style.display = 'none';
+    document.getElementById('progressFill').style.width = '0%';
+    btn.disabled = false; btn.textContent = '전체 업로드';
+  }, 800);
+  loadDocs();
+}
+
+// 탭
+function setTab(type) {
+  activeTab = type;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(type ? 'tab_'+type : 'tab_all').classList.add('active');
+  renderTable();
+}
+function toggleOldDocs() {
+  showOld = !showOld;
+  document.getElementById('toggleOld').classList.toggle('active', showOld);
+  renderTable();
+}
+function updateCounts(data) {
+  document.getElementById('cnt_all').textContent = data.length;
+  TYPES.forEach(t => document.getElementById('cnt_'+t).textContent = data.filter(d=>d.doc_type===t).length);
+}
+function renderTable() {
+  const sabun = document.getElementById('filterSabun').value.trim().toLowerCase();
+  let filtered = allDocs;
+  if (activeTab) filtered = filtered.filter(d => d.doc_type === activeTab);
+  if (!showOld)  filtered = filtered.filter(d => d.is_current);
+  if (sabun)     filtered = filtered.filter(d => d.sabun.toLowerCase().includes(sabun));
+
+  const tbody = document.getElementById('docTable');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">${activeTab?activeTab+' 문서가 없어요.':'등록된 문서가 없어요.'}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map(r => `
+    <tr>
+      <td style="font-weight:500">${r.sabun}</td>
+      <td><span class="doc-type-badge type-${r.doc_type}">${r.doc_type}</span></td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.doc_name}">${r.doc_name}</td>
+      <td><span class="version-badge">${r.version}</span></td>
+      <td>${r.is_current?'<span class="current-badge">적용중</span>':'<span class="old-badge">구버전</span>'}</td>
+      <td style="color:#888;font-size:12px">${r.uploaded_by||'-'}</td>
+      <td style="color:#aaa;font-size:12px">${fmtDate(r.created_at)}</td>
+      <td>
+        <div class="action-btns">
+          <button class="btn-view" onclick="window.open('${r.file_url}','_blank')">보기</button>
+          <button class="btn-edit" onclick="openEditModal(${JSON.stringify(r).replace(/"/g,'&quot;')})">수정</button>
+          <button class="btn-del" onclick="deleteDoc(${r.id},'${r.file_path}')">삭제</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function loadDocs() {
+  const { data } = await db.from('documents').select('*').order('created_at', { ascending: false });
+  allDocs = data || [];
+  updateCounts(allDocs);
+  renderTable();
+}
+
+async function loadMyName() {
+  const { data: { session } } = await db.auth.getSession();
+  if (session) {
+    const { data: u } = await db.from('users').select('name').eq('auth_user_id', session.user.id).single();
+    if (u) MY_NAME = u.name;
+  }
+}
+
+// 수정 모달
+function openEditModal(r) {
+  document.getElementById('edit_id').value       = r.id;
+  document.getElementById('edit_filepath').value = r.file_path;
+  document.getElementById('edit_version').value  = r.version;
+  document.getElementById('edit_sabun').value    = r.sabun;
+  document.getElementById('edit_doctype').value  = r.doc_type;
+  document.getElementById('edit_docname').value  = r.doc_name;
+  document.getElementById('edit_uploader').value = r.uploaded_by || '';
+  document.getElementById('edit_newversion').value = '';
+  document.getElementById('replaceFileSelected').textContent = '';
+  replaceFile = null;
+  document.getElementById('editModal').classList.add('open');
+}
+function closeEditModal() { document.getElementById('editModal').classList.remove('open'); }
+
+function onReplaceFileSelect(e) {
+  replaceFile = e.target.files[0];
+  if (replaceFile) document.getElementById('replaceFileSelected').textContent = '📄 ' + replaceFile.name;
+}
+
+async function saveEdit() {
+  const id       = document.getElementById('edit_id').value;
+  const oldPath  = document.getElementById('edit_filepath').value;
+  const oldVer   = document.getElementById('edit_version').value;
+  const sabun    = document.getElementById('edit_sabun').value.trim();
+  const docType  = document.getElementById('edit_doctype').value;
+  const docName  = document.getElementById('edit_docname').value.trim();
+  const uploader = document.getElementById('edit_uploader').value.trim();
+  const newVer   = document.getElementById('edit_newversion').value.trim() || oldVer;
+
+  let fileUrl = null, filePath = null;
+
+  if (replaceFile) {
+    // 파일 교체
+    await db.storage.from('documents').remove([oldPath]);
+    const safeFileName = replaceFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const safeDocType  = docType.replace(/[^a-zA-Z0-9._-]/g, '_');
+    filePath = `${sabun}/${safeDocType}/${newVer}_${Date.now()}_${safeFileName}`;
+    await db.storage.from('documents').upload(filePath, replaceFile, { contentType: 'application/pdf' });
+    const { data: urlData } = db.storage.from('documents').getPublicUrl(filePath);
+    fileUrl = urlData.publicUrl;
+  }
+
+  const updateData = {
+    sabun, doc_type: docType, doc_name: docName,
+    version: newVer, uploaded_by: uploader
+  };
+  if (fileUrl) { updateData.file_url = fileUrl; updateData.file_path = filePath; }
+
+  const { error } = await db.from('documents').update(updateData).eq('id', id);
+  if (error) { showToast('저장 실패: ' + error.message); return; }
+  showToast('수정됐어요 ✓');
+  closeEditModal();
+  loadDocs();
+}
+
+async function deleteDoc(id, filePath) {
+  if (!confirm('삭제하시겠습니까?\n삭제된 파일은 복구할 수 없습니다.')) return;
+  await db.storage.from('documents').remove([filePath]);
+  await db.from('documents').delete().eq('id', id);
+  showToast('삭제됐어요.');
+  loadDocs();
+}
+
+loadMyName();
+loadDocs();
+</script>
+<script src="sidebar.js"></script>
+</div><!-- main -->
+</body>
+</html>
