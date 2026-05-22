@@ -525,10 +525,17 @@ function renderGrid() {
     var b = buildings.find(function(x) { return x.id === currentBuildingId; });
     if (!b) return;
 
-    // 동 정보 표시
+    // 동 정보 표시 - 해당 동 금형 수 계산
+    var dongMoldCount = 0;
+    for (var i = 0; i < molds.length; i++) {
+        if (molds[i].mold_slots && molds[i].mold_slots.building_id === currentBuildingId) {
+            dongMoldCount++;
+        }
+    }
     document.getElementById('buildingInfo').innerHTML =
         '<strong>' + b.building_name + '</strong>' +
         '<span>' + b.total_rows + '호 × ' + b.total_floors + '층</span>' +
+        '<span style="background:#243bb2;color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700;">' + dongMoldCount + '벌</span>' +
         '<span>' + (b.description || '') + '</span>';
 
     // 해당 동의 금형 수집 (slot의 building_id로 필터)

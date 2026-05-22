@@ -40,33 +40,6 @@ body { font-family:'Noto Sans KR','Pretendard',sans-serif; background:#f1f3f9; c
 .repair-item { display:flex; align-items:center; padding:6px 0; border-bottom:1px solid #f1f5f9; font-size:13px; }
 .repair-item:last-child { border-bottom:none; }
 
-/* ===== 현황 요약 ===== */
-.stat-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:20px; }
-.stat-card { background:#fff; border-radius:12px; padding:14px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
-.stat-num { font-size:26px; font-weight:800; }
-.stat-label { font-size:11px; color:#64748b; margin-top:4px; }
-
-/* ===== 차트 ===== */
-.chart-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px; }
-.donut-wrap { display:flex; align-items:center; justify-content:center; gap:20px; }
-.donut { width:130px; height:130px; border-radius:50%; position:relative; }
-.donut-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; background:#fff; width:85px; height:85px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-.donut-center .big { font-size:22px; font-weight:800; color:#243bb2; }
-.donut-center .small { font-size:10px; color:#64748b; }
-.donut-legend { display:flex; flex-direction:column; gap:6px; }
-.donut-legend-item { display:flex; align-items:center; gap:6px; font-size:12px; }
-.donut-legend-dot { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
-.bar-chart { display:flex; flex-direction:column; gap:6px; max-height:400px; overflow-y:auto; }
-.bar-row { display:flex; align-items:center; gap:6px; }
-.bar-label { width:55px; font-size:11px; font-weight:600; color:#475569; text-align:right; flex-shrink:0; }
-.bar-track { flex:1; height:22px; background:#f1f5f9; border-radius:5px; overflow:hidden; }
-.bar-fill { height:100%; border-radius:5px; display:flex; align-items:center; padding-left:6px; transition:width 0.8s; }
-.bar-fill span { font-size:10px; font-weight:600; color:#fff; }
-.bar-count { width:35px; font-size:11px; font-weight:600; color:#64748b; text-align:right; flex-shrink:0; }
-
-/* ===== 구분선 ===== */
-.divider { border:none; border-top:2px solid #e2e8f0; margin:8px 0 20px; }
-
 /* ===== 이력 탭 섹션 ===== */
 .tabs { display:flex; gap:0; border-bottom:2px solid #e2e8f0; background:#fff; border-radius:10px 10px 0 0; margin-bottom:0; }
 .tab { padding:12px 24px; font-size:14px; font-weight:600; color:#64748b; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; white-space:nowrap; transition:all 0.2s; }
@@ -82,6 +55,9 @@ body { font-family:'Noto Sans KR','Pretendard',sans-serif; background:#f1f3f9; c
 .hist-stat-card { background:#fff; border-radius:10px; padding:12px 16px; min-width:100px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
 .hist-stat-card .num { font-size:22px; font-weight:700; }
 .hist-stat-card .label { font-size:11px; color:#64748b; margin-top:2px; }
+.hist-stat-card.clickable { cursor:pointer; transition:all 0.2s; border:2px solid transparent; }
+.hist-stat-card.clickable:hover { border-color:#243bb2; transform:translateY(-2px); box-shadow:0 4px 12px rgba(36,59,178,0.15); }
+.hist-stat-card.clickable.selected { border-color:#243bb2; background:#f0f3ff; }
 
 /* 이력 도구모음 */
 .toolbar { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; align-items:center; }
@@ -142,8 +118,6 @@ table.dt tr:hover { background:#f8fafc; }
 
 @media(max-width:768px) {
     .top-row { grid-template-columns:1fr; }
-    .chart-row { grid-template-columns:1fr; }
-    .stat-grid { grid-template-columns:repeat(3,1fr); }
     .form-row { flex-direction:column; gap:0; }
     .tab { padding:10px 14px; font-size:13px; }
     table.dt { font-size:11px; }
@@ -176,24 +150,6 @@ table.dt tr:hover { background:#f8fafc; }
     </div>
 </div>
 
-<!-- ========== 현황 요약 + 차트 ========== -->
-<div class="section-title"><span>📊</span> 금형 현황 요약</div>
-<div class="stat-grid">
-    <div class="stat-card"><div class="stat-num" id="sTotal" style="color:#243bb2;">-</div><div class="stat-label">전체 금형</div></div>
-    <div class="stat-card"><div class="stat-num" id="sActive" style="color:#0ea5e9;">-</div><div class="stat-label">활성 금형</div></div>
-    <div class="stat-card"><div class="stat-num" id="sStored" style="color:#16a34a;">-</div><div class="stat-label">보관중</div></div>
-    <div class="stat-card"><div class="stat-num" id="sInuse" style="color:#dc2626;">-</div><div class="stat-label">사용중</div></div>
-    <div class="stat-card"><div class="stat-num" id="sRepair" style="color:#f59e0b;">-</div><div class="stat-label">수리중</div></div>
-    <div class="stat-card"><div class="stat-num" id="sRetired" style="color:#94a3b8;">-</div><div class="stat-label">사용X</div></div>
-</div>
-<div class="chart-row">
-    <div class="card"><h4>상태 분포</h4><div class="donut-wrap"><div class="donut" id="donutChart"><div class="donut-center"><div class="big" id="donutTotal">-</div><div class="small">활성 금형</div></div></div><div class="donut-legend" id="donutLegend"></div></div></div>
-    <div class="card"><h4>동별 금형 수</h4><div class="bar-chart" id="barChart"><div class="loading">로딩 중...</div></div></div>
-</div>
-
-<!-- ========== 구분선 ========== -->
-<hr class="divider">
-
 <!-- ========== 하단: 이력 탭 (손상/세척/수리) ========== -->
 <div class="section-title"><span>📝</span> 금형 이력 관리</div>
 
@@ -207,10 +163,10 @@ table.dt tr:hover { background:#f8fafc; }
 <div class="tab-content active" id="tab-damage">
     <div style="padding:16px 0;">
         <div class="hist-stat-row">
-            <div class="hist-stat-card"><div class="num" id="dmgTotal" style="color:#243bb2;">-</div><div class="label">전체</div></div>
-            <div class="hist-stat-card"><div class="num" id="dmgPending" style="color:#dc2626;">-</div><div class="label">미조치</div></div>
-            <div class="hist-stat-card"><div class="num" id="dmgProgress" style="color:#f59e0b;">-</div><div class="label">조치중</div></div>
-            <div class="hist-stat-card"><div class="num" id="dmgDone" style="color:#16a34a;">-</div><div class="label">완료</div></div>
+            <div class="hist-stat-card clickable" onclick="filterDamage('')"><div class="num" id="dmgTotal" style="color:#243bb2;">-</div><div class="label">전체</div></div>
+            <div class="hist-stat-card clickable" onclick="filterDamage('pending')"><div class="num" id="dmgPending" style="color:#dc2626;">-</div><div class="label">미조치</div></div>
+            <div class="hist-stat-card clickable" onclick="filterDamage('in_progress')"><div class="num" id="dmgProgress" style="color:#f59e0b;">-</div><div class="label">조치중</div></div>
+            <div class="hist-stat-card clickable" onclick="filterDamage('completed')"><div class="num" id="dmgDone" style="color:#16a34a;">-</div><div class="label">완료</div></div>
         </div>
         <div class="toolbar">
             <input type="text" class="search-input" id="dmgSearch" placeholder="사번, 작업자, 손상내용 검색...">
@@ -257,9 +213,9 @@ table.dt tr:hover { background:#f8fafc; }
 <div class="tab-content" id="tab-repair">
     <div style="padding:16px 0;">
         <div class="hist-stat-row">
-            <div class="hist-stat-card"><div class="num" id="repTotal" style="color:#243bb2;">-</div><div class="label">전체</div></div>
-            <div class="hist-stat-card"><div class="num" id="repProgress" style="color:#f59e0b;">-</div><div class="label">수리중</div></div>
-            <div class="hist-stat-card"><div class="num" id="repDone" style="color:#16a34a;">-</div><div class="label">완료</div></div>
+            <div class="hist-stat-card clickable" onclick="filterRepair('')"><div class="num" id="repTotal" style="color:#243bb2;">-</div><div class="label">전체</div></div>
+            <div class="hist-stat-card clickable" onclick="filterRepair('in_progress')"><div class="num" id="repProgress" style="color:#f59e0b;">-</div><div class="label">수리중</div></div>
+            <div class="hist-stat-card clickable" onclick="filterRepair('completed')"><div class="num" id="repDone" style="color:#16a34a;">-</div><div class="label">완료</div></div>
         </div>
         <div class="toolbar">
             <input type="text" class="search-input" id="repSearch" placeholder="사번, 수리업체, 수리내용 검색...">
@@ -366,7 +322,7 @@ table.dt tr:hover { background:#f8fafc; }
 var SU = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
 var SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
 
-var allMolds = [], buildings = [];
+var allMolds = [];
 var damageData = [], cleanData = [], repairData = [], moldsData = [], workersData = [], equipmentList = [];
 
 function supaHeaders() { return {'apikey':SK,'Authorization':'Bearer '+SK,'Content-Type':'application/json','Prefer':'return=representation'}; }
@@ -403,9 +359,8 @@ function fmtLocal(d) {
 // =============================================
 async function loadData() {
     try {
-        buildings = await sf('mold_buildings','order=sort_order.asc');
         allMolds = await sf('molds','select=*,mold_slots(address,building_id)&order=mold_code.asc');
-        renderStats(); renderDonut(); renderBarChart(); renderAlerts(); renderRepairList(); loadHistory();
+        renderAlerts(); renderRepairList(); loadHistory();
     } catch(e) {
         document.getElementById('alertCard').innerHTML = '<div class="alert-empty" style="color:#dc2626;">대시보드 로드 실패</div>';
     }
@@ -428,39 +383,6 @@ async function loadHistoryData() {
         buildDropdowns();
         renderDamage(); renderClean(); renderRepair();
     } catch(e) { showToast('이력 데이터 로드 실패: '+e.message,'error'); }
-}
-
-// =============================================
-// 대시보드: 현황 요약
-// =============================================
-function renderStats() {
-    var t=allMolds.length, st=0, iu=0, rp=0, rt=0;
-    for (var i=0;i<t;i++) { var m=allMolds[i]; if(!m.is_active){rt++;continue;} if(m.status==='stored')st++; else if(m.status==='in_use')iu++; else if(m.status==='repairing')rp++; }
-    document.getElementById('sTotal').textContent=t;
-    document.getElementById('sActive').textContent=t-rt;
-    document.getElementById('sStored').textContent=st;
-    document.getElementById('sInuse').textContent=iu;
-    document.getElementById('sRepair').textContent=rp;
-    document.getElementById('sRetired').textContent=rt;
-}
-
-function renderDonut() {
-    var st=0,iu=0,rp=0;
-    for(var i=0;i<allMolds.length;i++){var m=allMolds[i];if(!m.is_active)continue;if(m.status==='stored')st++;else if(m.status==='in_use')iu++;else if(m.status==='repairing')rp++;}
-    var ac=st+iu+rp;document.getElementById('donutTotal').textContent=ac;if(ac===0)return;
-    var p1=st/ac*100,p2=iu/ac*100,s1=p1,s2=s1+p2;
-    document.getElementById('donutChart').style.background='conic-gradient(#22c55e 0% '+s1+'%,#ef4444 '+s1+'% '+s2+'%,#f59e0b '+s2+'% 100%)';
-    document.getElementById('donutLegend').innerHTML='<div class="donut-legend-item"><div class="donut-legend-dot" style="background:#22c55e;"></div>보관중 '+st+'개 ('+p1.toFixed(1)+'%)</div><div class="donut-legend-item"><div class="donut-legend-dot" style="background:#ef4444;"></div>사용중 '+iu+'개 ('+p2.toFixed(1)+'%)</div><div class="donut-legend-item"><div class="donut-legend-dot" style="background:#f59e0b;"></div>수리중 '+rp+'개 ('+(100-p1-p2).toFixed(1)+'%)</div>';
-}
-
-function renderBarChart() {
-    var bc={},mx=0;for(var i=0;i<buildings.length;i++)bc[buildings[i].id]={name:buildings[i].building_name,count:0};
-    for(var i=0;i<allMolds.length;i++){var m=allMolds[i];if(m.mold_slots&&bc[m.mold_slots.building_id])bc[m.mold_slots.building_id].count++;}
-    for(var k in bc)if(bc[k].count>mx)mx=bc[k].count;
-    var cs=['#243bb2','#2563eb','#3b82f6','#60a5fa','#93c5fd','#243bb2','#2563eb','#3b82f6','#60a5fa','#93c5fd'];
-    var h='',ci=0;
-    for(var i=0;i<buildings.length;i++){var b=buildings[i],c=bc[b.id];if(!c)continue;var p=mx>0?(c.count/mx*100):0;h+='<div class="bar-row"><div class="bar-label">'+c.name+'</div><div class="bar-track"><div class="bar-fill" style="width:'+p+'%;background:'+cs[ci%cs.length]+';"><span>'+(c.count>0?c.count:'')+'</span></div></div><div class="bar-count">'+c.count+'</div></div>';ci++;}
-    document.getElementById('barChart').innerHTML=h;
 }
 
 // =============================================
@@ -576,6 +498,29 @@ function buildDropdowns() {
     for (var i=0; i<equipmentList.length; i++) {
         var opt = document.createElement('option'); opt.value = equipmentList[i]; opt.textContent = equipmentList[i]; equipSel.appendChild(opt);
     }
+}
+
+// =============================================
+// 통계카드 클릭 필터
+// =============================================
+function filterDamage(status) {
+    document.getElementById('dmgFilter').value = status;
+    // 선택 하이라이트
+    var cards = document.querySelectorAll('#tab-damage .hist-stat-card');
+    for (var i = 0; i < cards.length; i++) cards[i].classList.remove('selected');
+    var idx = {'':0, 'pending':1, 'in_progress':2, 'completed':3};
+    if (idx[status] !== undefined && cards[idx[status]]) cards[idx[status]].classList.add('selected');
+    renderDamage();
+}
+
+function filterRepair(status) {
+    // 수리 탭은 select 필터가 없으므로 변수로 관리
+    window._repairFilter = status;
+    var cards = document.querySelectorAll('#tab-repair .hist-stat-card');
+    for (var i = 0; i < cards.length; i++) cards[i].classList.remove('selected');
+    var idx = {'':0, 'in_progress':1, 'completed':2};
+    if (idx[status] !== undefined && cards[idx[status]]) cards[idx[status]].classList.add('selected');
+    renderRepair();
 }
 
 // =============================================
@@ -779,7 +724,9 @@ async function submitClean() {
 // =============================================
 function renderRepair() {
     var keyword = (document.getElementById('repSearch').value||'').toUpperCase();
+    var statusFilter = window._repairFilter || '';
     var filtered = repairData.filter(function(r) {
+        if (statusFilter && r.repair_status !== statusFilter) return false;
         if (!keyword) return true;
         var s = ((r.description||'')+(r.vendor||'')).toUpperCase();
         return s.indexOf(keyword)!==-1;
