@@ -54,12 +54,29 @@ async function checkAuth() {
     // 캐시 저장
     sessionStorage.setItem('userInfo', JSON.stringify(userResult.data));
 
-    // 모니터 전용 계정: 적치대 + 대시보드/이력만 접근 허용
+    // 모니터 전용 계정: 적치대 + 대시보드만 접근 허용
     if (userResult.data.process === '모니터') {
         var currentPage = location.pathname.split('/').pop();
-        if (currentPage !== 'mold_layout.html' && currentPage !== 'mold_dashboard.html') {
+        var monitorAllowed = ['mold_layout.html', 'mold_dashboard.html', 'index.html', 'login.html'];
+        var isAllowed = false;
+        for (var i = 0; i < monitorAllowed.length; i++) {
+            if (currentPage === monitorAllowed[i]) { isAllowed = true; break; }
+        }
+        if (!isAllowed) {
             location.href = 'mold_layout.html';
             return null;
+        }
+    }
+
+    // worker 계정: 관리 페이지 접근 차단
+    if (userResult.data.user_type === 'worker') {
+        var currentPage = location.pathname.split('/').pop();
+        var workerBlocked = ['master_data.html', 'users.html', 'docs_manager.html'];
+        for (var i = 0; i < workerBlocked.length; i++) {
+            if (currentPage === workerBlocked[i]) {
+                location.href = 'mold_dashboard.html';
+                return null;
+            }
         }
     }
 
