@@ -60,12 +60,12 @@ table.data-table tr.row-danger { background:#fee2e2; }
 .shot-pct { font-size:11px; font-weight:600; min-width:35px; }
 
 /* 행 액션 버튼 */
-.row-actions { display:flex; gap:4px; }
-.btn-row-edit { background:#d97706; color:#fff; border:none; padding:5px 10px; border-radius:5px; font-size:11px; cursor:pointer; }
+.row-actions { display:flex; gap:6px; }
+.btn-row-edit { background:#d97706; color:#fff; border:none; padding:5px 14px; border-radius:5px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
 .btn-row-edit:hover { background:#b45309; }
-.btn-row-del { background:#dc2626; color:#fff; border:none; padding:5px 10px; border-radius:5px; font-size:11px; cursor:pointer; }
+.btn-row-del { background:#dc2626; color:#fff; border:none; padding:5px 14px; border-radius:5px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
 .btn-row-del:hover { background:#b91c1c; }
-.btn-row-shot { background:#2563eb; color:#fff; border:none; padding:5px 10px; border-radius:5px; font-size:11px; cursor:pointer; }
+.btn-row-shot { background:#2563eb; color:#fff; border:none; padding:5px 14px; border-radius:5px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
 .btn-row-shot:hover { background:#1d4ed8; }
 
 /* 모달 */
@@ -628,9 +628,9 @@ function renderTable() {
             + '<td>' + shotHtml + '</td>'
             + '<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + noteText + '">' + noteText + '</td>'
             + '<td><div class="row-actions">'
-            + '<button class="btn-row-shot" onclick="openShotModal(\'' + m.id + '\')" title="타발수 입력">🔨</button>'
-            + '<button class="btn-row-edit" onclick="openEditModal(\'' + m.id + '\')" title="수정">✏️</button>'
-            + '<button class="btn-row-del" onclick="openDeleteModal(\'' + m.id + '\')" title="삭제">🗑️</button>'
+            + '<button class="btn-row-shot" onclick="openShotModal(\'' + m.id + '\')">타발수</button>'
+            + '<button class="btn-row-edit" onclick="openEditModal(\'' + m.id + '\')">수정</button>'
+            + '<button class="btn-row-del" onclick="openDeleteModal(\'' + m.id + '\')">삭제</button>'
             + '</div></td>'
             + '</tr>';
     }
@@ -1100,7 +1100,15 @@ loadData();
 </script>
 <script src="sidebar.js"></script>
 <script>
-(async function(){ var user = await checkAuth(); if(!user) return; })();
+(async function(){
+    var user = await checkAuth();
+    if(!user) return;
+    if(user.user_type !== 'super' && user.user_type !== 'admin') {
+        alert('금형 상세관리는 관리자 이상만 접근할 수 있습니다.');
+        location.href = 'mold_dashboard.html';
+        return;
+    }
+})();
 </script>
 </div><!-- main -->
 </body>
