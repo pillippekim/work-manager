@@ -54,10 +54,10 @@ async function checkAuth() {
     // 캐시 저장
     sessionStorage.setItem('userInfo', JSON.stringify(userResult.data));
 
-    // 모니터 전용 계정: 적치대 페이지로만 접근 허용
+    // 모니터 전용 계정: 적치대 + 대시보드/이력만 접근 허용
     if (userResult.data.process === '모니터') {
         var currentPage = location.pathname.split('/').pop();
-        if (currentPage !== 'mold_layout.html') {
+        if (currentPage !== 'mold_layout.html' && currentPage !== 'mold_dashboard.html') {
             location.href = 'mold_layout.html';
             return null;
         }
