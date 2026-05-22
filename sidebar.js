@@ -100,7 +100,17 @@ function initSidebar() {
             '</div>' +
 
             /* 비활성 메뉴 */
-            '<div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">✅</span><span class="c-label">품질관리</span><span class="c-badge off">향후</span></button></div>' +
+            /* 품질관리 */
+            '<div class="cat-item" id="c-quality">' +
+                '<button class="cat-btn" onclick="toggleCat(\'c-quality\')">' +
+                    '<span class="c-icon">✅</span><span class="c-label">품질관리</span>' +
+                    '<span class="c-badge on">운영</span><span class="c-arrow">▼</span>' +
+                '</button>' +
+                '<div class="cat-body">' +
+                    '<a class="nav-link" href="https://pillippekim.github.io/project-moon/inspection_round.html"><span class="n-icon">📋</span>순회검사 작성</a>' +
+                    '<a class="nav-link" href="https://pillippekim.github.io/project-moon/inspection_round_viewer.html"><span class="n-icon">📂</span>순회검사 조회</a>' +
+                '</div>' +
+            '</div>' +
             '<div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">🚚</span><span class="c-label">물류관리</span><span class="c-badge off">향후</span></button></div>' +
             '<div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">🔬</span><span class="c-label">R&D</span><span class="c-badge off">향후</span></button></div>' +
             '<div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">💼</span><span class="c-label">경영지원</span><span class="c-badge off">향후</span></button></div>' +
