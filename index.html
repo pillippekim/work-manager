@@ -324,6 +324,38 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
         '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#243bb2,#1a2a85);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;">' + avatar + '</div>' +
         '<div><div style="font-size:13px;font-weight:600;color:#334155;">' + (user.name||'-') + '</div><div style="font-size:10px;color:#94a3b8;">' + role + '</div></div>' +
         '<button onclick="logout()" style="font-size:12px;color:#94a3b8;cursor:pointer;padding:6px 12px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;font-family:inherit;transition:all 0.12s;">로그아웃</button>';
+
+    // worker/모니터 계정: 허용 메뉴 외 비활성화
+    if (user.user_type === 'worker' || user.process === '모니터') {
+        // 허용 페이지 목록
+        var allowedUrls = [
+            'mold_dashboard.html', 'mold_layout.html',
+            'project-moon/index.html', 'project-moon/cmb.html', 'project-moon/cutting.html',
+            'project-moon/coating.html', 'project-moon/molding.html', 'project-moon/postcure.html',
+            'project-moon/shot.html', 'project-moon/assembly.html', 'project-moon/inspection.html',
+            'project-moon/packaging.html', 'project-moon/docs_viewer.html'
+        ];
+        // 모니터 계정은 금형관리만
+        if (user.process === '모니터') {
+            allowedUrls = ['mold_dashboard.html', 'mold_layout.html'];
+        }
+        var links = document.querySelectorAll('.left-menu a.nav-link, .left-menu a.cat-btn');
+        for (var i = 0; i < links.length; i++) {
+            var href = links[i].getAttribute('href') || '';
+            var isAllowed = false;
+            for (var j = 0; j < allowedUrls.length; j++) {
+                if (href.indexOf(allowedUrls[j]) !== -1) { isAllowed = true; break; }
+            }
+            if (!isAllowed && href && href !== '#') {
+                links[i].style.opacity = '0.35';
+                links[i].style.pointerEvents = 'none';
+                links[i].style.cursor = 'default';
+            }
+        }
+        // 시스템 관리 카테고리 전체 비활성화
+        var sysItem = document.getElementById('c-system');
+        if (sysItem) { sysItem.style.opacity = '0.35'; sysItem.style.pointerEvents = 'none'; }
+    }
 })();
 
 var now=new Date(),days=['일','월','화','수','목','금','토'];
