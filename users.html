@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>사용자 관리 - HKHT</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sidebar.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth_guard.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Noto Sans KR','Pretendard',sans-serif; background: #f1f3f9; color: #1e293b; }
+
+.container { padding: 20px 24px; max-width: 1200px; }
+
+/* 페이지 헤더 */
+.page-header { display: flex; align-items: center; justify-content: space-between; background: white; padding: 16px 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(36,59,178,0.08); margin-bottom: 20px; }
+.page-title { font-size: 20px; font-weight: 700; color: #243bb2; display: flex; align-items: center; gap: 8px; }
+
+/* 통계 카드 */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1rem; }
+.stat-card { background: white; border-radius: 10px; border: 1px solid #e5e5e5; padding: 0.85rem 1rem; }
+.stat-icon { font-size: 20px; margin-bottom: 6px; }
+.stat-label { font-size: 11px; color: #888; margin-bottom: 4px; }
+.stat-num { font-size: 22px; font-weight: 600; color: #111; }
+.stat-num.blue { color: #243bb2; }
+.stat-num.green { color: #16a34a; }
+.stat-num.orange { color: #ea580c; }
+.stat-unit { font-size: 12px; color: #aaa; font-weight: 400; }
+
+/* 메인 탭 */
+.main-tabs { display: flex; gap: 0; margin-bottom: 1rem; background: white; border-radius: 12px; border: 1px solid #e5e5e5; overflow: hidden; }
+.main-tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; font-size: 14px; font-weight: 500; color: #888; border: none; background: transparent; font-family: inherit; transition: all 0.15s; border-bottom: 2.5px solid transparent; }
+.main-tab:hover { color: #243bb2; background: #f9f9f9; }
+.main-tab.active { color: #243bb2; border-bottom-color: #243bb2; background: #eef0ff; }
+
+.section { display: none; }
+.section.active { display: block; }
+
+/* 카드 */
+.card { background: white; border-radius: 12px; border: 1px solid #e5e5e5; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.card-title { font-size: 15px; font-weight: 600; color: #111; }
+
+/* 검색바 */
+.search-bar { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; }
+.search-input { flex: 1; min-width: 180px; font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 12px; outline: none; font-family: inherit; color: #111; }
+.search-input:focus { border-color: #243bb2; }
+.filter-select { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 12px; outline: none; font-family: inherit; color: #111; background: white; cursor: pointer; }
+
+/* 폼 */
+.form-grid { display: grid; gap: 12px; margin-bottom: 1rem; }
+.form-grid-2 { grid-template-columns: 1fr 1fr; }
+.form-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-label { font-size: 12px; color: #888; font-weight: 500; }
+.form-label .required { color: #e53e3e; }
+.form-input, .form-select { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 9px 11px; outline: none; font-family: inherit; color: #111; background: white; }
+.form-input:focus, .form-select:focus { border-color: #243bb2; }
+.form-help { font-size: 11px; color: #aaa; margin-top: 4px; }
+
+/* 라디오 */
+.radio-group { display: flex; gap: 8px; }
+.radio-option { flex: 1; padding: 10px; border: 1.5px solid #e5e5e5; border-radius: 8px; text-align: center; cursor: pointer; font-size: 13px; color: #555; }
+.radio-option.active { border-color: #243bb2; background: #eef0ff; color: #243bb2; font-weight: 500; }
+.radio-option input { display: none; }
+
+/* 버튼 */
+.btn-primary { font-size: 13px; padding: 10px 20px; border-radius: 8px; background: #243bb2; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
+.btn-primary:hover:not(:disabled) { opacity: 0.9; }
+.btn-primary:disabled { background: #aaa; cursor: not-allowed; }
+.btn-secondary { font-size: 13px; padding: 10px 16px; border-radius: 8px; background: transparent; color: #555; border: 1px solid #ddd; cursor: pointer; font-family: inherit; }
+
+/* 테이블 */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { font-size: 12px; font-weight: 500; color: #888; padding: 9px 12px; background: #f9f9f9; border-bottom: 1px solid #eee; text-align: left; white-space: nowrap; position: sticky; top: 0; z-index: 10; }
+td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; color: #111; vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #fafafa; }
+.role-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+.role-super { background: #fdf4ff; color: #9333ea; }
+.role-admin { background: #eff6ff; color: #243bb2; }
+.role-worker { background: #f0fdf4; color: #16a34a; }
+.status-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+.status-active { background: #f0fdf4; color: #16a34a; }
+.status-inactive { background: #f9f9f9; color: #aaa; }
+.pwd-pending { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #fef3c7; color: #d97706; font-weight: 500; }
+.action-btns { display: flex; gap: 4px; }
+.btn-sm { font-size: 12px; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-family: inherit; border: none; }
+.btn-edit-sm { background: #eff6ff; color: #243bb2; border: 1px solid #bfdbfe; }
+.btn-reset { background: #fef3c7; color: #d97706; border: 1px solid #fde68a; }
+.btn-reset:hover { background: #fde68a; }
+.btn-toggle { background: transparent; color: #555; border: 1px solid #ddd; }
+.btn-toggle:hover { background: #f5f5f5; }
+.btn-del { background: transparent; color: #e53e3e; border: 1px solid #fca5a5; }
+.btn-del:hover { background: #fff0f0; }
+.empty-row td { text-align: center; color: #aaa; padding: 2rem; }
+
+/* 엑셀 업로드 */
+.excel-zone { border: 1.5px dashed #cbd5e1; border-radius: 8px; padding: 1.5rem; text-align: center; cursor: pointer; background: white; margin-bottom: 12px; }
+.excel-zone:hover, .excel-zone.dragover { border-color: #243bb2; background: #eef0ff; border-style: solid; }
+.preview-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.preview-table th { background: #f9f9f9; padding: 6px 8px; border-bottom: 1px solid #eee; text-align: left; color: #888; }
+.preview-table td { padding: 6px 8px; border-bottom: 1px solid #f5f5f5; }
+
+/* 토스트 */
+.toast { display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #111; color: white; padding: 12px 24px; border-radius: 8px; font-size: 14px; z-index: 999; }
+.toast.show { display: block; }
+
+/* 권한 없음 */
+.no-permission { text-align: center; padding: 4rem 2rem; }
+.no-permission-icon { font-size: 56px; margin-bottom: 1rem; }
+.no-permission-title { font-size: 18px; font-weight: 600; color: #111; margin-bottom: 6px; }
+.no-permission-msg { font-size: 13px; color: #888; }
+.hidden { display: none !important; }
+
+/* 수정 모달 */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; padding: 1rem; }
+.modal-overlay.open { display: flex; }
+.modal-box { background: white; border-radius: 12px; padding: 1.5rem; width: 100%; max-width: 540px; max-height: 90vh; overflow-y: auto; }
+.modal-title { font-size: 16px; font-weight: 600; color: #111; margin-bottom: 1rem; }
+.modal-section { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #f0f0f0; }
+.modal-section:last-of-type { border-bottom: none; }
+.modal-section-title { font-size: 12px; font-weight: 500; color: #888; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.readonly-input { font-size: 13px; border: 1px solid #f0f0f0; border-radius: 8px; padding: 9px 11px; background: #f9f9f9; color: #888; width: 100%; }
+.modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1rem; }
+
+/* 테이블 헤더 고정 */
+.table-scroll-wrap { max-height: 600px; overflow-y: auto; overflow-x: auto; border-radius: 8px; border: 1px solid #f0f0f0; }
+.table-scroll-wrap table { margin: 0; }
+.table-scroll-wrap thead th { position: sticky; top: 0; z-index: 10; background: #f9f9f9; box-shadow: inset 0 -1px 0 #eee; }
+
+/* 모바일 */
+@media(max-width:768px) {
+  .container { padding: 12px; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .main-tabs { flex-direction: column; }
+  .form-grid-2 { grid-template-columns: 1fr; }
+  .search-bar { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- 권한 체크 로딩 화면 -->
+<div id="authCheckOverlay" style="position:fixed;inset:0;background:#f1f3f9;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="width:36px;height:36px;border:3px solid #e5e5e5;border-top-color:#243bb2;border-radius:50%;animation:authSpin 0.8s linear infinite"></div>
+  <div style="font-size:13px;color:#888;font-family:inherit">권한 확인 중...</div>
+  <style>@keyframes authSpin { to { transform: rotate(360deg); } }</style>
+</div>
+
+<!-- WM 레이아웃 -->
+<div id="top-header" class="top-header"></div>
+<nav id="sidebar-nav" class="sidebar"></nav>
+
+<div class="main">
+<div class="container">
+
+  <!-- 페이지 헤더 -->
+  <div class="page-header">
+    <span class="page-title">👥 사용자 관리</span>
+    <span style="font-size:12px;color:#94a3b8">슈퍼관리자 전용</span>
+  </div>
+
+  <!-- 권한 없음 화면 -->
+  <div class="card hidden" id="noPermission">
+    <div class="no-permission">
+      <div class="no-permission-icon">🔒</div>
+      <div class="no-permission-title">접근 권한이 없어요</div>
+      <div class="no-permission-msg">이 페이지는 슈퍼관리자만 접근할 수 있어요.</div>
+    </div>
+  </div>
+
+  <!-- 메인 컨텐츠 -->
+  <div id="mainContent" class="hidden">
+    <!-- 통계 -->
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">전체 사용자</div><div class="stat-num blue" id="statTotal">-</div></div>
+      <div class="stat-card"><div class="stat-icon">👷</div><div class="stat-label">작업자</div><div class="stat-num green" id="statWorker">-</div></div>
+      <div class="stat-card"><div class="stat-icon">💼</div><div class="stat-label">관리자</div><div class="stat-num orange" id="statAdmin">-</div></div>
+      <div class="stat-card"><div class="stat-icon">🔑</div><div class="stat-label">초기 비밀번호 미변경</div><div class="stat-num" id="statPending" style="color:#d97706">-</div></div>
+    </div>
+
+    <!-- 메인 탭 -->
+    <div class="main-tabs">
+      <button class="main-tab active" onclick="switchTab('list')" id="tabBtn_list">📋 직원 목록</button>
+      <button class="main-tab" onclick="switchTab('add')" id="tabBtn_add">➕ 계정 추가</button>
+      <button class="main-tab" onclick="switchTab('bulk')" id="tabBtn_bulk">📊 엑셀 일괄 등록</button>
+    </div>
+
+    <!-- 목록 섹션 -->
+    <div class="section active" id="section_list">
+      <div class="card">
+        <div class="search-bar">
+          <input class="search-input" id="searchInput" placeholder="🔍 입사코드 / 이름 / 부서 검색" oninput="renderUsers()" />
+          <select class="filter-select" id="filterType" onchange="renderUsers()">
+            <option value="">전체 유형</option>
+            <option value="super">슈퍼관리자</option>
+            <option value="admin">관리자</option>
+            <option value="worker">작업자</option>
+          </select>
+          <select class="filter-select" id="filterStatus" onchange="renderUsers()">
+            <option value="">전체 상태</option>
+            <option value="active">재직중</option>
+            <option value="inactive">비활성</option>
+          </select>
+        </div>
+        <div class="table-scroll-wrap">
+          <table>
+            <thead><tr><th>입사코드</th><th>이름</th><th>유형</th><th>부서/공정</th><th>직책</th><th>상태</th><th>비밀번호</th><th>등록일</th><th></th></tr></thead>
+            <tbody id="userTable"><tr class="empty-row"><td colspan="9">로딩 중...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 추가 섹션 -->
+    <div class="section" id="section_add">
+      <div class="card">
+        <div style="font-size:14px;color:#555;margin-bottom:1rem;line-height:1.6">
+          💡 새 직원 계정을 추가합니다.<br>
+          <span style="font-size:12px;color:#888">초기 비밀번호는 입사코드와 동일하게 설정되며, 첫 로그인 시 변경이 강제됩니다.</span>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="form-group">
+            <label class="form-label">입사코드 <span class="required">*</span></label>
+            <input class="form-input" id="add_emp_code" placeholder="예: 26043001" maxlength="8" />
+            <span class="form-help">YYMMDD + 일련번호(2자리) 형식</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">이름 <span class="required">*</span></label>
+            <input class="form-input" id="add_name" placeholder="예: 홍길동" />
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:1rem">
+          <label class="form-label">사용자 유형 <span class="required">*</span></label>
+          <div class="radio-group">
+            <label class="radio-option active" id="opt_worker"><input type="radio" name="user_type" value="worker" checked onchange="onTypeChange()" /> 👷 작업자</label>
+            <label class="radio-option" id="opt_admin"><input type="radio" name="user_type" value="admin" onchange="onTypeChange()" /> 💼 관리자</label>
+          </div>
+        </div>
+        <div class="form-grid form-grid-2" id="workerFields">
+          <div class="form-group"><label class="form-label">공정 <span class="required">*</span></label>
+            <select class="form-select" id="add_process"><option value="포장">포장</option><option value="재단">재단</option><option value="도포">도포</option><option value="검사">검사</option><option value="쇼트">쇼트</option><option value="성형">성형</option><option value="혼련(CMB)">혼련(CMB)</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">직책 (선택)</label><input class="form-input" id="add_position" placeholder="예: 반장, 사원" /></div>
+        </div>
+        <div class="form-grid form-grid-2 hidden" id="adminFields">
+          <div class="form-group"><label class="form-label">부서 <span class="required">*</span></label>
+            <select class="form-select" id="add_department"><option value="연구개발팀">연구개발팀</option><option value="품질관리팀">품질관리팀</option><option value="생산관리팀">생산관리팀</option><option value="물류관리팀">물류관리팀</option><option value="경영지원팀">경영지원팀</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">직책 (선택)</label><input class="form-input" id="add_position2" placeholder="예: 팀장, 사원" /></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:1rem">
+          <button class="btn-secondary" onclick="resetAddForm()">초기화</button>
+          <button class="btn-primary" id="addBtn" onclick="addUser()">계정 생성</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 엑셀 일괄 등록 섹션 -->
+    <div class="section" id="section_bulk">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div>
+            <div style="font-size:14px;color:#555;line-height:1.6">📊 엑셀 파일로 여러 직원을 한꺼번에 등록할 수 있어요.</div>
+            <div style="font-size:12px;color:#888;margin-top:4px">양식 다운로드 → 작성 → 업로드 순서로 진행하세요.</div>
+          </div>
+          <button class="btn-secondary" onclick="downloadUserTemplate()">📥 양식 다운로드</button>
+        </div>
+        <div class="excel-zone" id="bulkZone" onclick="document.getElementById('bulkInput').click()" ondragover="onBulkDragOver(event)" ondragleave="onBulkDragLeave(event)" ondrop="onBulkDrop(event)">
+          <div style="font-size:28px;margin-bottom:8px">📎</div>
+          <div style="font-size:13px;color:#888">엑셀 파일을 클릭하거나 드래그해서 올려주세요</div>
+          <div id="bulkSelected" style="font-size:13px;color:#243bb2;font-weight:500;margin-top:6px"></div>
+        </div>
+        <input type="file" id="bulkInput" accept=".xlsx,.xls" style="display:none" onchange="onBulkSelect(event)" />
+        <div id="bulkPreview" style="display:none;margin-bottom:12px">
+          <div id="bulkCount" style="font-size:13px;color:#555;margin-bottom:8px"></div>
+          <div style="max-height:240px;overflow-y:auto">
+            <table class="preview-table"><thead><tr><th>입사코드</th><th>이름</th><th>유형</th><th>부서/공정</th><th>직책</th></tr></thead><tbody id="bulkPreviewBody"></tbody></table>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <button class="btn-secondary" onclick="resetBulkForm()">취소</button>
+          <button class="btn-primary" id="bulkUploadBtn" onclick="bulkUpload()" disabled>일괄 등록</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- container -->
+</div><!-- main -->
+
+<!-- 사용자 수정 모달 -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-box">
+    <div class="modal-title">✏️ 사용자 정보 수정</div>
+    <input type="hidden" id="edit_id" />
+    <input type="hidden" id="edit_auth_id" />
+    <div class="modal-section">
+      <div class="modal-section-title">기본 정보</div>
+      <div class="form-grid form-grid-2">
+        <div class="form-group"><label class="form-label">입사코드</label><input class="readonly-input" id="edit_emp_code" disabled /><span class="form-help">입사코드는 변경 불가</span></div>
+        <div class="form-group"><label class="form-label">이름 <span class="required">*</span></label><input class="form-input" id="edit_name" /></div>
+      </div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">사용자 유형 및 소속</div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">사용자 유형 <span class="required">*</span></label>
+        <div class="radio-group">
+          <label class="radio-option" id="edit_opt_worker" onclick="setEditType('worker')">👷 작업자</label>
+          <label class="radio-option" id="edit_opt_admin" onclick="setEditType('admin')">💼 관리자</label>
+        </div>
+      </div>
+      <div class="form-grid form-grid-2" id="edit_workerFields">
+        <div class="form-group"><label class="form-label">공정 <span class="required">*</span></label>
+          <select class="form-select" id="edit_process"><option value="포장">포장</option><option value="재단">재단</option><option value="도포">도포</option><option value="검사">검사</option><option value="쇼트">쇼트</option><option value="성형">성형</option><option value="혼련(CMB)">혼련(CMB)</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">직책 (선택)</label><input class="form-input" id="edit_position_w" placeholder="예: 반장, 사원" /></div>
+      </div>
+      <div class="form-grid form-grid-2 hidden" id="edit_adminFields">
+        <div class="form-group"><label class="form-label">부서 <span class="required">*</span></label>
+          <select class="form-select" id="edit_department"><option value="연구개발팀">연구개발팀</option><option value="품질관리팀">품질관리팀</option><option value="생산관리팀">생산관리팀</option><option value="물류관리팀">물류관리팀</option><option value="경영지원팀">경영지원팀</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">직책 (선택)</label><input class="form-input" id="edit_position_a" placeholder="예: 팀장, 사원" /></div>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeEditModal()">취소</button>
+      <button class="btn-primary" id="saveEditBtn" onclick="saveEditUser()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var SU = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+var SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+var FUNCTIONS_URL = SU + '/functions/v1/user-admin';
+var db = window.supabase.createClient(SU, SK);
+
+var allUsers = [];
+var currentUserType = 'worker';
+var bulkData = [];
+var myInfo = null;
+
+function fmtDate(str) { return str ? str.slice(0,10) : '-'; }
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 3000);
+}
+
+// ── 권한 확인 (WM checkAuth + super 체크) ──
+(async function() {
+  var user = await checkAuth();
+  if (!user) return;
+  document.getElementById('authCheckOverlay').style.display = 'none';
+
+  if (user.user_type !== 'super') {
+    document.getElementById('noPermission').classList.remove('hidden');
+    return;
+  }
+  myInfo = user;
+  document.getElementById('mainContent').classList.remove('hidden');
+  loadUsers();
+})();
+
+// ── 탭 전환 ──
+function switchTab(tab) {
+  var sections = document.querySelectorAll('.section');
+  for (var i = 0; i < sections.length; i++) sections[i].classList.remove('active');
+  var tabs = document.querySelectorAll('.main-tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  document.getElementById('section_' + tab).classList.add('active');
+  document.getElementById('tabBtn_' + tab).classList.add('active');
+}
+
+// ── 사용자 목록 ──
+async function loadUsers() {
+  var result = await db.from('users').select('*').order('created_at', { ascending: false });
+  allUsers = result.data || [];
+  updateStats();
+  renderUsers();
+}
+
+function updateStats() {
+  var total = allUsers.length;
+  var workers = 0, admins = 0, pending = 0;
+  for (var i = 0; i < allUsers.length; i++) {
+    if (allUsers[i].user_type === 'worker') workers++;
+    if (allUsers[i].user_type === 'admin') admins++;
+    if (!allUsers[i].password_changed) pending++;
+  }
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statWorker').textContent = workers;
+  document.getElementById('statAdmin').textContent = admins;
+  document.getElementById('statPending').textContent = pending;
+}
+
+function renderUsers() {
+  var q = document.getElementById('searchInput').value.trim().toLowerCase();
+  var ft = document.getElementById('filterType').value;
+  var fs = document.getElementById('filterStatus').value;
+
+  var filtered = allUsers;
+  if (q) {
+    filtered = filtered.filter(function(u) {
+      return u.emp_code.toLowerCase().indexOf(q) !== -1 ||
+        u.name.toLowerCase().indexOf(q) !== -1 ||
+        (u.department||'').toLowerCase().indexOf(q) !== -1 ||
+        (u.process||'').toLowerCase().indexOf(q) !== -1;
+    });
+  }
+  if (ft) filtered = filtered.filter(function(u) { return u.user_type === ft; });
+  if (fs === 'active') filtered = filtered.filter(function(u) { return u.active; });
+  if (fs === 'inactive') filtered = filtered.filter(function(u) { return !u.active; });
+
+  var tbody = document.getElementById('userTable');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">사용자가 없어요.</td></tr>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < filtered.length; i++) {
+    var u = filtered[i];
+    var roleLabel = u.user_type === 'super' ? '슈퍼관리자' : u.user_type === 'admin' ? '관리자' : '작업자';
+    var roleClass = u.user_type === 'super' ? 'role-super' : u.user_type === 'admin' ? 'role-admin' : 'role-worker';
+    var deptOrProcess = u.user_type === 'worker' ? (u.process || '-') : (u.department || '-');
+    var pwdHtml = u.password_changed
+      ? '<span style="color:#aaa;font-size:11px">변경됨</span>'
+      : '<span class="pwd-pending">초기 미변경</span>';
+    var actionsHtml = '';
+    if (u.user_type !== 'super') {
+      actionsHtml =
+        '<button class="btn-sm btn-edit-sm" onclick="openEditModal(' + u.id + ')">수정</button>' +
+        '<button class="btn-sm btn-reset" onclick="resetPassword(\'' + u.auth_user_id + '\',\'' + u.emp_code + '\',\'' + u.name + '\')">비번초기화</button>' +
+        '<button class="btn-sm btn-toggle" onclick="toggleActive(' + u.id + ', ' + u.active + ')">' + (u.active ? '비활성' : '활성') + '</button>' +
+        '<button class="btn-sm btn-del" onclick="deleteUser(\'' + u.auth_user_id + '\',' + u.id + ',\'' + u.name + '\')">삭제</button>';
+    } else {
+      actionsHtml = '<span style="color:#aaa;font-size:11px">슈퍼관리자</span>';
+    }
+    html += '<tr>' +
+      '<td style="font-weight:500">' + u.emp_code + '</td>' +
+      '<td>' + u.name + '</td>' +
+      '<td><span class="role-badge ' + roleClass + '">' + roleLabel + '</span></td>' +
+      '<td>' + deptOrProcess + '</td>' +
+      '<td style="color:#888">' + (u.position || '-') + '</td>' +
+      '<td><span class="status-badge ' + (u.active ? 'status-active' : 'status-inactive') + '">' + (u.active ? '재직중' : '비활성') + '</span></td>' +
+      '<td>' + pwdHtml + '</td>' +
+      '<td style="color:#aaa;font-size:12px">' + fmtDate(u.created_at) + '</td>' +
+      '<td><div class="action-btns">' + actionsHtml + '</div></td></tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+// ── Edge Function 호출 ──
+async function callFunction(payload) {
+  var sessionResult = await db.auth.getSession();
+  var session = sessionResult.data.session;
+  if (!session) { showToast('세션이 만료됐어요.'); return null; }
+
+  var res = await fetch(FUNCTIONS_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + session.access_token
+    },
+    body: JSON.stringify(payload)
+  });
+  var text = await res.text();
+  var data;
+  try { data = JSON.parse(text); } catch(e) { showToast('서버 응답 오류'); return null; }
+  if (!res.ok) {
+    showToast(data.error || '오류가 발생했어요.');
+    return null;
+  }
+  return data;
+}
+
+// ── 계정 추가 ──
+function onTypeChange() {
+  var radios = document.querySelectorAll('input[name="user_type"]');
+  var t = 'worker';
+  for (var i = 0; i < radios.length; i++) { if (radios[i].checked) { t = radios[i].value; break; } }
+  currentUserType = t;
+  document.getElementById('opt_worker').className = 'radio-option' + (t === 'worker' ? ' active' : '');
+  document.getElementById('opt_admin').className = 'radio-option' + (t === 'admin' ? ' active' : '');
+  document.getElementById('workerFields').className = 'form-grid form-grid-2' + (t !== 'worker' ? ' hidden' : '');
+  document.getElementById('adminFields').className = 'form-grid form-grid-2' + (t !== 'admin' ? ' hidden' : '');
+}
+
+async function addUser() {
+  var empCode = document.getElementById('add_emp_code').value.trim();
+  var name = document.getElementById('add_name').value.trim();
+  if (!/^\d{8}$/.test(empCode)) { showToast('입사코드는 숫자 8자리여야 해요.'); return; }
+  if (!name) { showToast('이름을 입력해주세요.'); return; }
+  var payload = { action: 'create', emp_code: empCode, name: name, user_type: currentUserType };
+  if (currentUserType === 'worker') {
+    payload.process = document.getElementById('add_process').value;
+    payload.position = document.getElementById('add_position').value.trim();
+  } else {
+    payload.department = document.getElementById('add_department').value;
+    payload.position = document.getElementById('add_position2').value.trim();
+  }
+  var btn = document.getElementById('addBtn');
+  btn.disabled = true; btn.textContent = '생성 중...';
+  var result = await callFunction(payload);
+  btn.disabled = false; btn.textContent = '계정 생성';
+  if (result && result.success) {
+    showToast(name + ' 계정 생성 완료! 초기 비번: ' + empCode);
+    resetAddForm();
+    switchTab('list');
+    loadUsers();
+  }
+}
+
+function resetAddForm() {
+  document.getElementById('add_emp_code').value = '';
+  document.getElementById('add_name').value = '';
+  document.getElementById('add_position').value = '';
+  document.getElementById('add_position2').value = '';
+}
+
+// ── 사용자 수정 ──
+var editUserType = 'worker';
+
+function openEditModal(id) {
+  var u = null;
+  for (var i = 0; i < allUsers.length; i++) { if (allUsers[i].id == id) { u = allUsers[i]; break; } }
+  if (!u) return;
+  document.getElementById('edit_id').value = u.id;
+  document.getElementById('edit_auth_id').value = u.auth_user_id;
+  document.getElementById('edit_emp_code').value = u.emp_code;
+  document.getElementById('edit_name').value = u.name;
+  setEditType(u.user_type);
+  if (u.user_type === 'worker') {
+    document.getElementById('edit_process').value = u.process || '포장';
+    document.getElementById('edit_position_w').value = u.position || '';
+  } else {
+    document.getElementById('edit_department').value = u.department || '연구개발팀';
+    document.getElementById('edit_position_a').value = u.position || '';
+  }
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeEditModal() { document.getElementById('editModal').classList.remove('open'); }
+
+function setEditType(type) {
+  editUserType = type;
+  document.getElementById('edit_opt_worker').className = 'radio-option' + (type === 'worker' ? ' active' : '');
+  document.getElementById('edit_opt_admin').className = 'radio-option' + (type === 'admin' ? ' active' : '');
+  document.getElementById('edit_workerFields').className = 'form-grid form-grid-2' + (type !== 'worker' ? ' hidden' : '');
+  document.getElementById('edit_adminFields').className = 'form-grid form-grid-2' + (type !== 'admin' ? ' hidden' : '');
+}
+
+async function saveEditUser() {
+  var id = document.getElementById('edit_id').value;
+  var name = document.getElementById('edit_name').value.trim();
+  if (!name) { showToast('이름을 입력해주세요.'); return; }
+  var beforeUser = null;
+  for (var i = 0; i < allUsers.length; i++) { if (allUsers[i].id == id) { beforeUser = allUsers[i]; break; } }
+  var updateData = { name: name, user_type: editUserType };
+  if (editUserType === 'worker') {
+    updateData.process = document.getElementById('edit_process').value;
+    updateData.department = null;
+    updateData.position = document.getElementById('edit_position_w').value.trim() || null;
+  } else {
+    updateData.department = document.getElementById('edit_department').value;
+    updateData.process = null;
+    updateData.position = document.getElementById('edit_position_a').value.trim() || null;
+  }
+  var btn = document.getElementById('saveEditBtn');
+  btn.disabled = true; btn.textContent = '저장 중...';
+  var result = await db.from('users').update(updateData).eq('id', id);
+  if (result.error) { btn.disabled = false; btn.textContent = '저장'; showToast('저장 실패: ' + result.error.message); return; }
+  try {
+    if (beforeUser && beforeUser.user_type === 'worker' && beforeUser.process) {
+      await db.from('workers').delete().eq('name', beforeUser.name).eq('process', beforeUser.process);
+    }
+    if (editUserType === 'worker' && updateData.process) {
+      var existing = await db.from('workers').select('id').eq('name', name).eq('process', updateData.process).maybeSingle();
+      if (!existing.data) { await db.from('workers').insert({ name: name, process: updateData.process, active: true }); }
+    }
+  } catch(e) { console.warn('workers 동기화 실패:', e); }
+  btn.disabled = false; btn.textContent = '저장';
+  showToast(name + '님의 정보가 수정됐어요 ✓');
+  closeEditModal();
+  loadUsers();
+}
+
+// ── 비밀번호 초기화 ──
+async function resetPassword(authId, empCode, name) {
+  if (!confirm(name + '의 비밀번호를 입사코드(' + empCode + ')로 초기화하시겠어요?\n이후 첫 로그인 시 비밀번호 변경이 강제됩니다.')) return;
+  var result = await callFunction({ action: 'reset_password', user_id: authId, emp_code: empCode });
+  if (result && result.success) { showToast(name + '의 비밀번호가 초기화됐어요.'); loadUsers(); }
+}
+
+// ── 활성/비활성 ──
+async function toggleActive(id, current) {
+  await db.from('users').update({ active: !current }).eq('id', id);
+  var u = null;
+  for (var i = 0; i < allUsers.length; i++) { if (allUsers[i].id == id) { u = allUsers[i]; break; } }
+  if (u && u.user_type === 'worker' && u.name && u.process) {
+    await db.from('workers').update({ active: !current }).eq('name', u.name).eq('process', u.process);
+  }
+  showToast(current ? '비활성화됐어요.' : '활성화됐어요.');
+  loadUsers();
+}
+
+// ── 삭제 ──
+async function deleteUser(authId, id, name) {
+  if (!confirm(name + '의 계정을 완전히 삭제하시겠어요?\n이 작업은 되돌릴 수 없습니다.')) return;
+  var result = await callFunction({ action: 'delete', user_id: authId });
+  if (result && result.success) { await db.from('users').delete().eq('id', id); showToast('계정이 삭제됐어요.'); loadUsers(); }
+}
+
+// ── 양식 다운로드 ──
+function downloadUserTemplate() {
+  var wb = XLSX.utils.book_new();
+  var ws = XLSX.utils.aoa_to_sheet([
+    ['입사코드', '이름', '유형', '부서/공정', '직책'],
+    ['26043001', '홍길동', 'worker', '포장', '사원'],
+    ['26043002', '김영희', 'admin', '품질관리팀', '팀장'],
+  ]);
+  ws['!cols'] = [{wch:12},{wch:12},{wch:10},{wch:14},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws, '사용자 일괄등록');
+  var guide = XLSX.utils.aoa_to_sheet([
+    ['항목', '입력값', '비고'],
+    ['입사코드', '숫자 8자리 (YYMMDD + 01~10)', '필수'],
+    ['이름', '이름 입력', '필수'],
+    ['유형', 'worker 또는 admin', '필수'],
+    ['부서/공정', '작업자: 포장/재단/도포/검사/쇼트/성형/혼련(CMB)', '필수'],
+    ['', '관리자: 연구개발팀/품질관리팀/생산관리팀/물류관리팀/경영지원팀', ''],
+    ['직책', '직책 (선택사항)', '선택'],
+  ]);
+  guide['!cols'] = [{wch:12},{wch:50},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, guide, '입력 가이드');
+  XLSX.writeFile(wb, '사용자_일괄등록_양식.xlsx');
+}
+
+// ── 엑셀 업로드 ──
+function onBulkDragOver(e) { e.preventDefault(); document.getElementById('bulkZone').classList.add('dragover'); }
+function onBulkDragLeave(e) { document.getElementById('bulkZone').classList.remove('dragover'); }
+function onBulkDrop(e) {
+  e.preventDefault(); document.getElementById('bulkZone').classList.remove('dragover');
+  var file = e.dataTransfer.files[0];
+  if (!file) return;
+  if (!file.name.match(/\.xlsx?$/i)) { showToast('엑셀 파일만 가능해요.'); return; }
+  onBulkSelect({ target: { files: [file] } });
+}
+
+function onBulkSelect(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('bulkSelected').textContent = '📊 ' + file.name;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var wb = XLSX.read(ev.target.result, { type: 'binary' });
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var raw = XLSX.utils.sheet_to_json(ws, { header: 1 });
+    bulkData = [];
+    for (var i = 1; i < raw.length; i++) {
+      var row = raw[i];
+      if (!row || !row[0]) continue;
+      var empCode = String(row[0] || '').trim();
+      var name = String(row[1] || '').trim();
+      var userType = String(row[2] || '').trim().toLowerCase();
+      var deptOrProcess = String(row[3] || '').trim();
+      var position = String(row[4] || '').trim();
+      if (!empCode || !name) continue;
+      if (userType !== 'worker' && userType !== 'admin') continue;
+      var item = { emp_code: empCode, name: name, user_type: userType, position: position };
+      if (userType === 'worker') item.process = deptOrProcess;
+      else item.department = deptOrProcess;
+      bulkData.push(item);
+    }
+    document.getElementById('bulkCount').innerHTML = '총 <strong>' + bulkData.length + '명</strong> 인식 완료';
+    var previewHtml = '';
+    var limit = Math.min(bulkData.length, 10);
+    for (var i = 0; i < limit; i++) {
+      var d = bulkData[i];
+      previewHtml += '<tr><td>' + d.emp_code + '</td><td>' + d.name + '</td><td>' + d.user_type + '</td><td>' + (d.process || d.department || '') + '</td><td>' + (d.position || '') + '</td></tr>';
+    }
+    if (bulkData.length > 10) previewHtml += '<tr><td colspan="5" style="color:#aaa;text-align:center;padding:6px">... 외 ' + (bulkData.length-10) + '명</td></tr>';
+    document.getElementById('bulkPreviewBody').innerHTML = previewHtml;
+    document.getElementById('bulkPreview').style.display = 'block';
+    document.getElementById('bulkUploadBtn').disabled = false;
+  };
+  reader.readAsBinaryString(file);
+}
+
+async function bulkUpload() {
+  if (!bulkData.length) return;
+  var btn = document.getElementById('bulkUploadBtn');
+  btn.disabled = true; btn.textContent = '등록 중...';
+  var done = 0, fail = 0;
+  for (var i = 0; i < bulkData.length; i++) {
+    var result = await callFunction({ action: 'create', emp_code: bulkData[i].emp_code, name: bulkData[i].name, user_type: bulkData[i].user_type, process: bulkData[i].process, department: bulkData[i].department, position: bulkData[i].position });
+    if (result && result.success) done++; else fail++;
+  }
+  showToast(done + '명 등록 완료' + (fail ? ', ' + fail + '명 실패' : ''));
+  btn.disabled = false; btn.textContent = '일괄 등록';
+  resetBulkForm();
+  switchTab('list');
+  loadUsers();
+}
+
+function resetBulkForm() {
+  bulkData = [];
+  document.getElementById('bulkInput').value = '';
+  document.getElementById('bulkSelected').textContent = '';
+  document.getElementById('bulkPreview').style.display = 'none';
+  document.getElementById('bulkUploadBtn').disabled = true;
+}
+</script>
+<script src="sidebar.js"></script>
+</body>
+</html>
