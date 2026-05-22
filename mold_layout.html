@@ -620,6 +620,10 @@ async function showMoldDetail(address) {
     });
     if (cellMolds.length === 0) return;
 
+    // 모니터 계정 감지
+    var isMonitor = false;
+    try { var uc = JSON.parse(sessionStorage.getItem('userInfo') || '{}'); isMonitor = (uc.process === '모니터'); } catch(e) {}
+
     // 각 금형의 최근 상태 변경일 일괄 조회
     var moldIds = cellMolds.map(function(m) { return m.id; });
     var statusDates = {};
@@ -677,7 +681,8 @@ async function showMoldDetail(address) {
         if (m.maker) html += '<div class="modal-row"><span class="label">제작사</span><span class="value">' + m.maker + '</span></div>';
         if (m.made_date) html += '<div class="modal-row"><span class="label">제작일</span><span class="value">' + m.made_date + '</span></div>';
 
-        // 입출고 액션 버튼 (상태별로 다르게 표시)
+        // 입출고 액션 버튼 (모니터 계정에서는 숨김)
+        if (!isMonitor) {
         html += '<div class="action-btns">';
         if (m.is_active) {
             if (m.status === 'stored') {
@@ -705,6 +710,7 @@ async function showMoldDetail(address) {
         html += '<input type="text" id="noteInput_' + i + '" value="' + (m.note || '').replace(/"/g, '&quot;') + '" placeholder="비고 입력">';
         html += '<button class="btn-shot-save" onclick="saveNoteFromPopup(\'' + m.id + '\',' + i + ')">저장</button>';
         html += '</div>';
+        } // isMonitor 끝
 
         // ── 최근 상태변경 이력 ──
         html += '<div class="modal-section-title">📋 최근 상태 변경 이력</div>';
@@ -1357,6 +1363,8 @@ var stockInTargetAddress = '';
 var stockInTargetMold = null;
 
 function showStockInModal(address) {
+    // 모니터 계정은 입고 불가
+    try { var uc = JSON.parse(sessionStorage.getItem('userInfo') || '{}'); if (uc.process === '모니터') return; } catch(e) {}
     stockInTargetAddress = address;
     stockInTargetMold = null;
     document.getElementById('stockInAddress').textContent = address;

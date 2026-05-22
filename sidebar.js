@@ -6,6 +6,53 @@ function initSidebar() {
     var page = location.pathname.split('/').pop() || 'index.html';
     var hash = location.hash;
 
+    // 모니터 계정 감지
+    var isMonitor = false;
+    try {
+        var cached = sessionStorage.getItem('userInfo');
+        if (cached) {
+            var uInfo = JSON.parse(cached);
+            if (uInfo && uInfo.process === '모니터') isMonitor = true;
+        }
+    } catch(e) {}
+
+    // 모니터 모드: 사이드바 숨기고, 메인 영역 전체 사용
+    if (isMonitor) {
+        var nav = document.getElementById('sidebar-nav');
+        if (nav) nav.style.display = 'none';
+        // 메인 영역 마진 제거
+        var mainEl = document.querySelector('.main');
+        if (mainEl) { mainEl.style.marginLeft = '0'; }
+
+        // 헤더바는 로고 + 사용자 + 로그아웃만
+        var headerEl = document.getElementById('top-header');
+        if (headerEl) {
+            var now = new Date();
+            var days = ['일','월','화','수','목','금','토'];
+            var dateStr = now.getFullYear() + '년 ' + (now.getMonth()+1) + '월 ' + now.getDate() + '일 (' + days[now.getDay()] + ')';
+            var avatar = uInfo.name ? uInfo.name.charAt(0) : '?';
+
+            headerEl.innerHTML =
+                '<div class="top-header-left">' +
+                    '<img class="top-header-logo" src="hkht_logo.png" alt="HKHT">' +
+                    '<div class="top-header-divider"></div>' +
+                    '<div class="top-header-title">금형 적치대 현황</div>' +
+                '</div>' +
+                '<div class="top-header-right">' +
+                    '<div class="top-header-date">' + dateStr + '</div>' +
+                    '<div class="top-header-user">' +
+                        '<div class="top-header-avatar">' + avatar + '</div>' +
+                        '<div class="top-header-uinfo">' +
+                            '<div class="top-header-uname">' + (uInfo.name || '-') + '</div>' +
+                            '<div class="top-header-urole">현장 모니터</div>' +
+                        '</div>' +
+                        '<button class="top-header-logout" onclick="logout()">로그아웃</button>' +
+                    '</div>' +
+                '</div>';
+        }
+        return; // 사이드바 렌더링 스킵
+    }
+
     // 금형관리 페이지 여부
     var isMoldPage = ['mold_dashboard.html','mold_layout.html','mold_detail.html','mold_history.html'].indexOf(page) !== -1;
 
