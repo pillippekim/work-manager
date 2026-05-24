@@ -47,9 +47,14 @@ table.data-table tr.row-danger { background:#fee2e2; }
 .shot-bar-fill { height:100%; border-radius:4px; transition:width 0.5s; }
 .shot-pct { font-size:11px; font-weight:600; min-width:35px; }
 
-/* 행 액션 (타발수 버튼) */
-.btn-row-shot { background:#2563eb; color:#fff; border:none; padding:5px 14px; border-radius:5px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
+/* 행 액션 버튼 — 타발수 스타일 기준 통일 */
+.row-actions { display:flex; gap:6px; }
+.btn-row-shot { background:#2563eb; color:#fff; border:none; padding:5px 14px; border-radius:5px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; font-family:inherit; }
 .btn-row-shot:hover { background:#1d4ed8; }
+.btn-row-edit { background:#d97706; color:#fff; border:none; padding:5px 14px; border-radius:5px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; font-family:inherit; }
+.btn-row-edit:hover { background:#b45309; }
+.btn-row-del { background:#dc2626; color:#fff; border:none; padding:5px 14px; border-radius:5px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; font-family:inherit; }
+.btn-row-del:hover { background:#b91c1c; }
 
 /* 폼 (모달 안) */
 .form-group { margin-bottom:14px; }

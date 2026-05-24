@@ -6,20 +6,17 @@
 <title>금형 대시보드 - HKHT</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="common.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Noto Sans KR','Pretendard',sans-serif; background:#f1f3f9; color:#1e293b; }
-
-.container { padding:20px 24px; max-width:1200px; }
+/* ── mold_dashboard 고유 스타일 ── */
 .section-title { font-size:15px; font-weight:700; color:#1e293b; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
 
-/* ===== 상단 3칸 ===== */
+/* 상단 3칸 */
 .top-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:20px; }
-.card { background:#fff; border-radius:14px; padding:18px; box-shadow:0 1px 4px rgba(0,0,0,0.08); }
 .card h4 { font-size:14px; font-weight:700; color:#475569; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
 
-/* 알람/이력/수리 공통 */
+/* 알람/이력/수리 */
 .alert-empty { text-align:center; padding:24px; color:#94a3b8; font-size:13px; }
 .alert-item { display:flex; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9; }
 .alert-item:last-child { border-bottom:none; }
@@ -28,36 +25,28 @@ body { font-family:'Noto Sans KR','Pretendard',sans-serif; background:#f1f3f9; c
 .alert-item-title { font-size:13px; font-weight:600; }
 .alert-item-sub { font-size:11px; color:#64748b; margin-top:1px; }
 .alert-item-pct { font-size:13px; font-weight:700; min-width:40px; text-align:right; }
-
-/* 상태변경이력 */
 .history-item { display:flex; align-items:center; padding:7px 0; border-bottom:1px solid #f1f5f9; gap:8px; }
 .history-item:last-child { border-bottom:none; }
 .history-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 .history-text { flex:1; font-size:12px; font-weight:600; }
 .history-date { font-size:11px; color:#94a3b8; flex-shrink:0; white-space:nowrap; }
-
-/* 수리중 금형 */
 .repair-item { display:flex; align-items:center; padding:6px 0; border-bottom:1px solid #f1f5f9; font-size:13px; }
 .repair-item:last-child { border-bottom:none; }
 
-/* ===== 기간 필터 ===== */
+/* 기간 필터 */
 .period-filter { display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap; background:#fff; padding:12px 16px; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
 .period-filter label { font-size:13px; font-weight:700; color:#475569; white-space:nowrap; }
-.period-filter input[type="date"] { padding:7px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; outline:none; }
+.period-filter input[type="date"] { padding:7px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; outline:none; font-family:inherit; }
 .period-filter input[type="date"]:focus { border-color:#243bb2; box-shadow:0 0 0 3px rgba(36,59,178,0.15); }
-.btn-period { padding:7px 14px; border:1px solid #d1d5db; background:#fff; color:#555; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; transition:all 0.15s; }
-.btn-period:hover { border-color:#243bb2; color:#243bb2; }
-.btn-period.active { background:#eef0ff; color:#243bb2; border-color:#243bb2; }
-.btn-period-search { padding:7px 18px; background:#243bb2; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.btn-period-search { padding:7px 18px; background:#243bb2; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; font-family:inherit; }
 .btn-period-search:hover { background:#1e32a0; }
 
-/* ===== 이력 탭 섹션 ===== */
+/* 이력 탭 */
 .tabs { display:flex; gap:0; border-bottom:2px solid #e2e8f0; background:#fff; border-radius:10px 10px 0 0; margin-bottom:0; }
 .tab { padding:12px 24px; font-size:14px; font-weight:600; color:#64748b; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; white-space:nowrap; transition:all 0.2s; }
 .tab.active { color:#243bb2; border-bottom-color:#243bb2; }
 .tab:hover { color:#243bb2; }
 .tab .badge-count { display:inline-block; background:#ef4444; color:#fff; font-size:10px; padding:1px 6px; border-radius:10px; margin-left:4px; vertical-align:top; }
-
 .tab-content { display:none; }
 .tab-content.active { display:block; }
 
@@ -70,16 +59,6 @@ body { font-family:'Noto Sans KR','Pretendard',sans-serif; background:#f1f3f9; c
 .hist-stat-card.clickable:hover { border-color:#243bb2; transform:translateY(-2px); box-shadow:0 4px 12px rgba(36,59,178,0.15); }
 .hist-stat-card.clickable.selected { border-color:#243bb2; background:#f0f3ff; }
 
-/* 이력 도구모음 */
-.toolbar { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; align-items:center; }
-.search-input { flex:1; min-width:180px; padding:9px 14px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none; }
-.search-input:focus { border-color:#243bb2; box-shadow:0 0 0 3px rgba(36,59,178,0.15); }
-.btn-primary { background:#243bb2; color:#fff; border:none; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
-.btn-primary:hover { background:#1e32a0; }
-.btn-success { background:#16a34a; color:#fff; border:none; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
-.btn-success:hover { background:#15803d; }
-.filter-select { padding:9px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; outline:none; background:#fff; }
-
 /* 이력 테이블 */
 table.dt { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.08); font-size:13px; }
 table.dt thead { background:#f8fafc; }
@@ -87,49 +66,31 @@ table.dt th { padding:10px 8px; text-align:left; font-weight:600; color:#475569;
 table.dt td { padding:9px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
 table.dt tr:hover { background:#f8fafc; }
 
-/* 상태배지 */
-.badge { padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+/* 상태배지 (이력 전용) */
 .badge-pending { background:#fee2e2; color:#991b1b; }
 .badge-progress { background:#fef3c7; color:#92400e; }
 .badge-completed { background:#dcfce7; color:#166534; }
 
 /* 행 버튼 */
-.btn-sm { padding:4px 10px; border:none; border-radius:5px; font-size:11px; cursor:pointer; font-weight:600; }
 .btn-complete { background:#16a34a; color:#fff; }
 .btn-complete:hover { background:#15803d; }
 .btn-edit { background:#d97706; color:#fff; }
 .btn-edit:hover { background:#b45309; }
 
-/* 모달 */
-.modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; }
-.modal-overlay.show { display:flex; }
-.modal-content { background:#fff; border-radius:14px; padding:24px; max-width:520px; width:92%; max-height:85vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
-.modal-content h3 { font-size:18px; color:#243bb2; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; }
-.modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:#94a3b8; }
-.modal-close:hover { color:#1e293b; }
-.form-group { margin-bottom:12px; }
+/* 폼 (모달 안) */
 .form-group label { display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:4px; }
-.form-group input, .form-group select, .form-group textarea { width:100%; padding:9px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none; }
+.form-group input, .form-group select, .form-group textarea { width:100%; padding:9px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; outline:none; font-family:inherit; }
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color:#243bb2; box-shadow:0 0 0 3px rgba(36,59,178,0.15); }
-.form-row { display:flex; gap:12px; }
-.form-row .form-group { flex:1; }
-.btn-submit { width:100%; padding:12px; background:#243bb2; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; margin-top:8px; }
+.form-row-inline { display:flex; gap:12px; }
+.form-row-inline .form-group { flex:1; }
+.btn-submit { width:100%; padding:12px; background:#243bb2; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; margin-top:8px; font-family:inherit; }
 .btn-submit:hover { background:#1e32a0; }
-
-/* 토스트 */
-.toast { position:fixed; top:70px; right:16px; padding:12px 20px; border-radius:8px; color:#fff; font-size:14px; font-weight:600; z-index:300; opacity:0; transform:translateY(-10px); transition:all 0.3s; }
-.toast.show { opacity:1; transform:translateY(0); }
-.toast-success { background:#16a34a; }
-.toast-error { background:#dc2626; }
-
-.empty-msg { text-align:center; padding:40px; color:#94a3b8; font-size:14px; }
-.loading { text-align:center; padding:30px; color:#64748b; font-size:13px; }
 
 .card-list { max-height:300px; overflow-y:auto; }
 
 @media(max-width:768px) {
     .top-row { grid-template-columns:1fr; }
-    .form-row { flex-direction:column; gap:0; }
+    .form-row-inline { flex-direction:column; gap:0; }
     .tab { padding:10px 14px; font-size:13px; }
     table.dt { font-size:11px; }
     .period-filter { gap:6px; }
@@ -145,6 +106,16 @@ table.dt tr:hover { background:#f8fafc; }
 <nav id="sidebar-nav" class="sidebar"></nav>
 
 <div class="main">
+
+<div class="page-header">
+    <div class="header-row">
+        <div>
+            <h1>📊 대시보드 / 이력</h1>
+            <div class="sub">금형 유지보수 알람, 상태 변경 이력, 손상·세척·수리 관리</div>
+        </div>
+    </div>
+</div>
+
 <div class="container">
 
 <!-- ========== 상단 3칸: 유지보수알람 / 수리중금형 / 상태변경이력 ========== -->
