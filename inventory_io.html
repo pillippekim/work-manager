@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>입출고 관리 - 업무포탈</title>
+  <link rel="stylesheet" href="sidebar.css">
+  <link rel="stylesheet" href="common.css">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+  <style>
+    .io-container { max-width: 1300px; margin: 0 auto; padding: 20px; }
+
+    /* 우측 상단 고정 버튼 */
+    .top-actions {
+      position: fixed; top: 12px; right: 20px; z-index: 1000;
+      display: flex; gap: 8px;
+    }
+    .top-btn {
+      padding: 10px 18px; border-radius: 6px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.2s;
+    }
+    .top-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    .top-btn.home { background: #3d5a80; color: #fff; }
+    .top-btn.layout { background: #4A90D9; color: #fff; }
+
+    /* 메인 탭 */
+    .io-tabs {
+      display: flex; gap: 0; margin-bottom: 24px; border-bottom: 3px solid #eee;
+    }
+    .io-tab {
+      padding: 14px 28px; font-size: 14px; font-weight: 600; color: #999;
+      cursor: pointer; border-bottom: 3px solid transparent;
+      margin-bottom: -3px; transition: all 0.2s;
+    }
+    .io-tab:hover { color: #555; }
+    .io-tab.active { color: #4A90D9; border-bottom-color: #4A90D9; }
+    .io-tab .tab-badge {
+      display: inline-block; background: #E74C3C; color: #fff;
+      font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px;
+      margin-left: 6px; min-width: 18px; text-align: center;
+    }
+
+    /* 통계 카드 */
+    .io-stats {
+      display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .io-stat {
+      flex: 1; min-width: 130px; background: #fff; border-radius: 10px;
+      padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      border-left: 4px solid #4A90D9;
+    }
+    .io-stat .is-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+    .io-stat .is-value { font-size: 24px; font-weight: 700; color: #1a1a2e; }
+    .io-stat.green { border-left-color: #27AE60; }
+    .io-stat.orange { border-left-color: #F39C12; }
+    .io-stat.red { border-left-color: #E74C3C; }
+    .io-stat.purple { border-left-color: #9B59B6; }
+
+    /* 필터/검색 바 */
+    .filter-bar {
+      display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;
+    }
+    .filter-bar input, .filter-bar select {
+      padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 6px;
+      font-size: 13px;
+    }
+    .filter-bar input:focus, .filter-bar select:focus { border-color: #4A90D9; outline: none; }
+    .filter-bar .btn-filter {
+      padding: 8px 16px; border-radius: 6px; border: none;
+      background: #4A90D9; color: #fff; font-size: 13px; font-weight: 600;
+      cursor: pointer;
+    }
+    .filter-bar .btn-secondary {
+      padding: 8px 16px; border-radius: 6px; border: 1.5px solid #ddd;
+      background: #fff; color: #555; font-size: 13px; font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* 데이터 테이블 */
+    .data-table-wrap { overflow-x: auto; margin-bottom: 20px; }
+    .data-table {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+    }
+    .data-table th {
+      background: #f5f5f5; padding: 10px 8px; text-align: left;
+      font-weight: 600; color: #555; border-bottom: 2px solid #ddd;
+      white-space: nowrap;
+    }
+    .data-table td {
+      padding: 8px; border-bottom: 1px solid #eee; vertical-align: middle;
+    }
+    .data-table tr:hover { background: #f9f9f9; }
+    .data-table .qty-cell { text-align: right; font-weight: 600; }
+
+    /* 상태 배지 */
+    .status-badge {
+      display: inline-block; padding: 2px 10px; border-radius: 10px;
+      font-size: 11px; font-weight: 600;
+    }
+    .status-badge.waiting { background: #fff3e0; color: #E65100; }
+    .status-badge.stocked { background: #e8f5e9; color: #2E7D32; }
+    .status-badge.shipped { background: #e3f2fd; color: #1565C0; }
+    .status-badge.matched { background: #e8f5e9; color: #2E7D32; }
+    .status-badge.partial { background: #fff3e0; color: #E65100; }
+    .status-badge.unmatched { background: #ffebee; color: #C62828; }
+
+    /* 행 액션 버튼 */
+    .row-btn {
+      padding: 4px 10px; border-radius: 4px; border: none;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+    }
+    .row-btn.inbound { background: #4A90D9; color: #fff; }
+    .row-btn.inbound:hover { background: #3a7bc8; }
+
+    /* 업로드 영역 */
+    .upload-area {
+      border: 2px dashed #ccc; border-radius: 12px; padding: 40px 20px;
+      text-align: center; cursor: pointer; transition: all 0.2s; background: #fafafa;
+    }
+    .upload-area:hover { border-color: #4A90D9; background: #f0f6ff; }
+    .upload-area.dragover { border-color: #4A90D9; background: #e8f0fe; }
+    .upload-icon { font-size: 40px; margin-bottom: 10px; }
+    .upload-text { font-size: 14px; color: #555; margin-bottom: 4px; }
+    .upload-sub { font-size: 12px; color: #aaa; }
+    .upload-area input[type="file"] { display: none; }
+
+    /* 수동 입고 폼 */
+    .manual-form {
+      background: #fff; border-radius: 10px; padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px;
+    }
+    .form-title { font-size: 15px; font-weight: 700; color: #1a1a2e; margin-bottom: 16px; }
+    .form-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .form-group { flex: 1; min-width: 150px; }
+    .form-group label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; font-weight: 600; }
+    .form-group input, .form-group select {
+      width: 100%; padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 6px;
+      font-size: 14px; box-sizing: border-box;
+    }
+    .form-group input:focus, .form-group select:focus { border-color: #4A90D9; outline: none; }
+
+    /* 액션 버튼 */
+    .action-bar {
+      display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap;
+    }
+    .action-btn {
+      padding: 12px 28px; border-radius: 8px; border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .action-btn:hover { transform: translateY(-1px); }
+    .action-btn.primary { background: #4A90D9; color: #fff; }
+    .action-btn.danger { background: #E74C3C; color: #fff; }
+    .action-btn.success { background: #27AE60; color: #fff; }
+    .action-btn.secondary { background: #f5f5f5; color: #666; border: 1px solid #ddd; }
+    .action-btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+
+    /* 모달 */
+    .modal-overlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-box {
+      background: #fff; border-radius: 12px; padding: 24px; width: 90%; max-width: 500px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2); max-height: 80vh; overflow-y: auto;
+    }
+    .modal-title { font-size: 18px; font-weight: 700; color: #1a1a2e; margin-bottom: 16px; }
+
+    /* 매칭 결과 카드 */
+    .match-summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .match-card {
+      flex: 1; min-width: 100px; background: #fff; border-radius: 8px;
+      padding: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); text-align: center;
+    }
+    .match-card .mc-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+    .match-card .mc-value { font-size: 20px; font-weight: 700; }
+    .match-card .mc-value.blue { color: #4A90D9; }
+    .match-card .mc-value.green { color: #27AE60; }
+    .match-card .mc-value.red { color: #E74C3C; }
+    .match-card .mc-value.orange { color: #F39C12; }
+
+    /* 파일 정보 */
+    .file-info {
+      background: #e8f5e9; border-radius: 8px; padding: 12px 16px;
+      display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+    }
+    .file-info .file-name { font-size: 14px; font-weight: 600; color: #2E7D32; }
+    .file-info .file-detail { font-size: 12px; color: #666; }
+    .file-info .btn-remove {
+      margin-left: auto; background: none; border: none; color: #999;
+      cursor: pointer; font-size: 16px;
+    }
+
+    /* 완료 영역 */
+    .complete-area { text-align: center; padding: 40px 20px; }
+    .complete-icon { font-size: 56px; margin-bottom: 12px; }
+    .complete-title { font-size: 20px; font-weight: 700; color: #27AE60; margin-bottom: 8px; }
+    .complete-sub { font-size: 13px; color: #888; }
+
+    /* 토스트/로딩 */
+    .toast-msg {
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+      background: #333; color: #fff; padding: 12px 24px; border-radius: 8px;
+      font-size: 14px; z-index: 99999; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .toast-msg.show { display: block; }
+    .loading-overlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.4); z-index: 9999; justify-content: center; align-items: center;
+    }
+    .loading-overlay.show { display: flex; }
+    .loading-box { background: #fff; border-radius: 12px; padding: 30px 40px; text-align: center; }
+    .loading-box .spinner {
+      width: 40px; height: 40px; border: 4px solid #eee; border-top-color: #4A90D9;
+      border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-msg { text-align: center; color: #aaa; padding: 50px 20px; font-size: 14px; }
+
+    @media (max-width: 768px) {
+      .io-container { padding: 12px; }
+      .io-tabs { overflow-x: auto; }
+      .io-tab { padding: 10px 16px; font-size: 13px; white-space: nowrap; }
+      .io-stats { gap: 8px; }
+      .io-stat { min-width: 100px; padding: 12px; }
+      .io-stat .is-value { font-size: 20px; }
+      .form-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div id="sidebar"></div>
+
+  <div class="top-actions">
+    <button class="top-btn home" onclick="location.href='index.html'">&#127968; 메인으로</button>
+    <button class="top-btn layout" onclick="location.href='inventory_layout.html'">&#9664; 적재대 현황</button>
+  </div>
+
+  <main>
+    <div class="page-header">
+      <h1 class="page-title">입출고 관리</h1>
+      <p class="page-desc">입고대기 처리 및 이카운트 출하 데이터 기반 출고 관리</p>
+    </div>
+
+    <div class="io-container">
+      <!-- 탭 -->
+      <div class="io-tabs">
+        <div class="io-tab active" onclick="switchTab('waiting')" id="tabWaiting">입고대기 <span class="tab-badge" id="waitingCount">0</span></div>
+        <div class="io-tab" onclick="switchTab('register')" id="tabRegister">입고등록</div>
+        <div class="io-tab" onclick="switchTab('outbound')" id="tabOutbound">출고처리</div>
+        <div class="io-tab" onclick="switchTab('history')" id="tabHistory">처리이력</div>
+      </div>
+
+      <!-- 컨텐츠 -->
+      <div id="tabContent"></div>
+    </div>
+  </main>
+
+  <!-- 입고 모달 -->
+  <div class="modal-overlay" id="inboundModal">
+    <div class="modal-box" id="inboundModalBody"></div>
+  </div>
+
+  <!-- 로딩/토스트 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-box"><div class="spinner"></div><div id="loadingText">처리 중...</div></div>
+  </div>
+  <div class="toast-msg" id="toastMsg"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="sidebar.js"></script>
+  <script src="auth_guard.js"></script>
+  <script>
+    var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+    var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+    var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    var currentTab = 'waiting';
+    var waitingLots = [];
+    var allRacks = [];
+    var allSlots = [];
+    var parsedRows = [];
+    var matchResults = [];
+    var uploadedFile = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof checkAuth === 'function') { checkAuth(); }
+      loadInitialData();
+    });
+
+    function loadInitialData() {
+      Promise.all([
+        supabase.from('inventory_lots').select('*').eq('status', 'waiting').order('created_at'),
+        supabase.from('inventory_racks').select('*').eq('active', true).order('sort_order'),
+        supabase.from('inventory_rack_slots').select('*, inventory_racks(rack_name)').order('rack_id').order('row_no').order('col_no')
+      ]).then(function(res) {
+        waitingLots = res[0].data || [];
+        allRacks = res[1].data || [];
+        allSlots = res[2].data || [];
+        document.getElementById('waitingCount').textContent = waitingLots.length;
+        renderCurrentTab();
+      });
+    }
+
+    // ── 탭 전환 ──
+    function switchTab(tab) {
+      currentTab = tab;
+      var tabs = document.querySelectorAll('.io-tab');
+      for (var i = 0; i < tabs.length; i++) { tabs[i].className = 'io-tab'; }
+      document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).className = 'io-tab active';
+      renderCurrentTab();
+    }
+
+    function renderCurrentTab() {
+      if (currentTab === 'waiting') renderWaiting();
+      else if (currentTab === 'register') renderRegister();
+      else if (currentTab === 'outbound') renderOutbound();
+      else if (currentTab === 'history') renderHistory();
+    }
+
+    // ══════════════════════════════════════
+    // TAB 1: 입고대기
+    // ══════════════════════════════════════
+    function renderWaiting() {
+      var h = '';
+
+      // 통계
+      var totalWaiting = waitingLots.length;
+      var totalQty = 0;
+      for (var i = 0; i < waitingLots.length; i++) { totalQty += waitingLots[i].quantity || 0; }
+
+      h += '<div class="io-stats">';
+      h += '<div class="io-stat orange"><div class="is-label">입고대기</div><div class="is-value">' + totalWaiting + '건</div></div>';
+      h += '<div class="io-stat"><div class="is-label">대기 수량</div><div class="is-value">' + totalQty.toLocaleString() + '</div></div>';
+      h += '</div>';
+
+      if (waitingLots.length === 0) {
+        h += '<div class="empty-msg">입고대기 항목이 없습니다</div>';
+        document.getElementById('tabContent').innerHTML = h;
+        return;
+      }
+
+      // 테이블
+      h += '<div class="data-table-wrap"><table class="data-table">';
+      h += '<thead><tr><th>No</th><th>사번</th><th>제품명</th><th>LOT</th>';
+      h += '<th style="text-align:right">수량</th><th>등록일</th><th>출처</th><th>처리</th></tr></thead><tbody>';
+
+      for (var j = 0; j < waitingLots.length; j++) {
+        var lot = waitingLots[j];
+        h += '<tr>';
+        h += '<td>' + (j + 1) + '</td>';
+        h += '<td><strong>' + (lot.product_code || '-') + '</strong></td>';
+        h += '<td>' + (lot.product_name || '-') + '</td>';
+        h += '<td>' + (lot.lot_no || '-') + '</td>';
+        h += '<td class="qty-cell">' + (lot.quantity || 0).toLocaleString() + '</td>';
+        h += '<td>' + (lot.created_at ? lot.created_at.slice(0, 10) : '-') + '</td>';
+        h += '<td>' + (lot.source_type || '-') + '</td>';
+        h += '<td><button class="row-btn inbound" onclick="openInboundModal(' + lot.id + ')">입고처리</button></td>';
+        h += '</tr>';
+      }
+      h += '</tbody></table></div>';
+
+      document.getElementById('tabContent').innerHTML = h;
+    }
+
+    // ── 입고처리 모달 ──
+    function openInboundModal(lotId) {
+      var lot = null;
+      for (var i = 0; i < waitingLots.length; i++) {
+        if (waitingLots[i].id === lotId) { lot = waitingLots[i]; break; }
+      }
+      if (!lot) return;
+
+      // 빈 슬롯 목록
+      var emptySlots = [];
+      for (var s = 0; s < allSlots.length; s++) {
+        if (allSlots[s].status === 'empty') {
+          emptySlots.push(allSlots[s]);
+        }
+      }
+
+      var h = '';
+      h += '<div class="modal-title">입고처리 - ' + (lot.product_code || '-') + '</div>';
+      h += '<div class="form-row">';
+      h += '<div class="form-group"><label>사번</label><input type="text" value="' + (lot.product_code || '') + '" disabled></div>';
+      h += '<div class="form-group"><label>수량</label><input type="text" value="' + (lot.quantity || 0).toLocaleString() + '" disabled></div>';
+      h += '</div>';
+      h += '<div class="form-row">';
+      h += '<div class="form-group"><label>LOT</label><input type="text" value="' + (lot.lot_no || '') + '" disabled></div>';
+      h += '<div class="form-group"><label>제품명</label><input type="text" value="' + (lot.product_name || '') + '" disabled></div>';
+      h += '</div>';
+
+      h += '<hr style="margin:16px 0;border:none;border-top:1px solid #eee;">';
+      h += '<div class="form-title">랙 주소 배정</div>';
+
+      // 동 선택
+      h += '<div class="form-row">';
+      h += '<div class="form-group"><label>동 선택</label>';
+      h += '<select id="modalRack" onchange="updateSlotOptions()">';
+      h += '<option value="">-- 동 선택 --</option>';
+      for (var r = 0; r < allRacks.length; r++) {
+        h += '<option value="' + allRacks[r].id + '">' + allRacks[r].rack_name + '</option>';
+      }
+      h += '</select></div>';
+
+      // 슬롯 선택
+      h += '<div class="form-group"><label>슬롯 선택</label>';
+      h += '<select id="modalSlot"><option value="">-- 먼저 동을 선택 --</option></select></div>';
+      h += '</div>';
+
+      h += '<div class="action-bar" style="margin-top:20px;">';
+      h += '<button class="action-btn secondary" onclick="closeInboundModal()">취소</button>';
+      h += '<button class="action-btn success" onclick="processInbound(' + lotId + ')">입고 확정</button>';
+      h += '</div>';
+
+      document.getElementById('inboundModalBody').innerHTML = h;
+      document.getElementById('inboundModal').className = 'modal-overlay show';
+    }
+
+    function updateSlotOptions() {
+      var rackId = parseInt(document.getElementById('modalRack').value);
+      var sel = document.getElementById('modalSlot');
+      sel.innerHTML = '<option value="">-- 슬롯 선택 --</option>';
+      if (!rackId) return;
+
+      for (var i = 0; i < allSlots.length; i++) {
+        var s = allSlots[i];
+        if (s.rack_id === rackId && s.status === 'empty') {
+          var rn = s.inventory_racks ? s.inventory_racks.rack_name : '';
+          var opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.slot_code + ' (빈 슬롯)';
+          sel.appendChild(opt);
+        }
+      }
+    }
+
+    function processInbound(lotId) {
+      var rackId = parseInt(document.getElementById('modalRack').value);
+      var slotId = parseInt(document.getElementById('modalSlot').value);
+      if (!rackId) { showToast('동을 선택해주세요'); return; }
+      if (!slotId) { showToast('슬롯을 선택해주세요'); return; }
+
+      var lot = null;
+      for (var i = 0; i < waitingLots.length; i++) {
+        if (waitingLots[i].id === lotId) { lot = waitingLots[i]; break; }
+      }
+      if (!lot) return;
+
+      var slot = null;
+      for (var j = 0; j < allSlots.length; j++) {
+        if (allSlots[j].id === slotId) { slot = allSlots[j]; break; }
+      }
+      if (!slot) return;
+
+      showLoading('입고 처리 중...');
+
+      // 1. LOT 상태 업데이트
+      var lotUpdate = supabase.from('inventory_lots').update({
+        status: 'stocked',
+        location_type: 'rack',
+        rack_id: rackId,
+        slot_code: slot.slot_code,
+        stocked_at: new Date().toISOString()
+      }).eq('id', lotId);
+
+      // 2. 슬롯 업데이트
+      var slotUpdate = supabase.from('inventory_rack_slots').update({
+        product_code: lot.product_code,
+        lot_no: lot.lot_no,
+        quantity: lot.quantity,
+        status: 'occupied'
+      }).eq('id', slotId);
+
+      // 3. 이동이력
+      var rackName = '';
+      for (var r = 0; r < allRacks.length; r++) {
+        if (allRacks[r].id === rackId) { rackName = allRacks[r].rack_name; break; }
+      }
+      var movement = supabase.from('inventory_movements').insert({
+        lot_id: lotId,
+        product_code: lot.product_code,
+        movement_type: 'inbound',
+        to_location: rackName + '-' + slot.slot_code,
+        quantity: lot.quantity,
+        lot_no: lot.lot_no,
+        reason: '입고대기 → 입고완료',
+        moved_by: 'system'
+      });
+
+      Promise.all([lotUpdate, slotUpdate, movement]).then(function(results) {
+        hideLoading();
+        if (results[0].error) { showToast('LOT 업데이트 오류'); return; }
+        if (results[1].error) { showToast('슬롯 업데이트 오류'); return; }
+        showToast('입고 완료! (' + rackName + '-' + slot.slot_code + ')');
+        closeInboundModal();
+        loadInitialData();
+      });
+    }
+
+    function closeInboundModal() {
+      document.getElementById('inboundModal').className = 'modal-overlay';
+    }
+
+    // ══════════════════════════════════════
+    // TAB 2: 입고등록
+    // ══════════════════════════════════════
+    function renderRegister() {
+      var h = '';
+
+      // 수동 입력
+      h += '<div class="manual-form">';
+      h += '<div class="form-title">수동 입고대기 등록</div>';
+      h += '<div class="form-row">';
+      h += '<div class="form-group"><label>사번 *</label><input type="text" id="regProductCode" placeholder="제품 사번"></div>';
+      h += '<div class="form-group"><label>제품명</label><input type="text" id="regProductName" placeholder="제품명 (선택)"></div>';
+      h += '</div>';
+      h += '<div class="form-row">';
+      h += '<div class="form-group"><label>LOT 번호 *</label><input type="text" id="regLotNo" placeholder="LOT 번호"></div>';
+      h += '<div class="form-group"><label>수량 *</label><input type="number" id="regQty" placeholder="수량" min="1"></div>';
+      h += '</div>';
+      h += '<div class="form-row">';
+      h += '<div class="form-group"><label>생산일</label><input type="date" id="regProducedAt"></div>';
+      h += '<div class="form-group"><label>비고</label><input type="text" id="regNote" placeholder="비고 (선택)"></div>';
+      h += '</div>';
+      h += '<div class="action-bar" style="justify-content:flex-end;">';
+      h += '<button class="action-btn primary" onclick="registerManual()">입고대기 등록</button>';
+      h += '</div>';
+      h += '</div>';
+
+      // 엑셀 업로드
+      h += '<div class="manual-form">';
+      h += '<div class="form-title">엑셀 일괄 등록</div>';
+      h += '<div class="upload-area" id="regUploadArea" onclick="document.getElementById(\'regFileInput\').click()">';
+      h += '<input type="file" id="regFileInput" accept=".xlsx,.xls,.csv" onchange="handleRegFile(event)">';
+      h += '<div class="upload-icon">📋</div>';
+      h += '<div class="upload-text">입고 목록 엑셀 파일 업로드</div>';
+      h += '<div class="upload-sub">사번, LOT, 수량 컬럼이 포함된 파일 (.xlsx/.csv)</div>';
+      h += '</div>';
+      h += '</div>';
+
+      document.getElementById('tabContent').innerHTML = h;
+    }
+
+    function registerManual() {
+      var productCode = document.getElementById('regProductCode').value.trim();
+      var productName = document.getElementById('regProductName').value.trim();
+      var lotNo = document.getElementById('regLotNo').value.trim();
+      var qty = parseInt(document.getElementById('regQty').value) || 0;
+      var producedAt = document.getElementById('regProducedAt').value || null;
+      var note = document.getElementById('regNote').value.trim();
+
+      if (!productCode) { showToast('사번을 입력해주세요'); return; }
+      if (!lotNo) { showToast('LOT 번호를 입력해주세요'); return; }
+      if (qty <= 0) { showToast('수량을 입력해주세요'); return; }
+
+      showLoading('등록 중...');
+
+      supabase.from('inventory_lots').insert({
+        product_code: productCode,
+        product_name: productName,
+        lot_no: lotNo,
+        quantity: qty,
+        initial_quantity: qty,
+        status: 'waiting',
+        source_type: 'manual',
+        produced_at: producedAt,
+        note: note,
+        created_by: 'system'
+      }).then(function(res) {
+        hideLoading();
+        if (res.error) { showToast('등록 오류: ' + res.error.message); return; }
+        showToast('입고대기 등록 완료!');
+        loadInitialData();
+        switchTab('waiting');
+      });
+    }
+
+    function handleRegFile(e) {
+      if (e.target.files.length === 0) return;
+      var file = e.target.files[0];
+      showLoading('파일 읽는 중...');
+
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          var data = new Uint8Array(ev.target.result);
+          var wb = XLSX.read(data, { type: 'array' });
+          var ws = wb.Sheets[wb.SheetNames[0]];
+          var rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+          if (rows.length === 0) { hideLoading(); showToast('데이터가 없습니다'); return; }
+
+          var inserts = [];
+          for (var i = 0; i < rows.length; i++) {
+            var r = rows[i];
+            var pc = String(r['사번'] || r['product_code'] || r['사번번호'] || '').trim();
+            var pn = String(r['제품명'] || r['product_name'] || r['품목명'] || '').trim();
+            var ln = String(r['LOT'] || r['lot_no'] || r['LOT번호'] || '').trim();
+            var q = parseInt(r['수량'] || r['quantity'] || r['입고수량'] || 0);
+            if (!pc || q <= 0) continue;
+
+            inserts.push({
+              product_code: pc,
+              product_name: pn,
+              lot_no: ln,
+              quantity: q,
+              initial_quantity: q,
+              status: 'waiting',
+              source_type: 'excel',
+              created_by: 'system'
+            });
+          }
+
+          if (inserts.length === 0) { hideLoading(); showToast('유효한 데이터가 없습니다'); return; }
+
+          supabase.from('inventory_lots').insert(inserts).then(function(res) {
+            hideLoading();
+            if (res.error) { showToast('등록 오류: ' + res.error.message); return; }
+            showToast(inserts.length + '건 입고대기 등록 완료!');
+            loadInitialData();
+            switchTab('waiting');
+          });
+        } catch (err) {
+          hideLoading();
+          showToast('파일 오류: ' + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // ══════════════════════════════════════
+    // TAB 3: 출고처리
+    // ══════════════════════════════════════
+    function renderOutbound() {
+      var h = '';
+      h += '<div class="upload-area" id="outUploadArea" onclick="document.getElementById(\'outFileInput\').click()">';
+      h += '<input type="file" id="outFileInput" accept=".xlsx,.xls" onchange="handleOutFile(event)">';
+      h += '<div class="upload-icon">📤</div>';
+      h += '<div class="upload-text">이카운트 출하 엑셀 파일을 업로드하세요</div>';
+      h += '<div class="upload-sub">판매현황 Raw-Data (.xlsx) 파일을 드래그하거나 클릭하여 선택</div>';
+      h += '</div>';
+      document.getElementById('tabContent').innerHTML = h;
+
+      // 드래그앤드롭
+      var area = document.getElementById('outUploadArea');
+      area.addEventListener('dragover', function(e) { e.preventDefault(); area.classList.add('dragover'); });
+      area.addEventListener('dragleave', function() { area.classList.remove('dragover'); });
+      area.addEventListener('drop', function(e) {
+        e.preventDefault(); area.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) processOutFile(e.dataTransfer.files[0]);
+      });
+    }
+
+    function handleOutFile(e) {
+      if (e.target.files.length > 0) processOutFile(e.target.files[0]);
+    }
+
+    function processOutFile(file) {
+      if (!file.name.match(/\.xlsx?$/i)) { showToast('엑셀 파일만 가능합니다'); return; }
+      uploadedFile = file;
+      showLoading('파일 읽는 중...');
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var data = new Uint8Array(e.target.result);
+          var wb = XLSX.read(data, { type: 'array' });
+          var ws = wb.Sheets[wb.SheetNames[0]];
+          var jsonData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+          parseEcountData(jsonData);
+          hideLoading();
+          if (parsedRows.length === 0) { showToast('유효한 출하 데이터 없음'); return; }
+          renderOutPreview();
+        } catch (err) { hideLoading(); showToast('파일 오류: ' + err.message); }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function parseEcountData(jsonData) {
+      parsedRows = [];
+      var headerIdx = -1;
+      for (var i = 0; i < Math.min(jsonData.length, 10); i++) {
+        var firstCell = String(jsonData[i][0] || '');
+        if (firstCell.indexOf('일자') !== -1 || firstCell.indexOf('No') !== -1) { headerIdx = i; break; }
+      }
+      if (headerIdx === -1) headerIdx = 1;
+
+      for (var j = headerIdx + 1; j < jsonData.length; j++) {
+        var r = jsonData[j];
+        if (!r || r.length < 7) continue;
+        var dateVal = String(r[0] || '').trim();
+        var customer = String(r[1] || '').trim();
+        var dest = String(r[2] || '').trim();
+        var pc = String(r[3] || '').trim();
+        var ec = String(r[4] || '').trim();
+        var pn = String(r[5] || '').trim();
+        var qty = parseInt(r[6]) || 0;
+
+        if (dateVal.indexOf('계') !== -1 || customer.indexOf('계') !== -1 || customer === '총합계') continue;
+        if (!dateVal || !pc || qty <= 0) continue;
+
+        var shipDate = '', shipNo = '';
+        if (dateVal.indexOf('-') !== -1) {
+          var parts = dateVal.split('-');
+          shipDate = parts[0].trim().replace(/\//g, '-');
+          shipNo = parts.length > 1 ? parts[1].trim() : '';
+        } else { shipDate = dateVal.replace(/\//g, '-'); }
+
+        parsedRows.push({
+          ship_date: shipDate, ship_no: shipNo, customer: customer, destination: dest,
+          product_code: pc, ecount_code: ec, product_name: pn, quantity: qty,
+          unit_price: parseFloat(r[7]) || 0, supply_amount: parseFloat(r[8]) || 0,
+          vat: parseFloat(r[9]) || 0, total_amount: parseFloat(r[10]) || 0,
+          lot_no_record: String(r[11] || ''), remark1: String(r[12] || ''), remark2: String(r[13] || '')
+        });
+      }
+    }
+
+    function renderOutPreview() {
+      var h = '';
+      h += '<div class="file-info">';
+      h += '<div>📊</div><div><div class="file-name">' + uploadedFile.name + '</div>';
+      h += '<div class="file-detail">' + parsedRows.length + '건의 출하 데이터</div></div>';
+      h += '<button class="btn-remove" onclick="renderOutbound()">✕</button></div>';
+
+      var totalQty = 0;
+      for (var i = 0; i < parsedRows.length; i++) totalQty += parsedRows[i].quantity;
+
+      h += '<div class="match-summary">';
+      h += '<div class="match-card"><div class="mc-label">출하일</div><div class="mc-value blue">' + (parsedRows[0] ? parsedRows[0].ship_date : '-') + '</div></div>';
+      h += '<div class="match-card"><div class="mc-label">총 건수</div><div class="mc-value blue">' + parsedRows.length + '</div></div>';
+      h += '<div class="match-card"><div class="mc-label">총 수량</div><div class="mc-value orange">' + totalQty.toLocaleString() + '</div></div>';
+      h += '</div>';
+
+      h += '<div class="data-table-wrap"><table class="data-table"><thead><tr>';
+      h += '<th>No</th><th>거래처</th><th>사번</th><th>품목명</th><th style="text-align:right">수량</th><th>LOT기록</th>';
+      h += '</tr></thead><tbody>';
+      for (var j = 0; j < parsedRows.length; j++) {
+        var row = parsedRows[j];
+        h += '<tr><td>' + (j+1) + '</td><td>' + row.customer + '</td>';
+        h += '<td><strong>' + row.product_code + '</strong></td><td>' + row.product_name + '</td>';
+        h += '<td class="qty-cell">' + row.quantity.toLocaleString() + '</td><td>' + row.lot_no_record + '</td></tr>';
+      }
+      h += '</tbody></table></div>';
+
+      h += '<div class="action-bar">';
+      h += '<button class="action-btn secondary" onclick="renderOutbound()">다시 선택</button>';
+      h += '<button class="action-btn danger" onclick="doFifoProcess()">출고 처리 실행 (FIFO)</button>';
+      h += '</div>';
+
+      document.getElementById('tabContent').innerHTML = h;
+    }
+
+    function doFifoProcess() {
+      showLoading('FIFO 매칭 중...');
+
+      supabase.from('inventory_rack_slots').select('*, inventory_racks(rack_name)')
+        .eq('status', 'occupied').order('lot_no')
+        .then(function(res) {
+          var slots = res.data || [];
+          matchResults = [];
+          var matched = 0, partial = 0, unmatched = 0;
+
+          for (var i = 0; i < parsedRows.length; i++) {
+            var row = parsedRows[i];
+            var candidates = [];
+            for (var s = 0; s < slots.length; s++) {
+              if (slots[s].product_code === row.product_code && slots[s].quantity > 0) candidates.push(slots[s]);
+            }
+            candidates.sort(function(a, b) {
+              var la = a.lot_no || '999999', lb = b.lot_no || '999999';
+              return la < lb ? -1 : (la > lb ? 1 : 0);
+            });
+
+            var remain = row.quantity;
+            var ms = [];
+            for (var c = 0; c < candidates.length; c++) {
+              if (remain <= 0) break;
+              var sl = candidates[c];
+              var deduct = Math.min(remain, sl.quantity);
+              ms.push({ slot_id: sl.id, slot_code: sl.slot_code, rack_name: sl.inventory_racks ? sl.inventory_racks.rack_name : '-', lot_no: sl.lot_no, before_qty: sl.quantity, deduct_qty: deduct, after_qty: sl.quantity - deduct });
+              sl.quantity -= deduct;
+              remain -= deduct;
+            }
+
+            var st = 'unmatched';
+            if (remain === 0) { st = 'matched'; matched++; }
+            else if (remain < row.quantity) { st = 'partial'; partial++; }
+            else { unmatched++; }
+
+            matchResults.push({ row: row, matched_slots: ms, status: st, remain_qty: remain });
+          }
+
+          hideLoading();
+          renderFifoResults(matched, partial, unmatched);
+        });
+    }
+
+    function renderFifoResults(matched, partial, unmatched) {
+      var h = '';
+      h += '<div class="match-summary">';
+      h += '<div class="match-card"><div class="mc-label">전체</div><div class="mc-value blue">' + matchResults.length + '</div></div>';
+      h += '<div class="match-card"><div class="mc-label">매칭완료</div><div class="mc-value green">' + matched + '</div></div>';
+      h += '<div class="match-card"><div class="mc-label">부분매칭</div><div class="mc-value orange">' + partial + '</div></div>';
+      h += '<div class="match-card"><div class="mc-label">미매칭</div><div class="mc-value red">' + unmatched + '</div></div>';
+      h += '</div>';
+
+      h += '<div class="data-table-wrap"><table class="data-table"><thead><tr>';
+      h += '<th>No</th><th>사번</th><th>품목명</th><th style="text-align:right">요청</th>';
+      h += '<th style="text-align:right">매칭</th><th style="text-align:right">미매칭</th><th>상태</th><th>차감상세</th>';
+      h += '</tr></thead><tbody>';
+
+      for (var i = 0; i < matchResults.length; i++) {
+        var mr = matchResults[i];
+        var mQty = mr.row.quantity - mr.remain_qty;
+        h += '<tr><td>' + (i+1) + '</td><td><strong>' + mr.row.product_code + '</strong></td>';
+        h += '<td>' + mr.row.product_name + '</td><td class="qty-cell">' + mr.row.quantity.toLocaleString() + '</td>';
+        h += '<td class="qty-cell">' + mQty.toLocaleString() + '</td>';
+        h += '<td class="qty-cell" style="color:' + (mr.remain_qty > 0 ? '#E74C3C' : '#27AE60') + ';">' + mr.remain_qty.toLocaleString() + '</td>';
+        h += '<td><span class="status-badge ' + mr.status + '">' + (mr.status === 'matched' ? '완료' : (mr.status === 'partial' ? '부분' : '미매칭')) + '</span></td>';
+        h += '<td>';
+        for (var j = 0; j < mr.matched_slots.length; j++) {
+          var ms = mr.matched_slots[j];
+          h += '<span style="font-size:11px;color:#666;">' + ms.rack_name + '-' + ms.slot_code + '(' + ms.deduct_qty.toLocaleString() + ')</span>';
+          if (j < mr.matched_slots.length - 1) h += ', ';
+        }
+        if (mr.matched_slots.length === 0) h += '<span style="font-size:11px;color:#ccc;">재고없음</span>';
+        h += '</td></tr>';
+      }
+      h += '</tbody></table></div>';
+
+      h += '<div class="action-bar">';
+      h += '<button class="action-btn secondary" onclick="renderOutbound()">취소</button>';
+      h += '<button class="action-btn danger" onclick="confirmOutbound()">출고 확정</button>';
+      h += '</div>';
+
+      document.getElementById('tabContent').innerHTML = h;
+    }
+
+    function confirmOutbound() {
+      var hasMatch = false;
+      for (var i = 0; i < matchResults.length; i++) { if (matchResults[i].matched_slots.length > 0) { hasMatch = true; break; } }
+      if (!hasMatch) { showToast('매칭된 재고가 없습니다'); return; }
+      if (!confirm('출고를 확정하시겠습니까? 재고가 차감됩니다.')) return;
+
+      showLoading('출고 처리 중...');
+      var shipDate = parsedRows.length > 0 ? parsedRows[0].ship_date : new Date().toISOString().slice(0, 10);
+      var totalQty = 0, totalAmt = 0;
+      for (var q = 0; q < parsedRows.length; q++) { totalQty += parsedRows[q].quantity; totalAmt += parsedRows[q].total_amount; }
+
+      supabase.from('inventory_shipments').insert({
+        ship_date: shipDate, upload_file_name: uploadedFile ? uploadedFile.name : '',
+        total_rows: parsedRows.length, total_quantity: totalQty, total_amount: totalAmt,
+        status: 'processed', uploaded_by: 'system', processed_at: new Date().toISOString()
+      }).select().then(function(shipRes) {
+        if (shipRes.error) { hideLoading(); showToast('오류: ' + shipRes.error.message); return; }
+        var shipId = shipRes.data[0].id;
+        var promises = [];
+        for (var i = 0; i < matchResults.length; i++) {
+          var mr = matchResults[i]; var row = mr.row;
+          promises.push(supabase.from('inventory_shipment_items').insert({
+            shipment_id: shipId, ship_date: row.ship_date, ship_no: row.ship_no,
+            customer: row.customer, destination: row.destination, product_code: row.product_code,
+            ecount_code: row.ecount_code, product_name: row.product_name, quantity: row.quantity,
+            unit_price: row.unit_price, supply_amount: row.supply_amount, vat: row.vat,
+            total_amount: row.total_amount, lot_no_record: row.lot_no_record,
+            remark1: row.remark1, remark2: row.remark2, match_status: mr.status
+          }));
+          for (var j = 0; j < mr.matched_slots.length; j++) {
+            var ms = mr.matched_slots[j];
+            var ud = { quantity: ms.after_qty };
+            if (ms.after_qty <= 0) { ud.status = 'empty'; ud.product_code = null; ud.lot_no = null; ud.quantity = 0; }
+            promises.push(supabase.from('inventory_rack_slots').update(ud).eq('id', ms.slot_id));
+            promises.push(supabase.from('inventory_movements').insert({
+              product_code: row.product_code, movement_type: 'outbound',
+              from_location: ms.rack_name + '-' + ms.slot_code, quantity: ms.deduct_qty,
+              lot_no: ms.lot_no, reason: '이카운트 출하 - ' + row.customer, moved_by: 'system'
+            }));
+          }
+        }
+        Promise.all(promises).then(function() {
+          hideLoading();
+          var h = '<div class="complete-area"><div class="complete-icon">&#10004;</div>';
+          h += '<div class="complete-title">출고 처리 완료!</div>';
+          h += '<div class="complete-sub">출하 ID: #' + shipId + '</div></div>';
+          h += '<div class="action-bar"><button class="action-btn primary" onclick="renderOutbound()">새 출고</button>';
+          h += '<button class="action-btn secondary" onclick="switchTab(\'history\')">처리이력</button></div>';
+          document.getElementById('tabContent').innerHTML = h;
+          loadInitialData();
+        });
+      });
+    }
+
+    // ══════════════════════════════════════
+    // TAB 4: 처리이력
+    // ══════════════════════════════════════
+    function renderHistory() {
+      var h = '<div class="empty-msg">이력을 조회합니다...</div>';
+      document.getElementById('tabContent').innerHTML = h;
+
+      supabase.from('inventory_movements').select('*').order('moved_at', { ascending: false }).limit(50)
+        .then(function(res) {
+          var movements = res.data || [];
+          if (movements.length === 0) {
+            document.getElementById('tabContent').innerHTML = '<div class="empty-msg">처리 이력이 없습니다</div>';
+            return;
+          }
+
+          var h2 = '';
+          h2 += '<div class="filter-bar">';
+          h2 += '<select id="histFilter" onchange="filterHistory()">';
+          h2 += '<option value="">전체</option><option value="inbound">입고</option>';
+          h2 += '<option value="outbound">출고</option><option value="adjustment">조정</option>';
+          h2 += '</select></div>';
+
+          h2 += '<div class="data-table-wrap"><table class="data-table" id="histTable"><thead><tr>';
+          h2 += '<th>일시</th><th>유형</th><th>사번</th><th>LOT</th>';
+          h2 += '<th style="text-align:right">수량</th><th>위치</th><th>사유</th>';
+          h2 += '</tr></thead><tbody>';
+
+          for (var i = 0; i < movements.length; i++) {
+            var m = movements[i];
+            var typeText = m.movement_type === 'inbound' ? '입고' : (m.movement_type === 'outbound' ? '출고' : '조정');
+            var typeBadge = m.movement_type === 'inbound' ? 'stocked' : (m.movement_type === 'outbound' ? 'shipped' : 'waiting');
+            var loc = m.movement_type === 'inbound' ? (m.to_location || '-') : (m.from_location || '-');
+            h2 += '<tr data-type="' + m.movement_type + '">';
+            h2 += '<td>' + (m.moved_at ? m.moved_at.slice(0, 16).replace('T', ' ') : '-') + '</td>';
+            h2 += '<td><span class="status-badge ' + typeBadge + '">' + typeText + '</span></td>';
+            h2 += '<td><strong>' + (m.product_code || '-') + '</strong></td>';
+            h2 += '<td>' + (m.lot_no || '-') + '</td>';
+            h2 += '<td class="qty-cell">' + (m.quantity || 0).toLocaleString() + '</td>';
+            h2 += '<td>' + loc + '</td>';
+            h2 += '<td style="font-size:12px;color:#888;">' + (m.reason || '-') + '</td>';
+            h2 += '</tr>';
+          }
+          h2 += '</tbody></table></div>';
+          document.getElementById('tabContent').innerHTML = h2;
+        });
+    }
+
+    function filterHistory() {
+      var filter = document.getElementById('histFilter').value;
+      var rows = document.querySelectorAll('#histTable tbody tr');
+      for (var i = 0; i < rows.length; i++) {
+        if (!filter || rows[i].getAttribute('data-type') === filter) {
+          rows[i].style.display = '';
+        } else {
+          rows[i].style.display = 'none';
+        }
+      }
+    }
+
+    // ── 유틸 ──
+    function showToast(msg) {
+      var t = document.getElementById('toastMsg');
+      t.textContent = msg; t.className = 'toast-msg show';
+      setTimeout(function() { t.className = 'toast-msg'; }, 2500);
+    }
+    function showLoading(text) {
+      document.getElementById('loadingText').textContent = text || '처리 중...';
+      document.getElementById('loadingOverlay').className = 'loading-overlay show';
+    }
+    function hideLoading() { document.getElementById('loadingOverlay').className = 'loading-overlay'; }
+
+    document.getElementById('inboundModal').addEventListener('click', function(e) {
+      if (e.target === this) closeInboundModal();
+    });
+  </script>
+</body>
+</html>
