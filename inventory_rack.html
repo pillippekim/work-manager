@@ -368,7 +368,7 @@
       var h = '';
       h += '<div class="slot-grid" style="grid-template-columns: 40px repeat(' + cols + ', 1fr);">';
 
-      for (var r = 1; r <= rows; r++) {
+      for (var r = rows; r >= 1; r--) {
         // 행 라벨
         h += '<div class="row-label">' + (r * 100) + '번대</div>';
         for (var c = 1; c <= cols; c++) {
@@ -559,8 +559,9 @@
     function doAdjust(slotId) {
       var slot = findSlotById(slotId);
       var newQty = parseInt(document.getElementById('adjQty').value) || 0;
-      var reason = document.getElementById('adjReason').value.trim() || '수량 조정';
+      var reason = document.getElementById('adjReason').value.trim();
 
+      if (!reason) { showToast('사유를 반드시 입력해주세요'); return; }
       if (newQty === slot.quantity) { showToast('변경사항이 없습니다'); return; }
 
       var updateData = { quantity: newQty };
