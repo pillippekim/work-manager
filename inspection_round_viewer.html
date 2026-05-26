@@ -363,6 +363,17 @@ function downloadExcel() {
                 if (d.visual_data[t]) defects = defects.concat(d.visual_data[t]);
             });
         }
+        // 경도 데이터 추출
+        var hd = d.hardness_data || {};
+        var hFirst = (hd.first || []).join('/');
+        var hMid = (hd.mid || []).join('/');
+        var hLast = (hd.last || []).join('/');
+        // 치수 데이터 추출
+        var dd = d.dimension_data || {};
+        var dFirst = (dd.first || []).join('/');
+        var dMid = (dd.mid || []).join('/');
+        var dLast = (dd.last || []).join('/');
+
         return {
             '검사일': d.inspect_date,
             '작성자': d.inspector||'',
@@ -378,6 +389,12 @@ function downloadExcel() {
             '성형압': d.mold_pressure||'',
             '진공압': d.vacuum_pressure||'',
             '외관불량': defects.length>0 ? defects.join(',') : '양호',
+            '경도(초)': hFirst,
+            '경도(중)': hMid,
+            '경도(종)': hLast,
+            '치수(초)': dFirst,
+            '치수(중)': dMid,
+            '치수(종)': dLast,
             '변동점(금형)': (d.change_mold||[]).join(','),
             '변동점(설비)': (d.change_equip||[]).join(','),
             '원인및조치': d.action_detail||''
