@@ -469,7 +469,7 @@ function renderRepairList() {
 async function loadHistory() {
     try {
         // mold_status_logs에서 최근 10건 + molds join으로 사번 가져오기
-        var logs = await sf('mold_status_logs','select=*,molds(product_code)&order=changed_at.desc&limit=10');
+        var logs = await sf('mold_status_logs','select=*,molds(product_code)&order=created_at.desc&limit=10');
         if (!logs || logs.length === 0) {
             document.getElementById('historyCard').innerHTML = '<div class="alert-empty">아직 상태 변경 이력이 없습니다</div>';
             return;
@@ -492,8 +492,8 @@ async function loadHistory() {
 
             // 날짜만 표시 (시간 삭제)
             var dateStr = '';
-            if (l.changed_at) {
-                var d = new Date(l.changed_at);
+            if (l.created_at) {
+                var d = new Date(l.created_at);
                 dateStr = (d.getMonth()+1) + '/' + d.getDate();
             }
 

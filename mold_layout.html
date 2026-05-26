@@ -622,10 +622,10 @@ async function showMoldDetail(address) {
     var statusDates = {};
     try {
         for (var si = 0; si < moldIds.length; si++) {
-            var logRes = await fetch(SB + '/rest/v1/mold_status_logs?mold_id=eq.' + moldIds[si] + '&order=changed_at.desc&limit=1', { headers: H });
+            var logRes = await fetch(SB + '/rest/v1/mold_status_logs?mold_id=eq.' + moldIds[si] + '&order=created_at.desc&limit=1', { headers: H });
             var logData = await logRes.json();
             if (Array.isArray(logData) && logData.length > 0) {
-                var dt = new Date(logData[0].changed_at);
+                var dt = new Date(logData[0].created_at);
                 statusDates[moldIds[si]] = (dt.getMonth()+1) + '/' + dt.getDate() + ' ' + String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
             }
         }
@@ -724,7 +724,7 @@ async function loadStatusHistory(moldId, idx) {
     var el = document.getElementById('historyList_' + idx);
     if (!el) return;
     try {
-        var res = await fetch(SB + '/rest/v1/mold_status_logs?select=*,molds(product_code)&mold_id=eq.' + moldId + '&order=changed_at.desc&limit=5', { headers: H });
+        var res = await fetch(SB + '/rest/v1/mold_status_logs?select=*,molds(product_code)&mold_id=eq.' + moldId + '&order=created_at.desc&limit=5', { headers: H });
         var logs = await res.json();
         if (!Array.isArray(logs) || logs.length === 0) {
             el.innerHTML = '<div style="text-align:center;padding:8px;color:#94a3b8;font-size:12px;">이력이 없습니다</div>';
@@ -738,7 +738,7 @@ async function loadStatusHistory(moldId, idx) {
             var fromText = statusMap[log.prev_status] || log.prev_status || '?';
             var toText = statusMap[log.new_status] || log.new_status || '?';
             var toColor = colorMap[log.new_status] || '#94a3b8';
-            var dt = new Date(log.changed_at);
+            var dt = new Date(log.created_at);
             var dateStr = (dt.getMonth()+1) + '/' + dt.getDate();
             var sabun = (log.molds && log.molds.product_code) ? log.molds.product_code : '';
             var displayText = sabun ? (sabun + ' / ' + fromText + ' > ' + toText) : (fromText + ' > ' + toText);
