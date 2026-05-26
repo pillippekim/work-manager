@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>출고 관리 - 업무포탈</title>
+  <link rel="stylesheet" href="sidebar.css">
+  <link rel="stylesheet" href="common.css">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+  <style>
+    .outbound-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+    /* 우측 상단 고정 버튼 */
+    .top-actions {
+      position: fixed; top: 12px; right: 20px; z-index: 1000;
+      display: flex; gap: 8px;
+    }
+    .top-btn {
+      padding: 10px 18px; border-radius: 6px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.2s;
+    }
+    .top-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    .top-btn.back { background: #3d5a80; color: #fff; }
+    .top-btn.back:hover { background: #2c4a6e; }
+
+    /* 스텝 인디케이터 */
+    .step-bar {
+      display: flex; gap: 0; margin-bottom: 28px; background: #f0f0f0; border-radius: 8px; overflow: hidden;
+    }
+    .step-item {
+      flex: 1; padding: 14px 10px; text-align: center; font-size: 13px; font-weight: 600;
+      color: #999; background: #f5f5f5; position: relative; transition: all 0.3s;
+    }
+    .step-item.active { background: #4A90D9; color: #fff; }
+    .step-item.done { background: #27AE60; color: #fff; }
+    .step-item .step-num {
+      display: inline-block; width: 22px; height: 22px; border-radius: 50%;
+      background: rgba(255,255,255,0.2); line-height: 22px; font-size: 12px;
+      margin-right: 6px;
+    }
+    .step-item.active .step-num { background: rgba(255,255,255,0.3); }
+
+    /* 업로드 영역 */
+    .upload-area {
+      border: 2px dashed #ccc; border-radius: 12px; padding: 50px 20px;
+      text-align: center; cursor: pointer; transition: all 0.2s;
+      background: #fafafa;
+    }
+    .upload-area:hover { border-color: #4A90D9; background: #f0f6ff; }
+    .upload-area.dragover { border-color: #4A90D9; background: #e8f0fe; }
+    .upload-icon { font-size: 48px; margin-bottom: 12px; }
+    .upload-text { font-size: 15px; color: #555; margin-bottom: 6px; }
+    .upload-sub { font-size: 12px; color: #aaa; }
+    .upload-area input[type="file"] { display: none; }
+
+    /* 파일 정보 */
+    .file-info {
+      background: #e8f5e9; border-radius: 8px; padding: 14px 20px;
+      display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+    }
+    .file-info .file-icon { font-size: 24px; }
+    .file-info .file-name { font-size: 14px; font-weight: 600; color: #2E7D32; }
+    .file-info .file-detail { font-size: 12px; color: #666; }
+    .file-info .btn-remove {
+      margin-left: auto; background: none; border: none; color: #999;
+      cursor: pointer; font-size: 18px;
+    }
+
+    /* 매칭 결과 테이블 */
+    .match-summary {
+      display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .match-card {
+      flex: 1; min-width: 120px; background: #fff; border-radius: 8px;
+      padding: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); text-align: center;
+    }
+    .match-card .mc-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+    .match-card .mc-value { font-size: 22px; font-weight: 700; }
+    .match-card .mc-value.blue { color: #4A90D9; }
+    .match-card .mc-value.green { color: #27AE60; }
+    .match-card .mc-value.red { color: #E74C3C; }
+    .match-card .mc-value.orange { color: #F39C12; }
+
+    .result-table-wrap {
+      overflow-x: auto; margin-bottom: 20px;
+    }
+    .result-table {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+    }
+    .result-table th {
+      background: #f5f5f5; padding: 10px 8px; text-align: left;
+      font-weight: 600; color: #555; border-bottom: 2px solid #ddd;
+      white-space: nowrap;
+    }
+    .result-table td {
+      padding: 8px; border-bottom: 1px solid #eee; vertical-align: middle;
+    }
+    .result-table tr:hover { background: #f9f9f9; }
+    .result-table .status-matched { color: #27AE60; font-weight: 600; }
+    .result-table .status-partial { color: #F39C12; font-weight: 600; }
+    .result-table .status-unmatched { color: #E74C3C; font-weight: 600; }
+    .result-table .qty-cell { text-align: right; font-weight: 600; }
+
+    /* 처리 완료 */
+    .complete-area {
+      text-align: center; padding: 40px 20px;
+    }
+    .complete-icon { font-size: 64px; margin-bottom: 16px; }
+    .complete-title { font-size: 22px; font-weight: 700; color: #27AE60; margin-bottom: 8px; }
+    .complete-sub { font-size: 14px; color: #888; }
+
+    /* 액션 버튼 */
+    .action-bar {
+      display: flex; gap: 10px; justify-content: center; margin-top: 24px; flex-wrap: wrap;
+    }
+    .action-btn {
+      padding: 12px 32px; border-radius: 8px; border: none;
+      font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .action-btn:hover { transform: translateY(-1px); }
+    .action-btn.primary { background: #4A90D9; color: #fff; }
+    .action-btn.primary:hover { background: #3a7bc8; }
+    .action-btn.danger { background: #E74C3C; color: #fff; }
+    .action-btn.danger:hover { background: #c0392b; }
+    .action-btn.secondary { background: #f5f5f5; color: #666; border: 1px solid #ddd; }
+    .action-btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+
+    /* 토스트 */
+    .toast-msg {
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+      background: #333; color: #fff; padding: 12px 24px; border-radius: 8px;
+      font-size: 14px; z-index: 99999; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .toast-msg.show { display: block; }
+
+    /* 로딩 */
+    .loading-overlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.4); z-index: 9999;
+      justify-content: center; align-items: center;
+    }
+    .loading-overlay.show { display: flex; }
+    .loading-box {
+      background: #fff; border-radius: 12px; padding: 30px 40px; text-align: center;
+    }
+    .loading-box .spinner {
+      width: 40px; height: 40px; border: 4px solid #eee; border-top-color: #4A90D9;
+      border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 768px) {
+      .outbound-container { padding: 12px; }
+      .step-bar { flex-direction: column; }
+      .step-item { padding: 10px; }
+      .upload-area { padding: 30px 16px; }
+      .match-summary { gap: 8px; }
+      .match-card { min-width: 80px; padding: 10px; }
+      .match-card .mc-value { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="sidebar"></div>
+
+  <div class="top-actions">
+    <button class="top-btn back" onclick="location.href='inventory_layout.html'">&#9664; 적재대 현황</button>
+  </div>
+
+  <main>
+    <div class="page-header">
+      <h1 class="page-title">출고 관리</h1>
+      <p class="page-desc">이카운트 출하 데이터를 업로드하여 재고를 차감합니다 (선입선출 강제)</p>
+    </div>
+
+    <div class="outbound-container">
+      <!-- 스텝 -->
+      <div class="step-bar">
+        <div class="step-item active" id="step1"><span class="step-num">1</span>파일 업로드</div>
+        <div class="step-item" id="step2"><span class="step-num">2</span>매칭 확인</div>
+        <div class="step-item" id="step3"><span class="step-num">3</span>출고 처리</div>
+      </div>
+
+      <!-- 컨텐츠 영역 -->
+      <div id="contentArea"></div>
+    </div>
+  </main>
+
+  <!-- 로딩 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-box">
+      <div class="spinner"></div>
+      <div id="loadingText">처리 중...</div>
+    </div>
+  </div>
+
+  <!-- 토스트 -->
+  <div class="toast-msg" id="toastMsg"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="sidebar.js"></script>
+  <script src="auth_guard.js"></script>
+  <script>
+    var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+    var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+    var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    var uploadedFile = null;
+    var parsedRows = [];
+    var matchResults = [];
+    var currentStep = 1;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof checkAuth === 'function') { checkAuth(); }
+      renderStep1();
+    });
+
+    // ── 스텝 UI 업데이트 ──
+    function setStep(num) {
+      currentStep = num;
+      for (var i = 1; i <= 3; i++) {
+        var el = document.getElementById('step' + i);
+        el.className = 'step-item';
+        if (i < num) el.className = 'step-item done';
+        if (i === num) el.className = 'step-item active';
+      }
+    }
+
+    // ══════════════════════════════════════
+    // STEP 1: 파일 업로드
+    // ══════════════════════════════════════
+    function renderStep1() {
+      setStep(1);
+      var h = '';
+      h += '<div class="upload-area" id="uploadArea" onclick="document.getElementById(\'fileInput\').click()">';
+      h += '<input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(event)">';
+      h += '<div class="upload-icon">📄</div>';
+      h += '<div class="upload-text">이카운트 출하 엑셀 파일을 업로드하세요</div>';
+      h += '<div class="upload-sub">판매현황 Raw-Data (.xlsx) 파일을 드래그하거나 클릭하여 선택</div>';
+      h += '</div>';
+      document.getElementById('contentArea').innerHTML = h;
+
+      // 드래그앤드롭
+      var area = document.getElementById('uploadArea');
+      area.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        area.classList.add('dragover');
+      });
+      area.addEventListener('dragleave', function() {
+        area.classList.remove('dragover');
+      });
+      area.addEventListener('drop', function(e) {
+        e.preventDefault();
+        area.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+          processFile(e.dataTransfer.files[0]);
+        }
+      });
+    }
+
+    function handleFile(e) {
+      if (e.target.files.length > 0) {
+        processFile(e.target.files[0]);
+      }
+    }
+
+    function processFile(file) {
+      if (!file.name.match(/\.xlsx?$/i)) {
+        showToast('엑셀 파일(.xlsx)만 업로드 가능합니다');
+        return;
+      }
+      uploadedFile = file;
+      showLoading('파일을 읽는 중...');
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var data = new Uint8Array(e.target.result);
+          var workbook = XLSX.read(data, { type: 'array' });
+          var sheetName = workbook.SheetNames[0];
+          var sheet = workbook.Sheets[sheetName];
+          var jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+          parseEcountData(jsonData);
+          hideLoading();
+
+          if (parsedRows.length === 0) {
+            showToast('유효한 출하 데이터가 없습니다');
+            renderStep1();
+            return;
+          }
+
+          renderStep2Preview();
+        } catch (err) {
+          hideLoading();
+          showToast('파일 파싱 오류: ' + err.message);
+          console.error(err);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // ── 이카운트 데이터 파싱 ──
+    function parseEcountData(jsonData) {
+      parsedRows = [];
+
+      // 헤더 행 찾기
+      var headerIdx = -1;
+      for (var i = 0; i < Math.min(jsonData.length, 10); i++) {
+        var row = jsonData[i];
+        if (row && row.length > 0) {
+          var firstCell = String(row[0] || '');
+          if (firstCell.indexOf('일자') !== -1 || firstCell.indexOf('No') !== -1) {
+            headerIdx = i;
+            break;
+          }
+        }
+      }
+      if (headerIdx === -1) {
+        // 두 번째 행부터 시도 (첫 행이 회사명인 경우)
+        headerIdx = 1;
+      }
+
+      // 데이터 행 파싱
+      for (var j = headerIdx + 1; j < jsonData.length; j++) {
+        var r = jsonData[j];
+        if (!r || r.length < 7) continue;
+
+        var dateVal = String(r[0] || '').trim();
+        var customer = String(r[1] || '').trim();
+        var destination = String(r[2] || '').trim();
+        var productCode = String(r[3] || '').trim();
+        var ecountCode = String(r[4] || '').trim();
+        var productName = String(r[5] || '').trim();
+        var qty = parseInt(r[6]) || 0;
+        var unitPrice = parseFloat(r[7]) || 0;
+        var supplyAmt = parseFloat(r[8]) || 0;
+        var vat = parseFloat(r[9]) || 0;
+        var totalAmt = parseFloat(r[10]) || 0;
+        var lotRecord = String(r[11] || '').trim();
+        var remark1 = String(r[12] || '').trim();
+        var remark2 = String(r[13] || '').trim();
+
+        // 계/총합계 행 필터링
+        if (dateVal.indexOf('계') !== -1 || dateVal.indexOf('총합계') !== -1) continue;
+        if (customer.indexOf('계') !== -1 || customer === '총합계') continue;
+        // 빈 행 필터링
+        if (!dateVal || !productCode || qty <= 0) continue;
+        // 날짜 추출
+        var shipDate = '';
+        var shipNo = '';
+        if (dateVal.indexOf('-') !== -1) {
+          var parts = dateVal.split('-');
+          shipDate = parts[0].trim().replace(/\//g, '-');
+          shipNo = parts.length > 1 ? parts[1].trim() : '';
+        } else {
+          shipDate = dateVal.replace(/\//g, '-');
+        }
+
+        parsedRows.push({
+          ship_date: shipDate,
+          ship_no: shipNo,
+          customer: customer,
+          destination: destination,
+          product_code: productCode,
+          ecount_code: ecountCode,
+          product_name: productName,
+          quantity: qty,
+          unit_price: unitPrice,
+          supply_amount: supplyAmt,
+          vat: vat,
+          total_amount: totalAmt,
+          lot_no_record: lotRecord,
+          remark1: remark1,
+          remark2: remark2,
+          match_status: 'unmatched',
+          matched_slots: []
+        });
+      }
+    }
+
+    // ══════════════════════════════════════
+    // STEP 2: 매칭 확인
+    // ══════════════════════════════════════
+    function renderStep2Preview() {
+      setStep(2);
+
+      var h = '';
+
+      // 파일 정보
+      h += '<div class="file-info">';
+      h += '<div class="file-icon">📊</div>';
+      h += '<div>';
+      h += '<div class="file-name">' + uploadedFile.name + '</div>';
+      h += '<div class="file-detail">' + parsedRows.length + '건의 출하 데이터</div>';
+      h += '</div>';
+      h += '<button class="btn-remove" onclick="renderStep1()" title="다시 선택">✕</button>';
+      h += '</div>';
+
+      // 요약 카드
+      var totalQty = 0;
+      var uniqueProducts = {};
+      var shipDate = parsedRows.length > 0 ? parsedRows[0].ship_date : '-';
+      for (var i = 0; i < parsedRows.length; i++) {
+        totalQty += parsedRows[i].quantity;
+        uniqueProducts[parsedRows[i].product_code] = true;
+      }
+      var productCount = Object.keys(uniqueProducts).length;
+
+      h += '<div class="match-summary">';
+      h += '<div class="match-card"><div class="mc-label">출하일</div><div class="mc-value blue">' + shipDate + '</div></div>';
+      h += '<div class="match-card"><div class="mc-label">총 건수</div><div class="mc-value blue">' + parsedRows.length + '</div></div>';
+      h += '<div class="match-card"><div class="mc-label">제품 종류</div><div class="mc-value green">' + productCount + '</div></div>';
+      h += '<div class="match-card"><div class="mc-label">총 수량</div><div class="mc-value orange">' + totalQty.toLocaleString() + '</div></div>';
+      h += '</div>';
+
+      // 데이터 테이블
+      h += '<div class="result-table-wrap">';
+      h += '<table class="result-table">';
+      h += '<thead><tr>';
+      h += '<th>No</th><th>일자</th><th>거래처</th><th>출고처</th>';
+      h += '<th>사번</th><th>품목명</th><th style="text-align:right">수량</th>';
+      h += '<th>LOT기록</th><th>적요</th>';
+      h += '</tr></thead><tbody>';
+
+      for (var j = 0; j < parsedRows.length; j++) {
+        var row = parsedRows[j];
+        h += '<tr>';
+        h += '<td>' + (j + 1) + '</td>';
+        h += '<td>' + row.ship_date + '</td>';
+        h += '<td>' + row.customer + '</td>';
+        h += '<td>' + row.destination + '</td>';
+        h += '<td><strong>' + row.product_code + '</strong></td>';
+        h += '<td>' + row.product_name + '</td>';
+        h += '<td class="qty-cell">' + row.quantity.toLocaleString() + '</td>';
+        h += '<td>' + row.lot_no_record + '</td>';
+        h += '<td>' + row.remark1 + '</td>';
+        h += '</tr>';
+      }
+      h += '</tbody></table></div>';
+
+      // 액션
+      h += '<div class="action-bar">';
+      h += '<button class="action-btn secondary" onclick="renderStep1()">다시 선택</button>';
+      h += '<button class="action-btn primary" onclick="doMatchAndProcess()">출고 처리 실행</button>';
+      h += '</div>';
+
+      document.getElementById('contentArea').innerHTML = h;
+    }
+
+    // ══════════════════════════════════════
+    // STEP 3: 출고 처리 (FIFO)
+    // ══════════════════════════════════════
+    function doMatchAndProcess() {
+      showLoading('슬롯 데이터 조회 중...');
+
+      // 모든 occupied 슬롯 가져오기
+      supabase.from('inventory_rack_slots').select('*, inventory_racks(rack_name)')
+        .eq('status', 'occupied')
+        .order('lot_no')
+        .then(function(res) {
+          if (res.error) {
+            hideLoading();
+            showToast('슬롯 조회 오류: ' + res.error.message);
+            return;
+          }
+
+          var allSlots = res.data || [];
+          processOutbound(allSlots);
+        });
+    }
+
+    function processOutbound(allSlots) {
+      showLoading('FIFO 매칭 중...');
+
+      matchResults = [];
+      var updatePromises = [];
+      var movementRecords = [];
+      var totalMatched = 0;
+      var totalUnmatched = 0;
+      var totalPartial = 0;
+
+      for (var i = 0; i < parsedRows.length; i++) {
+        var row = parsedRows[i];
+        var needQty = row.quantity;
+        var matchedSlots = [];
+
+        // 같은 사번의 슬롯을 LOT 날짜순으로 찾기 (FIFO)
+        var candidateSlots = [];
+        for (var s = 0; s < allSlots.length; s++) {
+          if (allSlots[s].product_code === row.product_code && allSlots[s].quantity > 0) {
+            candidateSlots.push(allSlots[s]);
+          }
+        }
+
+        // LOT 번호 순 정렬 (오래된 것부터)
+        candidateSlots.sort(function(a, b) {
+          var lotA = a.lot_no || '999999';
+          var lotB = b.lot_no || '999999';
+          return lotA < lotB ? -1 : (lotA > lotB ? 1 : 0);
+        });
+
+        var remainQty = needQty;
+        for (var c = 0; c < candidateSlots.length; c++) {
+          if (remainQty <= 0) break;
+          var slot = candidateSlots[c];
+          var deductQty = Math.min(remainQty, slot.quantity);
+
+          matchedSlots.push({
+            slot_id: slot.id,
+            slot_code: slot.slot_code,
+            rack_name: slot.inventory_racks ? slot.inventory_racks.rack_name : '-',
+            lot_no: slot.lot_no,
+            before_qty: slot.quantity,
+            deduct_qty: deductQty,
+            after_qty: slot.quantity - deductQty
+          });
+
+          // 슬롯 수량 차감 (메모리에서)
+          slot.quantity -= deductQty;
+          remainQty -= deductQty;
+        }
+
+        var status = 'unmatched';
+        if (remainQty === 0) { status = 'matched'; totalMatched++; }
+        else if (remainQty < needQty) { status = 'partial'; totalPartial++; }
+        else { totalUnmatched++; }
+
+        matchResults.push({
+          row: row,
+          matched_slots: matchedSlots,
+          status: status,
+          remain_qty: remainQty
+        });
+      }
+
+      hideLoading();
+      renderStep3Results(totalMatched, totalPartial, totalUnmatched);
+    }
+
+    function renderStep3Results(matched, partial, unmatched) {
+      setStep(3);
+
+      var h = '';
+
+      // 매칭 요약
+      h += '<div class="match-summary">';
+      h += '<div class="match-card"><div class="mc-label">전체 건수</div><div class="mc-value blue">' + matchResults.length + '</div></div>';
+      h += '<div class="match-card"><div class="mc-label">매칭 완료</div><div class="mc-value green">' + matched + '</div></div>';
+      h += '<div class="match-card"><div class="mc-label">부분 매칭</div><div class="mc-value orange">' + partial + '</div></div>';
+      h += '<div class="match-card"><div class="mc-label">미매칭</div><div class="mc-value red">' + unmatched + '</div></div>';
+      h += '</div>';
+
+      // 결과 테이블
+      h += '<div class="result-table-wrap">';
+      h += '<table class="result-table">';
+      h += '<thead><tr>';
+      h += '<th>No</th><th>사번</th><th>품목명</th>';
+      h += '<th style="text-align:right">요청수량</th><th style="text-align:right">매칭수량</th>';
+      h += '<th style="text-align:right">미매칭</th><th>상태</th><th>차감 상세</th>';
+      h += '</tr></thead><tbody>';
+
+      for (var i = 0; i < matchResults.length; i++) {
+        var mr = matchResults[i];
+        var row = mr.row;
+        var matchedQty = row.quantity - mr.remain_qty;
+
+        var statusClass = 'status-' + mr.status;
+        var statusText = mr.status === 'matched' ? '완료' : (mr.status === 'partial' ? '부분' : '미매칭');
+
+        h += '<tr>';
+        h += '<td>' + (i + 1) + '</td>';
+        h += '<td><strong>' + row.product_code + '</strong></td>';
+        h += '<td>' + row.product_name + '</td>';
+        h += '<td class="qty-cell">' + row.quantity.toLocaleString() + '</td>';
+        h += '<td class="qty-cell">' + matchedQty.toLocaleString() + '</td>';
+        h += '<td class="qty-cell" style="color:' + (mr.remain_qty > 0 ? '#E74C3C' : '#27AE60') + ';">' + mr.remain_qty.toLocaleString() + '</td>';
+        h += '<td><span class="' + statusClass + '">' + statusText + '</span></td>';
+        h += '<td>';
+        if (mr.matched_slots.length > 0) {
+          for (var j = 0; j < mr.matched_slots.length; j++) {
+            var ms = mr.matched_slots[j];
+            h += '<span style="font-size:11px;color:#666;">';
+            h += ms.rack_name + '-' + ms.slot_code;
+            h += '(' + ms.deduct_qty.toLocaleString() + ')';
+            if (j < mr.matched_slots.length - 1) h += ', ';
+            h += '</span>';
+          }
+        } else {
+          h += '<span style="font-size:11px;color:#ccc;">재고 없음</span>';
+        }
+        h += '</td>';
+        h += '</tr>';
+      }
+      h += '</tbody></table></div>';
+
+      // 액션
+      h += '<div class="action-bar">';
+      h += '<button class="action-btn secondary" onclick="renderStep2Preview()">이전으로</button>';
+      h += '<button class="action-btn danger" onclick="confirmProcess()">출고 확정</button>';
+      h += '</div>';
+
+      document.getElementById('contentArea').innerHTML = h;
+    }
+
+    // ── 출고 확정 ──
+    function confirmProcess() {
+      var hasMatch = false;
+      for (var i = 0; i < matchResults.length; i++) {
+        if (matchResults[i].matched_slots.length > 0) { hasMatch = true; break; }
+      }
+      if (!hasMatch) {
+        showToast('매칭된 재고가 없어 처리할 수 없습니다');
+        return;
+      }
+
+      if (!confirm('출고를 확정하시겠습니까? 재고가 차감됩니다.')) return;
+
+      showLoading('출고 처리 중...');
+
+      // 1. shipment 레코드 생성
+      var shipDate = parsedRows.length > 0 ? parsedRows[0].ship_date : new Date().toISOString().slice(0, 10);
+      var totalQty = 0;
+      var totalAmt = 0;
+      for (var q = 0; q < parsedRows.length; q++) {
+        totalQty += parsedRows[q].quantity;
+        totalAmt += parsedRows[q].total_amount;
+      }
+
+      supabase.from('inventory_shipments').insert({
+        ship_date: shipDate,
+        upload_file_name: uploadedFile ? uploadedFile.name : '',
+        total_rows: parsedRows.length,
+        total_quantity: totalQty,
+        total_amount: totalAmt,
+        status: 'processed',
+        uploaded_by: 'system',
+        processed_at: new Date().toISOString()
+      }).select().then(function(shipRes) {
+        if (shipRes.error) {
+          hideLoading();
+          showToast('출하 이력 저장 오류: ' + shipRes.error.message);
+          return;
+        }
+
+        var shipmentId = shipRes.data[0].id;
+        executeSlotUpdates(shipmentId);
+      });
+    }
+
+    function executeSlotUpdates(shipmentId) {
+      var promises = [];
+
+      for (var i = 0; i < matchResults.length; i++) {
+        var mr = matchResults[i];
+        var row = mr.row;
+
+        // shipment_items 저장
+        promises.push(
+          supabase.from('inventory_shipment_items').insert({
+            shipment_id: shipmentId,
+            ship_date: row.ship_date,
+            ship_no: row.ship_no,
+            customer: row.customer,
+            destination: row.destination,
+            product_code: row.product_code,
+            ecount_code: row.ecount_code,
+            product_name: row.product_name,
+            quantity: row.quantity,
+            unit_price: row.unit_price,
+            supply_amount: row.supply_amount,
+            vat: row.vat,
+            total_amount: row.total_amount,
+            lot_no_record: row.lot_no_record,
+            remark1: row.remark1,
+            remark2: row.remark2,
+            match_status: mr.status
+          })
+        );
+
+        // 슬롯 수량 차감
+        for (var j = 0; j < mr.matched_slots.length; j++) {
+          var ms = mr.matched_slots[j];
+          var updateData = { quantity: ms.after_qty };
+          if (ms.after_qty <= 0) {
+            updateData.status = 'empty';
+            updateData.product_code = null;
+            updateData.lot_no = null;
+            updateData.quantity = 0;
+          }
+
+          promises.push(
+            supabase.from('inventory_rack_slots').update(updateData).eq('id', ms.slot_id)
+          );
+
+          // 이동 이력
+          promises.push(
+            supabase.from('inventory_movements').insert({
+              product_code: row.product_code,
+              movement_type: 'outbound',
+              from_location: ms.rack_name + '-' + ms.slot_code,
+              quantity: ms.deduct_qty,
+              lot_no: ms.lot_no,
+              reason: '이카운트 출하 - ' + row.customer,
+              moved_by: 'system'
+            })
+          );
+        }
+      }
+
+      Promise.all(promises).then(function() {
+        hideLoading();
+        renderComplete(shipmentId);
+      }).catch(function(err) {
+        hideLoading();
+        showToast('처리 중 오류 발생: ' + err.message);
+        console.error(err);
+      });
+    }
+
+    // ── 완료 화면 ──
+    function renderComplete(shipmentId) {
+      var h = '';
+      h += '<div class="complete-area">';
+      h += '<div class="complete-icon">&#10004;</div>';
+      h += '<div class="complete-title">출고 처리 완료!</div>';
+      h += '<div class="complete-sub">출하 ID: #' + shipmentId + ' | 처리 시간: ' + new Date().toLocaleString() + '</div>';
+      h += '</div>';
+
+      h += '<div class="action-bar">';
+      h += '<button class="action-btn primary" onclick="renderStep1()">새 출고 처리</button>';
+      h += '<button class="action-btn secondary" onclick="location.href=\'inventory_layout.html\'">적재대 현황</button>';
+      h += '</div>';
+
+      document.getElementById('contentArea').innerHTML = h;
+    }
+
+    // ── 유틸 ──
+    function showToast(msg) {
+      var t = document.getElementById('toastMsg');
+      t.textContent = msg;
+      t.className = 'toast-msg show';
+      setTimeout(function() { t.className = 'toast-msg'; }, 2500);
+    }
+
+    function showLoading(text) {
+      document.getElementById('loadingText').textContent = text || '처리 중...';
+      document.getElementById('loadingOverlay').className = 'loading-overlay show';
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingOverlay').className = 'loading-overlay';
+    }
+  </script>
+</body>
+</html>

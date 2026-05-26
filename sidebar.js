@@ -23,7 +23,7 @@ function initSidebar() {
     var isQualityPage = ['inspection_round_viewer.html'].indexOf(page) !== -1;
     var isDataPage = ['data_viewer.html','safety_viewer.html','docs_manager.html'].indexOf(page) !== -1;
     var isSystemPage = ['master_data.html','users.html'].indexOf(page) !== -1;
-    var isInventoryPage = ['inventory_layout.html','inventory_rack.html'].indexOf(page) !== -1;
+    var isInventoryPage = ['inventory_layout.html','inventory_rack.html','inventory_outbound.html'].indexOf(page) !== -1;
 
     // 금형관리 active
     var dashActive = (page === 'mold_dashboard.html') ? ' nav-active' : '';
@@ -45,6 +45,7 @@ function initSidebar() {
     // 재고관리 active
     var invLayoutActive = (page === 'inventory_layout.html') ? ' nav-active' : '';
     var invRackActive = (page === 'inventory_rack.html') ? ' nav-active' : '';
+    var invOutboundActive = (page === 'inventory_outbound.html') ? ' nav-active' : '';
 
     // 자동 펼침
     var prodOpen = isMoldPage ? ' open' : '';
@@ -163,6 +164,7 @@ function initSidebar() {
                         '<div class="sub-body">' +
                             '<a class="nav-link' + invLayoutActive + '" href="inventory_layout.html"><span class="n-icon">🗺️</span>적재대 현황</a>' +
                             '<a class="nav-link' + invRackActive + '" href="inventory_rack.html"><span class="n-icon">🗄️</span>랙 상세 현황</a>' +
+                            '<a class="nav-link' + invOutboundActive + '" href="inventory_outbound.html"><span class="n-icon">📤</span>출고 관리</a>' +
                         '</div>' +
                     '</div>' +
                 '</div>' +
