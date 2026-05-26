@@ -162,6 +162,23 @@
       text-align: center; color: #aaa; padding: 60px 20px; font-size: 14px;
     }
 
+    /* 우측 상단 고정 버튼 */
+    .top-actions {
+      position: fixed; top: 12px; right: 20px; z-index: 1000;
+      display: flex; gap: 8px;
+    }
+    .top-btn {
+      padding: 10px 18px; border-radius: 6px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.2s;
+    }
+    .top-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    .top-btn.back { background: #3d5a80; color: #fff; }
+    .top-btn.back:hover { background: #2c4a6e; }
+    .top-btn.view { background: #f0ad4e; color: #fff; }
+    .top-btn.view:hover { background: #d4952e; }
+    .top-btn.view.disabled { background: #ccc; color: #999; cursor: default; pointer-events: none; }
+
     @media (max-width: 768px) {
       .rack-container { padding: 12px; }
       .rack-controls { gap: 8px; }
@@ -176,6 +193,13 @@
 </head>
 <body>
   <div id="sidebar"></div>
+
+  <!-- 우측 상단 고정 버튼 -->
+  <div class="top-actions">
+    <button class="top-btn back" onclick="location.href='inventory_layout.html'">&#9664; 적재대 현황</button>
+    <button class="top-btn view disabled">&#128194; 조회</button>
+  </div>
+
   <main>
     <div class="page-header">
       <h1 class="page-title" id="pageTitle">랙 상세 현황</h1>
@@ -185,7 +209,6 @@
     <div class="rack-container">
       <!-- 컨트롤 -->
       <div class="rack-controls">
-        <button class="btn-back" onclick="goBack()">&#9664; 적재대 현황</button>
         <select class="rack-select" id="rackSelect" onchange="onRackChange()">
           <option value="">동 선택</option>
         </select>
