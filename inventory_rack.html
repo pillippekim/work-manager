@@ -8,206 +8,145 @@
   <link rel="stylesheet" href="common.css">
   <style>
     .rack-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+    .top-actions { position: fixed; top: 12px; right: 20px; z-index: 1000; display: flex; gap: 8px; }
+    .top-btn {
+      padding: 10px 18px; border-radius: 6px; border: none; font-size: 13px; font-weight: 600;
+      cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.2s;
+    }
+    .top-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    .top-btn.back { background: #3d5a80; color: #fff; }
+    .top-btn.view { background: #ccc; color: #999; cursor: default; pointer-events: none; }
 
-    /* 상단 컨트롤 */
-    .rack-controls {
-      display: flex; gap: 12px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;
-    }
-    .rack-select {
-      padding: 8px 14px; border-radius: 6px; border: 1.5px solid #ddd;
-      font-size: 14px; background: #fff; min-width: 120px;
-    }
+    .rack-controls { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .rack-select { padding: 8px 14px; border-radius: 6px; border: 1.5px solid #ddd; font-size: 14px; background: #fff; min-width: 120px; }
     .rack-select:focus { border-color: #4A90D9; outline: none; }
-    .btn-back {
-      padding: 8px 16px; border-radius: 6px; border: 1.5px solid #ddd;
-      background: #fff; cursor: pointer; font-size: 13px; color: #555;
-      display: flex; align-items: center; gap: 6px;
-    }
-    .btn-back:hover { background: #f5f5f5; border-color: #bbb; }
 
-    /* 탭 */
-    .rack-tabs {
-      display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap;
-      border-bottom: 2px solid #eee; padding-bottom: 0;
-    }
-    .rack-tab {
-      padding: 10px 20px; border-radius: 6px 6px 0 0; border: 1.5px solid #eee;
-      border-bottom: none; background: #f9f9f9; cursor: pointer;
-      font-size: 13px; font-weight: 500; color: #888; transition: all 0.2s;
-    }
-    .rack-tab:hover { background: #f0f0f0; color: #555; }
-    .rack-tab.active {
-      background: #fff; color: #1a1a2e; font-weight: 700;
-      border-color: #4A90D9; border-bottom: 2px solid #fff; margin-bottom: -2px;
-    }
+    .slot-legend { display: flex; gap: 16px; flex-wrap: wrap; }
+    .slot-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #888; }
+    .slot-legend-dot { width: 16px; height: 16px; border-radius: 4px; border: 1px solid #ddd; }
 
-    /* 통계 바 */
     .rack-stats {
-      display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;
+      display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;
       padding: 14px 20px; background: #f8f9fa; border-radius: 8px;
     }
     .rack-stat-item { font-size: 13px; color: #666; }
     .rack-stat-item strong { color: #1a1a2e; font-weight: 700; font-size: 16px; margin-right: 2px; }
     .rack-stat-item.highlight strong { color: #E74C3C; }
 
-    /* 범례 */
-    .slot-legend {
-      display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;
-    }
-    .slot-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #888; }
-    .slot-legend-dot { width: 16px; height: 16px; border-radius: 4px; border: 1px solid #ddd; }
-
-    /* 슬롯 그리드 */
-    .slot-grid {
-      display: grid;
-      gap: 6px;
-      margin-bottom: 20px;
-    }
+    .slot-grid { display: grid; gap: 6px; margin-bottom: 20px; }
     .slot-cell {
-      border: 1.5px solid #e0e0e0; border-radius: 6px; padding: 6px;
-      cursor: pointer; transition: all 0.15s; min-height: 60px;
-      display: flex; flex-direction: column; justify-content: center;
-      position: relative;
+      border: 1.5px solid #e0e0e0; border-radius: 6px; padding: 6px; cursor: pointer;
+      transition: all 0.15s; min-height: 60px; display: flex; flex-direction: column;
+      justify-content: center; position: relative;
     }
-    .slot-cell:hover {
-      border-color: #4A90D9; box-shadow: 0 2px 8px rgba(74,144,217,0.2);
-      transform: translateY(-1px);
-    }
+    .slot-cell:hover { border-color: #4A90D9; box-shadow: 0 2px 8px rgba(74,144,217,0.2); transform: translateY(-1px); }
     .slot-cell.empty { background: #fafafa; }
     .slot-cell.occupied { background: #e8f5e9; border-color: #81C784; }
     .slot-cell.reserved { background: #fff3e0; border-color: #FFB74D; }
     .slot-cell.negative { background: #ffebee; border-color: #E57373; }
-    .slot-cell .slot-code {
-      font-size: 12px; font-weight: 700; color: #333;
-    }
-    .slot-cell .slot-product {
-      font-size: 11px; color: #555; margin-top: 2px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .slot-cell .slot-qty {
-      font-size: 13px; font-weight: 700; margin-top: 2px;
-    }
+    .slot-cell .slot-code { font-size: 12px; font-weight: 700; color: #333; }
+    .slot-cell .slot-product { font-size: 11px; color: #555; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .slot-cell .slot-qty { font-size: 13px; font-weight: 700; margin-top: 2px; }
     .slot-cell .slot-qty.positive { color: #2E7D32; }
     .slot-cell .slot-qty.zero { color: #999; }
     .slot-cell .slot-qty.neg { color: #C62828; }
 
-    /* 행 라벨 */
     .row-label {
       display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 700; color: #888;
-      background: #f5f5f5; border-radius: 6px; padding: 4px;
+      font-size: 13px; font-weight: 700; color: #888; background: #f5f5f5; border-radius: 6px; padding: 4px;
     }
 
     /* 모달 */
     .modal-overlay {
       display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.5); z-index: 9999;
-      justify-content: center; align-items: center;
+      background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;
     }
     .modal-overlay.show { display: flex; }
     .modal-box {
-      background: #fff; border-radius: 12px; padding: 24px; width: 90%; max-width: 480px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.2); max-height: 80vh; overflow-y: auto;
+      background: #fff; border-radius: 12px; padding: 24px; width: 90%; max-width: 520px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2); max-height: 85vh; overflow-y: auto;
     }
-    .modal-title {
-      font-size: 18px; font-weight: 700; color: #1a1a2e; margin-bottom: 16px;
-      display: flex; align-items: center; gap: 8px;
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
     }
-    .modal-title .slot-badge {
-      font-size: 12px; padding: 2px 8px; border-radius: 10px;
-      background: #e8f5e9; color: #2E7D32; font-weight: 600;
-    }
-    .modal-title .slot-badge.empty-badge { background: #f5f5f5; color: #999; }
-    .modal-field { margin-bottom: 14px; }
-    .modal-field label {
-      display: block; font-size: 12px; color: #888; margin-bottom: 4px; font-weight: 600;
-    }
-    .modal-field .field-value {
-      font-size: 15px; color: #1a1a2e; font-weight: 600;
-    }
-    .modal-field input, .modal-field select {
-      width: 100%; padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 6px;
-      font-size: 14px; box-sizing: border-box;
-    }
-    .modal-field input:focus, .modal-field select:focus {
-      border-color: #4A90D9; outline: none;
-    }
-    .modal-actions {
-      display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap;
-    }
-    .modal-actions button {
-      flex: 1; padding: 10px; border-radius: 6px; border: none;
-      font-size: 13px; font-weight: 600; cursor: pointer; min-width: 80px;
-    }
-    .btn-inbound { background: #4A90D9; color: #fff; }
-    .btn-inbound:hover { background: #3a7bc8; }
-    .btn-outbound { background: #E74C3C; color: #fff; }
-    .btn-outbound:hover { background: #c0392b; }
-    .btn-move { background: #F39C12; color: #fff; }
-    .btn-move:hover { background: #d68910; }
-    .btn-clear { background: #95a5a6; color: #fff; }
-    .btn-clear:hover { background: #7f8c8d; }
-    .btn-cancel { background: #f5f5f5; color: #666; border: 1px solid #ddd; }
-    .btn-cancel:hover { background: #eee; }
+    .modal-title { font-size: 18px; font-weight: 700; color: #1a1a2e; }
+    .modal-badge { font-size: 12px; padding: 3px 10px; border-radius: 10px; font-weight: 600; }
+    .modal-badge.occupied { background: #e8f5e9; color: #2E7D32; }
+    .modal-badge.empty { background: #f5f5f5; color: #999; }
 
-    /* 토스트 */
+    .modal-info { margin-bottom: 16px; }
+    .modal-info-row { display: flex; gap: 16px; margin-bottom: 8px; }
+    .modal-info-item { flex: 1; }
+    .modal-info-item .mi-label { font-size: 11px; color: #aaa; margin-bottom: 2px; }
+    .modal-info-item .mi-value { font-size: 15px; font-weight: 600; color: #1a1a2e; }
+
+    .modal-divider { border: none; border-top: 1px solid #eee; margin: 16px 0; }
+
+    .modal-section-title {
+      font-size: 13px; font-weight: 700; margin-bottom: 10px; padding: 6px 10px;
+      border-radius: 4px; display: inline-block;
+    }
+    .modal-section-title.blue { background: #e3f2fd; color: #1565C0; }
+    .modal-section-title.red { background: #ffebee; color: #C62828; }
+    .modal-section-title.orange { background: #fff3e0; color: #E65100; }
+    .modal-section-title.green { background: #e8f5e9; color: #2E7D32; }
+    .modal-section-title.gray { background: #f5f5f5; color: #666; }
+
+    .modal-form-row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+    .modal-form-group { flex: 1; min-width: 120px; }
+    .modal-form-group label { display: block; font-size: 11px; color: #888; margin-bottom: 3px; font-weight: 600; }
+    .modal-form-group input, .modal-form-group select {
+      width: 100%; padding: 8px 10px; border: 1.5px solid #ddd; border-radius: 6px;
+      font-size: 13px; box-sizing: border-box;
+    }
+    .modal-form-group input:focus, .modal-form-group select:focus { border-color: #4A90D9; outline: none; }
+
+    .modal-btn-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .modal-btn {
+      flex: 1; padding: 9px 8px; border-radius: 6px; border: none;
+      font-size: 12px; font-weight: 600; cursor: pointer; min-width: 70px; text-align: center;
+    }
+    .modal-btn.blue { background: #4A90D9; color: #fff; }
+    .modal-btn.blue:hover { background: #3a7bc8; }
+    .modal-btn.red { background: #E74C3C; color: #fff; }
+    .modal-btn.red:hover { background: #c0392b; }
+    .modal-btn.orange { background: #F39C12; color: #fff; }
+    .modal-btn.orange:hover { background: #d68910; }
+    .modal-btn.green { background: #27AE60; color: #fff; }
+    .modal-btn.green:hover { background: #1e8449; }
+    .modal-btn.gray { background: #95a5a6; color: #fff; }
+    .modal-btn.gray:hover { background: #7f8c8d; }
+    .modal-btn.cancel { background: #f5f5f5; color: #666; border: 1px solid #ddd; }
+
     .toast-msg {
       position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
       background: #333; color: #fff; padding: 12px 24px; border-radius: 8px;
       font-size: 14px; z-index: 99999; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
     .toast-msg.show { display: block; }
-
-    .no-slots {
-      text-align: center; color: #aaa; padding: 60px 20px; font-size: 14px;
-    }
-
-    /* 우측 상단 고정 버튼 */
-    .top-actions {
-      position: fixed; top: 12px; right: 20px; z-index: 1000;
-      display: flex; gap: 8px;
-    }
-    .top-btn {
-      padding: 10px 18px; border-radius: 6px; border: none;
-      font-size: 13px; font-weight: 600; cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.2s;
-    }
-    .top-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
-    .top-btn.back { background: #3d5a80; color: #fff; }
-    .top-btn.back:hover { background: #2c4a6e; }
-    .top-btn.view { background: #f0ad4e; color: #fff; }
-    .top-btn.view:hover { background: #d4952e; }
-    .top-btn.view.disabled { background: #ccc; color: #999; cursor: default; pointer-events: none; }
+    .no-slots { text-align: center; color: #aaa; padding: 60px 20px; font-size: 14px; }
 
     @media (max-width: 768px) {
       .rack-container { padding: 12px; }
-      .rack-controls { gap: 8px; }
-      .rack-tabs { gap: 2px; }
-      .rack-tab { padding: 8px 12px; font-size: 12px; }
       .slot-cell { min-height: 50px; padding: 4px; }
       .slot-cell .slot-code { font-size: 11px; }
-      .slot-cell .slot-product { font-size: 10px; }
       .slot-cell .slot-qty { font-size: 12px; }
+      .modal-box { padding: 16px; }
     }
   </style>
 </head>
 <body>
   <div id="sidebar"></div>
-
-  <!-- 우측 상단 고정 버튼 -->
   <div class="top-actions">
     <button class="top-btn back" onclick="location.href='inventory_layout.html'">&#9664; 적재대 현황</button>
-    <button class="top-btn view disabled">&#128194; 조회</button>
+    <button class="top-btn view">&#128194; 조회</button>
   </div>
-
   <main>
     <div class="page-header">
       <h1 class="page-title" id="pageTitle">랙 상세 현황</h1>
-      <p class="page-desc" id="pageDesc">슬롯을 클릭하여 입고/출고/이동 처리를 할 수 있습니다</p>
+      <p class="page-desc">슬롯을 클릭하여 입고/출고/이동/조정 처리를 할 수 있습니다</p>
     </div>
-
     <div class="rack-container">
-      <!-- 컨트롤 -->
       <div class="rack-controls">
         <select class="rack-select" id="rackSelect" onchange="onRackChange()">
           <option value="">동 선택</option>
@@ -220,45 +159,20 @@
           <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#ffebee;border-color:#E57373;"></div> 마이너스</div>
         </div>
       </div>
-
-      <!-- 탭 -->
-      <div class="rack-tabs" id="rackTabs">
-        <div class="rack-tab active" onclick="switchTab('grid')">슬롯 현황</div>
-        <div class="rack-tab" onclick="switchTab('inbound')">입고 처리</div>
-        <div class="rack-tab" onclick="switchTab('outbound')">출고 처리</div>
-        <div class="rack-tab" onclick="switchTab('move')">이동 처리</div>
-        <div class="rack-tab" onclick="switchTab('adjust')">재고 조정</div>
-      </div>
-
-      <!-- 통계 바 -->
-      <div class="rack-stats" id="rackStatsBar">
+      <div class="rack-stats">
         <div class="rack-stat-item">전체 <strong id="sSTotal">0</strong>칸</div>
         <div class="rack-stat-item">사용 <strong id="sSUsed">0</strong>칸</div>
         <div class="rack-stat-item">빈칸 <strong id="sSEmpty">0</strong>칸</div>
         <div class="rack-stat-item">사용률 <strong id="sSRate">0%</strong></div>
         <div class="rack-stat-item highlight">마이너스 <strong id="sSNeg">0</strong>건</div>
       </div>
-
-      <!-- 슬롯 그리드 -->
-      <div id="slotGridArea">
-        <div class="no-slots">동을 선택해주세요</div>
-      </div>
+      <div id="slotGridArea"><div class="no-slots">동을 선택해주세요</div></div>
     </div>
   </main>
 
-  <!-- 슬롯 상세 모달 -->
   <div class="modal-overlay" id="slotModal">
-    <div class="modal-box">
-      <div class="modal-title">
-        슬롯 <span id="modalSlotCode">-</span>
-        <span class="slot-badge" id="modalBadge">-</span>
-      </div>
-      <div id="modalBody"></div>
-      <div class="modal-actions" id="modalActions"></div>
-    </div>
+    <div class="modal-box" id="slotModalBody"></div>
   </div>
-
-  <!-- 토스트 -->
   <div class="toast-msg" id="toastMsg"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -272,14 +186,13 @@
     var allRacks = [];
     var currentRack = null;
     var currentSlots = [];
-    var currentTab = 'grid';
+    var allSlots = []; // 이동처리용 전체 슬롯
 
     document.addEventListener('DOMContentLoaded', function() {
       if (typeof checkAuth === 'function') { checkAuth(); }
       loadRacks();
     });
 
-    // ── 랙 목록 로드 ──
     function loadRacks() {
       supabase.from('inventory_racks').select('*').eq('active', true).order('sort_order')
         .then(function(res) {
@@ -291,366 +204,358 @@
             opt.textContent = allRacks[i].rack_name;
             sel.appendChild(opt);
           }
-          // URL 파라미터 확인
           var params = new URLSearchParams(window.location.search);
           var rackParam = params.get('rack');
-          if (rackParam) {
-            sel.value = rackParam;
-            onRackChange();
-          }
+          if (rackParam) { sel.value = rackParam; onRackChange(); }
         });
     }
 
-    // ── 동 변경 ──
     function onRackChange() {
       var code = document.getElementById('rackSelect').value;
-      if (!code) {
-        currentRack = null;
-        currentSlots = [];
-        document.getElementById('slotGridArea').innerHTML = '<div class="no-slots">동을 선택해주세요</div>';
-        return;
-      }
+      if (!code) { currentRack = null; currentSlots = [];
+        document.getElementById('slotGridArea').innerHTML = '<div class="no-slots">동을 선택해주세요</div>'; return; }
       currentRack = null;
-      for (var i = 0; i < allRacks.length; i++) {
-        if (allRacks[i].rack_code === code) { currentRack = allRacks[i]; break; }
-      }
+      for (var i = 0; i < allRacks.length; i++) { if (allRacks[i].rack_code === code) { currentRack = allRacks[i]; break; } }
       if (!currentRack) return;
-
       document.getElementById('pageTitle').textContent = currentRack.rack_name + ' 상세 현황';
       loadSlots();
     }
 
-    // ── 슬롯 데이터 로드 ──
     function loadSlots() {
       if (!currentRack) return;
-      supabase.from('inventory_rack_slots').select('*')
-        .eq('rack_id', currentRack.id)
-        .order('row_no').order('col_no')
+      supabase.from('inventory_rack_slots').select('*').eq('rack_id', currentRack.id).order('row_no').order('col_no')
         .then(function(res) {
           currentSlots = res.data || [];
           if (currentSlots.length === 0) {
-            document.getElementById('slotGridArea').innerHTML =
-              '<div class="no-slots">이 동에는 아직 슬롯이 등록되지 않았습니다.<br>슬롯 구조가 확정되면 등록해주세요.</div>';
-            updateStats();
-            return;
-          }
-          renderSlotGrid();
+            document.getElementById('slotGridArea').innerHTML = '<div class="no-slots">이 동에는 아직 슬롯이 등록되지 않았습니다.</div>';
+          } else { renderSlotGrid(); }
           updateStats();
         });
     }
 
-    // ── 통계 업데이트 ──
     function updateStats() {
-      var total = currentSlots.length;
-      var used = 0;
-      var neg = 0;
+      var total = currentSlots.length, used = 0, neg = 0;
       for (var i = 0; i < currentSlots.length; i++) {
         if (currentSlots[i].status === 'occupied') used++;
         if (currentSlots[i].quantity < 0) neg++;
       }
-      var empty = total - used;
-      var rate = total > 0 ? Math.round((used / total) * 100) : 0;
       document.getElementById('sSTotal').textContent = total;
       document.getElementById('sSUsed').textContent = used;
-      document.getElementById('sSEmpty').textContent = empty;
-      document.getElementById('sSRate').textContent = rate + '%';
+      document.getElementById('sSEmpty').textContent = total - used;
+      document.getElementById('sSRate').textContent = (total > 0 ? Math.round((used / total) * 100) : 0) + '%';
       document.getElementById('sSNeg').textContent = neg;
     }
 
-    // ── 슬롯 그리드 렌더링 ──
     function renderSlotGrid() {
-      if (!currentRack || currentSlots.length === 0) return;
-
       var rows = currentRack.total_rows;
       var cols = currentRack.total_cols;
-      var colCount = cols + 1; // +1 for row label
-
-      var h = '';
-      h += '<div class="slot-grid" style="grid-template-columns: 40px repeat(' + cols + ', 1fr);">';
-
+      var h = '<div class="slot-grid" style="grid-template-columns: 40px repeat(' + cols + ', 1fr);">';
       for (var r = rows; r >= 1; r--) {
-        // 행 라벨
         h += '<div class="row-label">' + (r * 100) + '번대</div>';
         for (var c = 1; c <= cols; c++) {
           var slot = findSlot(r, c);
-          if (!slot) {
-            h += '<div class="slot-cell empty" style="opacity:0.3;"><div class="slot-code">-</div></div>';
-            continue;
-          }
-          var cellClass = 'empty';
-          var qtyClass = 'zero';
-          var qtyText = '-';
-          var prodText = '';
-
-          if (slot.quantity < 0) {
-            cellClass = 'negative';
-            qtyClass = 'neg';
-            qtyText = slot.quantity.toLocaleString();
-            prodText = slot.product_code || '';
-          } else if (slot.status === 'occupied' && slot.quantity > 0) {
-            cellClass = 'occupied';
-            qtyClass = 'positive';
-            qtyText = slot.quantity.toLocaleString();
-            prodText = slot.product_code || '';
-          } else if (slot.status === 'reserved') {
-            cellClass = 'reserved';
-            prodText = slot.product_code || '예약';
-          }
-
-          h += '<div class="slot-cell ' + cellClass + '" onclick="openSlotModal(' + slot.id + ')">';
+          if (!slot) { h += '<div class="slot-cell empty" style="opacity:0.3;"><div class="slot-code">-</div></div>'; continue; }
+          var cellClass = 'empty', qtyClass = 'zero', qtyText = '-', prodText = '';
+          if (slot.quantity < 0) { cellClass = 'negative'; qtyClass = 'neg'; qtyText = slot.quantity.toLocaleString(); prodText = slot.product_code || ''; }
+          else if (slot.status === 'occupied' && slot.quantity > 0) { cellClass = 'occupied'; qtyClass = 'positive'; qtyText = slot.quantity.toLocaleString(); prodText = slot.product_code || ''; }
+          else if (slot.status === 'reserved') { cellClass = 'reserved'; prodText = slot.product_code || '예약'; }
+          h += '<div class="slot-cell ' + cellClass + '" onclick="openModal(' + slot.id + ')">';
           h += '<div class="slot-code">' + slot.slot_code + '</div>';
-          if (prodText) {
-            h += '<div class="slot-product">' + prodText + '</div>';
-          }
-          h += '<div class="slot-qty ' + qtyClass + '">' + qtyText + '</div>';
-          h += '</div>';
+          if (prodText) h += '<div class="slot-product">' + prodText + '</div>';
+          h += '<div class="slot-qty ' + qtyClass + '">' + qtyText + '</div></div>';
         }
       }
       h += '</div>';
-
       document.getElementById('slotGridArea').innerHTML = h;
     }
 
-    // ── 슬롯 찾기 ──
     function findSlot(row, col) {
-      for (var i = 0; i < currentSlots.length; i++) {
-        if (currentSlots[i].row_no === row && currentSlots[i].col_no === col) {
-          return currentSlots[i];
-        }
-      }
+      for (var i = 0; i < currentSlots.length; i++) { if (currentSlots[i].row_no === row && currentSlots[i].col_no === col) return currentSlots[i]; }
       return null;
     }
-
     function findSlotById(id) {
-      for (var i = 0; i < currentSlots.length; i++) {
-        if (currentSlots[i].id === id) return currentSlots[i];
-      }
+      for (var i = 0; i < currentSlots.length; i++) { if (currentSlots[i].id === id) return currentSlots[i]; }
       return null;
     }
 
-    // ── 탭 전환 ──
-    function switchTab(tab) {
-      currentTab = tab;
-      var tabs = document.querySelectorAll('.rack-tab');
-      for (var i = 0; i < tabs.length; i++) {
-        tabs[i].className = 'rack-tab';
-      }
-      var tabNames = ['grid', 'inbound', 'outbound', 'move', 'adjust'];
-      for (var j = 0; j < tabNames.length; j++) {
-        if (tabNames[j] === tab) {
-          tabs[j].className = 'rack-tab active';
-          break;
-        }
-      }
-      // 탭별 동작은 슬롯 클릭 시 모달에서 처리
-    }
-
-    // ── 슬롯 모달 열기 ──
-    function openSlotModal(slotId) {
+    // ══════════════════════════════════════
+    // 통합 모달
+    // ══════════════════════════════════════
+    function openModal(slotId) {
       var slot = findSlotById(slotId);
       if (!slot) return;
 
-      document.getElementById('modalSlotCode').textContent = slot.slot_code;
+      var isOccupied = (slot.status === 'occupied' && slot.product_code);
+      var h = '';
 
-      var badge = document.getElementById('modalBadge');
-      if (slot.status === 'occupied') {
-        badge.textContent = '적재중';
-        badge.className = 'slot-badge';
-      } else if (slot.status === 'reserved') {
-        badge.textContent = '예약';
-        badge.className = 'slot-badge';
-        badge.style.background = '#fff3e0';
-        badge.style.color = '#E65100';
+      // 헤더
+      h += '<div class="modal-header">';
+      h += '<div class="modal-title">슬롯 ' + slot.slot_code + '</div>';
+      if (isOccupied) { h += '<div class="modal-badge occupied">적재중</div>'; }
+      else { h += '<div class="modal-badge empty">빈 슬롯</div>'; }
+      h += '</div>';
+
+      // 현재 정보
+      h += '<div class="modal-info">';
+      h += '<div class="modal-info-row">';
+      h += '<div class="modal-info-item"><div class="mi-label">사번</div><div class="mi-value">' + (slot.product_code || '-') + '</div></div>';
+      h += '<div class="modal-info-item"><div class="mi-label">LOT</div><div class="mi-value">' + (slot.lot_no || '-') + '</div></div>';
+      h += '<div class="modal-info-item"><div class="mi-label">현재 수량</div><div class="mi-value">' + (slot.quantity || 0).toLocaleString() + '</div></div>';
+      h += '</div></div>';
+
+      if (isOccupied) {
+        // ── 추가 입고 ──
+        h += '<hr class="modal-divider">';
+        h += '<div class="modal-section-title blue">추가 입고</div>';
+        h += '<div class="modal-form-row">';
+        h += '<div class="modal-form-group"><label>추가 수량</label><input type="number" id="addQty" placeholder="추가할 수량" min="1"></div>';
+        h += '</div>';
+        h += '<div class="modal-btn-row"><button class="modal-btn blue" onclick="doAddInbound(' + slotId + ')">추가 입고</button></div>';
+
+        // ── 일부/전량 출고 ──
+        h += '<hr class="modal-divider">';
+        h += '<div class="modal-section-title red">출고 처리</div>';
+        h += '<div class="modal-form-row">';
+        h += '<div class="modal-form-group"><label>출고 수량</label><input type="number" id="outQty" placeholder="출고할 수량" min="1" max="' + slot.quantity + '"></div>';
+        h += '</div>';
+        h += '<div class="modal-btn-row">';
+        h += '<button class="modal-btn red" onclick="doPartialOut(' + slotId + ')">일부 출고</button>';
+        h += '<button class="modal-btn red" onclick="doFullOut(' + slotId + ')">전량 출고</button>';
+        h += '</div>';
+
+        // ── 이동 처리 ──
+        h += '<hr class="modal-divider">';
+        h += '<div class="modal-section-title orange">이동 처리</div>';
+        h += '<div class="modal-form-row">';
+        h += '<div class="modal-form-group"><label>이동할 동</label>';
+        h += '<select id="moveRack" onchange="loadMoveSlots()">';
+        h += '<option value="">-- 동 선택 --</option>';
+        for (var r = 0; r < allRacks.length; r++) {
+          if (allRacks[r].id !== currentRack.id) {
+            h += '<option value="' + allRacks[r].id + '">' + allRacks[r].rack_name + '</option>';
+          }
+        }
+        h += '</select></div>';
+        h += '<div class="modal-form-group"><label>이동할 슬롯</label>';
+        h += '<select id="moveSlot"><option value="">-- 먼저 동 선택 --</option></select></div>';
+        h += '</div>';
+        h += '<div class="modal-form-row">';
+        h += '<div class="modal-form-group"><label>이동 수량</label><input type="number" id="moveQty" value="' + slot.quantity + '" min="1" max="' + slot.quantity + '"></div>';
+        h += '</div>';
+        h += '<div class="modal-btn-row"><button class="modal-btn orange" onclick="doMove(' + slotId + ')">이동 처리</button></div>';
+
+        // ── 수량 조정 ──
+        h += '<hr class="modal-divider">';
+        h += '<div class="modal-section-title green">수량 조정</div>';
+        h += '<div class="modal-form-row">';
+        h += '<div class="modal-form-group"><label>변경 수량</label><input type="number" id="adjQty" value="' + (slot.quantity || 0) + '"></div>';
+        h += '<div class="modal-form-group"><label>사유 (필수)</label><input type="text" id="adjReason" placeholder="조정 사유 입력"></div>';
+        h += '</div>';
+        h += '<div class="modal-btn-row"><button class="modal-btn green" onclick="doAdjust(' + slotId + ')">수량 조정</button></div>';
+
+        // ── 슬롯 비우기 ──
+        h += '<hr class="modal-divider">';
+        h += '<div class="modal-btn-row">';
+        h += '<button class="modal-btn gray" onclick="doClear(' + slotId + ')">슬롯 비우기</button>';
+        h += '<button class="modal-btn cancel" onclick="closeModal()">닫기</button>';
+        h += '</div>';
+
       } else {
-        badge.textContent = '빈 슬롯';
-        badge.className = 'slot-badge empty-badge';
+        // ── 빈 슬롯: 입고 처리 ──
+        h += '<hr class="modal-divider">';
+        h += '<div class="modal-section-title blue">입고 처리</div>';
+        h += '<div class="modal-form-row">';
+        h += '<div class="modal-form-group"><label>사번 *</label><input type="text" id="inProductCode" placeholder="제품 사번"></div>';
+        h += '<div class="modal-form-group"><label>LOT 번호</label><input type="text" id="inLotNo" placeholder="LOT 번호"></div>';
+        h += '</div>';
+        h += '<div class="modal-form-row">';
+        h += '<div class="modal-form-group"><label>수량 *</label><input type="number" id="inQty" placeholder="입고 수량" min="1"></div>';
+        h += '</div>';
+        h += '<div class="modal-btn-row">';
+        h += '<button class="modal-btn blue" onclick="doInbound(' + slotId + ')">입고 처리</button>';
+        h += '<button class="modal-btn cancel" onclick="closeModal()">닫기</button>';
+        h += '</div>';
       }
 
-      var body = '';
-      body += '<div class="modal-field"><label>현재 상태</label><div class="field-value">' + getStatusText(slot.status) + '</div></div>';
-
-      if (slot.product_code) {
-        body += '<div class="modal-field"><label>사번</label><div class="field-value">' + slot.product_code + '</div></div>';
-      }
-      if (slot.lot_no) {
-        body += '<div class="modal-field"><label>LOT 번호</label><div class="field-value">' + slot.lot_no + '</div></div>';
-      }
-      body += '<div class="modal-field"><label>현재 수량</label><div class="field-value">' + (slot.quantity || 0).toLocaleString() + '</div></div>';
-
-      // 입고 폼 (빈 슬롯일 때)
-      if (slot.status === 'empty' || !slot.product_code) {
-        body += '<hr style="margin:16px 0;border:none;border-top:1px solid #eee;">';
-        body += '<div style="font-size:13px;font-weight:700;color:#4A90D9;margin-bottom:10px;">입고 처리</div>';
-        body += '<div class="modal-field"><label>사번</label><input type="text" id="inProductCode" placeholder="제품 사번 입력"></div>';
-        body += '<div class="modal-field"><label>LOT 번호</label><input type="text" id="inLotNo" placeholder="LOT 번호 입력"></div>';
-        body += '<div class="modal-field"><label>수량</label><input type="number" id="inQty" placeholder="입고 수량" min="1"></div>';
-      }
-
-      // 출고/수량 조정 폼 (적재중일 때)
-      if (slot.status === 'occupied' && slot.product_code) {
-        body += '<hr style="margin:16px 0;border:none;border-top:1px solid #eee;">';
-        body += '<div class="modal-field"><label>수량 변경</label><input type="number" id="adjQty" value="' + (slot.quantity || 0) + '"></div>';
-        body += '<div class="modal-field"><label>사유</label><input type="text" id="adjReason" placeholder="조정 사유 입력"></div>';
-      }
-
-      document.getElementById('modalBody').innerHTML = body;
-
-      // 액션 버튼
-      var actions = '';
-      if (slot.status === 'empty' || !slot.product_code) {
-        actions += '<button class="btn-inbound" onclick="doInbound(' + slot.id + ')">입고 처리</button>';
-      }
-      if (slot.status === 'occupied' && slot.product_code) {
-        actions += '<button class="btn-inbound" onclick="doAdjust(' + slot.id + ')">수량 수정</button>';
-        actions += '<button class="btn-outbound" onclick="doOutbound(' + slot.id + ')">전량 출고</button>';
-        actions += '<button class="btn-clear" onclick="doClear(' + slot.id + ')">슬롯 비우기</button>';
-      }
-      actions += '<button class="btn-cancel" onclick="closeModal()">닫기</button>';
-      document.getElementById('modalActions').innerHTML = actions;
-
+      document.getElementById('slotModalBody').innerHTML = h;
       document.getElementById('slotModal').className = 'modal-overlay show';
     }
 
-    function closeModal() {
-      document.getElementById('slotModal').className = 'modal-overlay';
-    }
+    function closeModal() { document.getElementById('slotModal').className = 'modal-overlay'; }
 
-    function getStatusText(s) {
-      if (s === 'occupied') return '적재중';
-      if (s === 'reserved') return '예약';
-      return '빈 슬롯';
-    }
-
-    // ── 입고 처리 ──
+    // ── 입고 (빈 슬롯) ──
     function doInbound(slotId) {
-      var productCode = document.getElementById('inProductCode').value.trim();
-      var lotNo = document.getElementById('inLotNo').value.trim();
+      var pc = document.getElementById('inProductCode').value.trim();
+      var ln = document.getElementById('inLotNo').value.trim();
       var qty = parseInt(document.getElementById('inQty').value) || 0;
-
-      if (!productCode) { showToast('사번을 입력해주세요'); return; }
+      if (!pc) { showToast('사번을 입력해주세요'); return; }
       if (qty <= 0) { showToast('수량을 입력해주세요'); return; }
 
-      supabase.from('inventory_rack_slots').update({
-        product_code: productCode,
-        lot_no: lotNo,
-        quantity: qty,
-        status: 'occupied'
-      }).eq('id', slotId).then(function(res) {
-        if (res.error) { showToast('오류: ' + res.error.message); return; }
-
-        // 이동 이력 기록
-        supabase.from('inventory_movements').insert({
-          product_code: productCode,
-          movement_type: 'inbound',
-          to_location: currentRack.rack_name + '-' + findSlotById(slotId).slot_code,
-          quantity: qty,
-          lot_no: lotNo,
-          reason: '슬롯 입고',
-          moved_by: 'system'
-        }).then(function() {});
-
-        showToast('입고 완료!');
-        closeModal();
-        loadSlots();
-      });
-    }
-
-    // ── 수량 수정 ──
-    function doAdjust(slotId) {
-      var slot = findSlotById(slotId);
-      var newQty = parseInt(document.getElementById('adjQty').value) || 0;
-      var reason = document.getElementById('adjReason').value.trim();
-
-      if (!reason) { showToast('사유를 반드시 입력해주세요'); return; }
-      if (newQty === slot.quantity) { showToast('변경사항이 없습니다'); return; }
-
-      var updateData = { quantity: newQty };
-      if (newQty <= 0) {
-        updateData.status = 'empty';
-        updateData.product_code = null;
-        updateData.lot_no = null;
-        updateData.quantity = 0;
-      }
-
-      supabase.from('inventory_rack_slots').update(updateData).eq('id', slotId)
+      supabase.from('inventory_rack_slots').update({ product_code: pc, lot_no: ln, quantity: qty, status: 'occupied' }).eq('id', slotId)
         .then(function(res) {
           if (res.error) { showToast('오류: ' + res.error.message); return; }
+          logMovement(pc, 'inbound', null, currentRack.rack_name + '-' + findSlotById(slotId).slot_code, qty, ln, '슬롯 입고');
+          showToast('입고 완료!'); closeModal(); loadSlots();
+        });
+    }
 
-          // 조정 이력
-          supabase.from('inventory_adjustments').insert({
-            product_code: slot.product_code,
-            lot_no: slot.lot_no,
-            adjust_type: 'adjust',
-            before_qty: slot.quantity,
-            after_qty: newQty,
-            diff_qty: newQty - slot.quantity,
-            reason: reason,
-            adjusted_by: 'system'
-          }).then(function() {});
+    // ── 추가 입고 ──
+    function doAddInbound(slotId) {
+      var slot = findSlotById(slotId);
+      var addQty = parseInt(document.getElementById('addQty').value) || 0;
+      if (addQty <= 0) { showToast('추가 수량을 입력해주세요'); return; }
+      var newQty = slot.quantity + addQty;
 
-          showToast('수량 수정 완료!');
-          closeModal();
-          loadSlots();
+      supabase.from('inventory_rack_slots').update({ quantity: newQty }).eq('id', slotId)
+        .then(function(res) {
+          if (res.error) { showToast('오류: ' + res.error.message); return; }
+          logMovement(slot.product_code, 'inbound', null, currentRack.rack_name + '-' + slot.slot_code, addQty, slot.lot_no, '추가 입고 (' + slot.quantity + ' → ' + newQty + ')');
+          showToast('추가 입고 완료! (' + newQty.toLocaleString() + '개)'); closeModal(); loadSlots();
+        });
+    }
+
+    // ── 일부 출고 ──
+    function doPartialOut(slotId) {
+      var slot = findSlotById(slotId);
+      var outQty = parseInt(document.getElementById('outQty').value) || 0;
+      if (outQty <= 0) { showToast('출고 수량을 입력해주세요'); return; }
+      if (outQty > slot.quantity) { showToast('현재 수량(' + slot.quantity.toLocaleString() + ')보다 많습니다'); return; }
+      if (outQty === slot.quantity) { doFullOut(slotId); return; }
+
+      var newQty = slot.quantity - outQty;
+      supabase.from('inventory_rack_slots').update({ quantity: newQty }).eq('id', slotId)
+        .then(function(res) {
+          if (res.error) { showToast('오류: ' + res.error.message); return; }
+          logMovement(slot.product_code, 'outbound', currentRack.rack_name + '-' + slot.slot_code, null, outQty, slot.lot_no, '일부 출고 (' + slot.quantity + ' → ' + newQty + ')');
+          showToast('일부 출고 완료! (잔량: ' + newQty.toLocaleString() + '개)'); closeModal(); loadSlots();
         });
     }
 
     // ── 전량 출고 ──
-    function doOutbound(slotId) {
+    function doFullOut(slotId) {
       var slot = findSlotById(slotId);
-      if (!confirm(slot.slot_code + ' 슬롯의 ' + slot.product_code + ' ' + (slot.quantity || 0).toLocaleString() + '개를 전량 출고하시겠습니까?')) return;
+      if (!confirm(slot.slot_code + ' 슬롯 ' + slot.product_code + ' ' + (slot.quantity || 0).toLocaleString() + '개를 전량 출고하시겠습니까?')) return;
 
-      supabase.from('inventory_rack_slots').update({
-        product_code: null, lot_no: null, quantity: 0, status: 'empty'
-      }).eq('id', slotId).then(function(res) {
-        if (res.error) { showToast('오류: ' + res.error.message); return; }
+      supabase.from('inventory_rack_slots').update({ product_code: null, lot_no: null, quantity: 0, status: 'empty' }).eq('id', slotId)
+        .then(function(res) {
+          if (res.error) { showToast('오류: ' + res.error.message); return; }
+          logMovement(slot.product_code, 'outbound', currentRack.rack_name + '-' + slot.slot_code, null, slot.quantity, slot.lot_no, '전량 출고');
+          showToast('전량 출고 완료!'); closeModal(); loadSlots();
+        });
+    }
 
-        supabase.from('inventory_movements').insert({
-          product_code: slot.product_code,
-          movement_type: 'outbound',
-          from_location: currentRack.rack_name + '-' + slot.slot_code,
-          quantity: slot.quantity,
-          lot_no: slot.lot_no,
-          reason: '전량 출고',
-          moved_by: 'system'
-        }).then(function() {});
+    // ── 이동 처리 ──
+    function loadMoveSlots() {
+      var rackId = parseInt(document.getElementById('moveRack').value);
+      var sel = document.getElementById('moveSlot');
+      sel.innerHTML = '<option value="">-- 슬롯 선택 --</option>';
+      if (!rackId) return;
 
-        showToast('출고 완료!');
-        closeModal();
-        loadSlots();
+      supabase.from('inventory_rack_slots').select('*').eq('rack_id', rackId).eq('status', 'empty').order('row_no').order('col_no')
+        .then(function(res) {
+          var slots = res.data || [];
+          for (var i = 0; i < slots.length; i++) {
+            var opt = document.createElement('option');
+            opt.value = slots[i].id;
+            opt.textContent = slots[i].slot_code + ' (빈 슬롯)';
+            sel.appendChild(opt);
+          }
+          if (slots.length === 0) {
+            var opt2 = document.createElement('option');
+            opt2.value = '';
+            opt2.textContent = '빈 슬롯이 없습니다';
+            sel.appendChild(opt2);
+          }
+        });
+    }
+
+    function doMove(slotId) {
+      var slot = findSlotById(slotId);
+      var toRackId = parseInt(document.getElementById('moveRack').value);
+      var toSlotId = parseInt(document.getElementById('moveSlot').value);
+      var moveQty = parseInt(document.getElementById('moveQty').value) || 0;
+
+      if (!toRackId) { showToast('이동할 동을 선택해주세요'); return; }
+      if (!toSlotId) { showToast('이동할 슬롯을 선택해주세요'); return; }
+      if (moveQty <= 0) { showToast('이동 수량을 입력해주세요'); return; }
+      if (moveQty > slot.quantity) { showToast('현재 수량보다 많습니다'); return; }
+
+      var toRackName = '';
+      for (var r = 0; r < allRacks.length; r++) { if (allRacks[r].id === toRackId) { toRackName = allRacks[r].rack_name; break; } }
+
+      if (!confirm(slot.slot_code + ' → ' + toRackName + ' 으로 ' + moveQty.toLocaleString() + '개를 이동하시겠습니까?')) return;
+
+      // 원본 슬롯 차감
+      var fromNewQty = slot.quantity - moveQty;
+      var fromUpdate = { quantity: fromNewQty };
+      if (fromNewQty <= 0) { fromUpdate.status = 'empty'; fromUpdate.product_code = null; fromUpdate.lot_no = null; fromUpdate.quantity = 0; }
+
+      // 대상 슬롯 입고
+      var toUpdate = { product_code: slot.product_code, lot_no: slot.lot_no, quantity: moveQty, status: 'occupied' };
+
+      Promise.all([
+        supabase.from('inventory_rack_slots').update(fromUpdate).eq('id', slotId),
+        supabase.from('inventory_rack_slots').update(toUpdate).eq('id', toSlotId)
+      ]).then(function(results) {
+        if (results[0].error || results[1].error) { showToast('이동 처리 오류'); return; }
+
+        supabase.from('inventory_rack_slots').select('slot_code').eq('id', toSlotId).then(function(slotRes) {
+          var toSlotCode = slotRes.data && slotRes.data[0] ? slotRes.data[0].slot_code : '?';
+          logMovement(slot.product_code, 'transfer', currentRack.rack_name + '-' + slot.slot_code, toRackName + '-' + toSlotCode, moveQty, slot.lot_no, '슬롯 이동');
+          showToast('이동 완료! → ' + toRackName + '-' + toSlotCode); closeModal(); loadSlots();
+        });
       });
+    }
+
+    // ── 수량 조정 ──
+    function doAdjust(slotId) {
+      var slot = findSlotById(slotId);
+      var newQty = parseInt(document.getElementById('adjQty').value) || 0;
+      var reason = document.getElementById('adjReason').value.trim();
+      if (!reason) { showToast('사유를 반드시 입력해주세요'); return; }
+      if (newQty === slot.quantity) { showToast('변경사항이 없습니다'); return; }
+
+      var updateData = { quantity: newQty };
+      if (newQty <= 0) { updateData.status = 'empty'; updateData.product_code = null; updateData.lot_no = null; updateData.quantity = 0; }
+
+      supabase.from('inventory_rack_slots').update(updateData).eq('id', slotId)
+        .then(function(res) {
+          if (res.error) { showToast('오류: ' + res.error.message); return; }
+          supabase.from('inventory_adjustments').insert({
+            product_code: slot.product_code, lot_no: slot.lot_no, adjust_type: 'adjust',
+            before_qty: slot.quantity, after_qty: newQty, diff_qty: newQty - slot.quantity,
+            reason: reason, adjusted_by: 'system'
+          }).then(function() {});
+          showToast('수량 조정 완료! (' + slot.quantity + ' → ' + newQty + ')'); closeModal(); loadSlots();
+        });
     }
 
     // ── 슬롯 비우기 ──
     function doClear(slotId) {
       var slot = findSlotById(slotId);
-      if (!confirm(slot.slot_code + ' 슬롯을 비우시겠습니까? (데이터가 초기화됩니다)')) return;
-
-      supabase.from('inventory_rack_slots').update({
-        product_code: null, lot_no: null, quantity: 0, status: 'empty'
-      }).eq('id', slotId).then(function(res) {
-        if (res.error) { showToast('오류: ' + res.error.message); return; }
-        showToast('슬롯 초기화 완료!');
-        closeModal();
-        loadSlots();
-      });
+      if (!confirm(slot.slot_code + ' 슬롯을 비우시겠습니까?')) return;
+      supabase.from('inventory_rack_slots').update({ product_code: null, lot_no: null, quantity: 0, status: 'empty' }).eq('id', slotId)
+        .then(function(res) {
+          if (res.error) { showToast('오류: ' + res.error.message); return; }
+          showToast('슬롯 초기화 완료!'); closeModal(); loadSlots();
+        });
     }
 
-    // ── 유틸 ──
-    function goBack() {
-      window.location.href = 'inventory_layout.html';
+    // ── 이동이력 기록 ──
+    function logMovement(pc, type, from, to, qty, lot, reason) {
+      supabase.from('inventory_movements').insert({
+        product_code: pc, movement_type: type, from_location: from, to_location: to,
+        quantity: qty, lot_no: lot, reason: reason, moved_by: 'system'
+      }).then(function() {});
     }
 
     function showToast(msg) {
       var t = document.getElementById('toastMsg');
-      t.textContent = msg;
-      t.className = 'toast-msg show';
+      t.textContent = msg; t.className = 'toast-msg show';
       setTimeout(function() { t.className = 'toast-msg'; }, 2500);
     }
 
-    // 모달 외부 클릭 닫기
-    document.getElementById('slotModal').addEventListener('click', function(e) {
-      if (e.target === this) closeModal();
-    });
+    document.getElementById('slotModal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
   </script>
 </body>
 </html>
