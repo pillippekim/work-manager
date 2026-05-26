@@ -352,55 +352,102 @@ function viewDetail(id) {
 function closeDetailModal() { document.getElementById('detailModal').classList.remove('show'); }
 document.getElementById('detailModal').addEventListener('click',function(e){if(e.target===this)closeDetailModal();});
 
-// 엑셀 다운로드
+// 엑셀 다운로드 (경도/치수 5포인트 개별 셀 분리)
 function downloadExcel() {
     if (!allData.length) { showToast('데이터가 없습니다','error'); return; }
-    var rows = allData.map(function(d) {
+
+    // 헤더 순서 정의
+    var headers = [
+        '검사일','작성자','설비','타입','면','비가동','사번','Cavity','재질','사상방법',
+        '금형온도','가류시간','성형압','진공압','외관불량',
+        '경도(초)X1','경도(초)X2','경도(초)X3','경도(초)X4','경도(초)X5',
+        '경도(중)X1','경도(중)X2','경도(중)X3','경도(중)X4','경도(중)X5',
+        '경도(종)X1','경도(종)X2','경도(종)X3','경도(종)X4','경도(종)X5',
+        '치수(초)X1','치수(초)X2','치수(초)X3','치수(초)X4','치수(초)X5',
+        '치수(중)X1','치수(중)X2','치수(중)X3','치수(중)X4','치수(중)X5',
+        '치수(종)X1','치수(종)X2','치수(종)X3','치수(종)X4','치수(종)X5',
+        '변동점(금형)','변동점(설비)','원인및조치'
+    ];
+
+    var rows = [];
+    for (var i=0;i<allData.length;i++) {
+        var d = allData[i];
         var faceMap = {A:'가',B:'나',C:'다'};
         var defects = [];
         if (d.visual_data) {
-            ['first','mid','last'].forEach(function(t) {
-                if (d.visual_data[t]) defects = defects.concat(d.visual_data[t]);
-            });
+            var timings = ['first','mid','last'];
+            for (var t=0;t<timings.length;t++) {
+                if (d.visual_data[timings[t]]) defects = defects.concat(d.visual_data[timings[t]]);
+            }
         }
-        // 경도 데이터 추출
-        var hd = d.hardness_data || {};
-        var hFirst = (hd.first || []).join('/');
-        var hMid = (hd.mid || []).join('/');
-        var hLast = (hd.last || []).join('/');
-        // 치수 데이터 추출
-        var dd = d.dimension_data || {};
-        var dFirst = (dd.first || []).join('/');
-        var dMid = (dd.mid || []).join('/');
-        var dLast = (dd.last || []).join('/');
 
-        return {
-            '검사일': d.inspect_date,
-            '작성자': d.inspector||'',
-            '설비': d.equipment||'',
-            '타입': d.equip_type||'',
-            '면': faceMap[d.face]||d.face,
-            '사번': d.sabun||'',
-            'Cavity': d.cavity_count||'',
-            '재질': d.material||'',
-            '사상방법': d.trim_method||'',
-            '금형온도': d.mold_temp||'',
-            '가류시간': d.cure_time||'',
-            '성형압': d.mold_pressure||'',
-            '진공압': d.vacuum_pressure||'',
-            '외관불량': defects.length>0 ? defects.join(',') : '양호',
-            '경도(초)': hFirst,
-            '경도(중)': hMid,
-            '경도(종)': hLast,
-            '치수(초)': dFirst,
-            '치수(중)': dMid,
-            '치수(종)': dLast,
-            '변동점(금형)': (d.change_mold||[]).join(','),
-            '변동점(설비)': (d.change_equip||[]).join(','),
-            '원인및조치': d.action_detail||''
-        };
-    });
-    var ws = XLSX.utils.json_to_sheet(rows);
+        // 경도 5포인트 개별 추출
+        var hd = d.hardness_data || {};
+        var hFirst = hd.first || ['','','','',''];
+        var hMid = hd.mid || ['','','','',''];
+        var hLast = hd.last || ['','','','',''];
+
+        // 치수 5포인트 개별 추출
+        var dd2 = d.dimension_data || {};
+        var dFirst = dd2.first || ['','','','',''];
+        var dMid = dd2.mid || ['','','','',''];
+        var dLast = dd2.last || ['','','','',''];
+
+        // 경도 값을 숫자로 변환 (SPC 분석용)
+        function toNum(v) { var n = parseFloat(v); return isNaN(n) ? '' : n; }
+
+        var row = {};
+        row['검사일'] = d.inspect_date;
+        row['작성자'] = d.inspector||'';
+        row['설비'] = d.equipment||'';
+        row['타입'] = d.equip_type||'';
+        row['면'] = faceMap[d.face]||d.face;
+        row['비가동'] = d.is_inactive ? 'Y' : '';
+        row['사번'] = d.sabun||'';
+        row['Cavity'] = d.cavity_count||'';
+        row['재질'] = d.material||'';
+        row['사상방법'] = d.trim_method||'';
+        row['금형온도'] = d.mold_temp||'';
+        row['가류시간'] = d.cure_time||'';
+        row['성형압'] = d.mold_pressure||'';
+        row['진공압'] = d.vacuum_pressure||'';
+        row['외관불량'] = defects.length>0 ? defects.join(',') : '양호';
+
+        // 경도 15개 셀
+        for (var x=0;x<5;x++) row['경도(초)X'+(x+1)] = toNum(hFirst[x]);
+        for (var x=0;x<5;x++) row['경도(중)X'+(x+1)] = toNum(hMid[x]);
+        for (var x=0;x<5;x++) row['경도(종)X'+(x+1)] = toNum(hLast[x]);
+
+        // 치수 15개 셀
+        for (var x=0;x<5;x++) row['치수(초)X'+(x+1)] = toNum(dFirst[x]);
+        for (var x=0;x<5;x++) row['치수(중)X'+(x+1)] = toNum(dMid[x]);
+        for (var x=0;x<5;x++) row['치수(종)X'+(x+1)] = toNum(dLast[x]);
+
+        row['변동점(금형)'] = (d.change_mold||[]).join(',');
+        row['변동점(설비)'] = (d.change_equip||[]).join(',');
+        row['원인및조치'] = d.action_detail||'';
+
+        rows.push(row);
+    }
+
+    var ws = XLSX.utils.json_to_sheet(rows, {header: headers});
+
+    // 컬럼 너비 설정 (경도/치수 셀은 좁게)
+    var wscols = [];
+    for (var c=0;c<headers.length;c++) {
+        var hdr = headers[c];
+        if (hdr.indexOf('X1')!==-1 || hdr.indexOf('X2')!==-1 || hdr.indexOf('X3')!==-1 || hdr.indexOf('X4')!==-1 || hdr.indexOf('X5')!==-1) {
+            wscols.push({wch:8});
+        } else if (hdr === '검사일' || hdr === '설비') {
+            wscols.push({wch:12});
+        } else if (hdr === '원인및조치') {
+            wscols.push({wch:25});
+        } else {
+            wscols.push({wch:10});
+        }
+    }
+    ws['!cols'] = wscols;
+
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '공정검사');
     XLSX.writeFile(wb, '공정검사_'+fmtLocal(new Date()).replace(/-/g,'')+'.xlsx');
