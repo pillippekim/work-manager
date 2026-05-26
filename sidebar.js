@@ -23,6 +23,7 @@ function initSidebar() {
     var isQualityPage = ['inspection_round_viewer.html'].indexOf(page) !== -1;
     var isDataPage = ['data_viewer.html','safety_viewer.html','docs_manager.html'].indexOf(page) !== -1;
     var isSystemPage = ['master_data.html','users.html'].indexOf(page) !== -1;
+    var isInventoryPage = ['inventory_layout.html','inventory_rack.html'].indexOf(page) !== -1;
 
     // 금형관리 active
     var dashActive = (page === 'mold_dashboard.html') ? ' nav-active' : '';
@@ -41,6 +42,10 @@ function initSidebar() {
     var masterActive = (page === 'master_data.html') ? ' nav-active' : '';
     var usersActive = (page === 'users.html') ? ' nav-active' : '';
 
+    // 재고관리 active
+    var invLayoutActive = (page === 'inventory_layout.html') ? ' nav-active' : '';
+    var invRackActive = (page === 'inventory_rack.html') ? ' nav-active' : '';
+
     // 자동 펼침
     var prodOpen = isMoldPage ? ' open' : '';
     var moldOpen = isMoldPage ? ' open' : '';
@@ -48,6 +53,8 @@ function initSidebar() {
     var inspOpen = isQualityPage ? ' open' : '';
     var dataOpen = isDataPage ? ' open' : '';
     var systemOpen = isSystemPage ? ' open' : '';
+    var logisticsOpen = isInventoryPage ? ' open' : '';
+    var inventoryOpen = isInventoryPage ? ' open' : '';
 
     /* ── 상단 헤더 바 ── */
     var headerEl = document.getElementById('top-header');
@@ -117,11 +124,6 @@ function initSidebar() {
                             '<a class="nav-link' + detailActive + '" href="mold_detail.html"><span class="n-icon">📋</span>금형 상세관리</a>' +
                         '</div>' +
                     '</div>' +
-                    /* 재고관리 (비활성) */
-                    '<div class="sub-item disabled">' +
-                        '<button class="sub-btn"><span class="s-icon">📦</span><span class="s-label">재고관리</span><span class="s-badge c-badge off">2차</span></button>' +
-                    '</div>' +
-                '</div>' +
             '</div>' +
 
             /* 품질관리 */
@@ -146,7 +148,25 @@ function initSidebar() {
             '</div>' +
 
             /* 비활성 메뉴 */
-            '<div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">🚚</span><span class="c-label">물류관리</span><span class="c-badge off">향후</span></button></div>' +
+            /* 물류관리 */
+            '<div class="cat-item' + logisticsOpen + '" id="c-logistics">' +
+                '<button class="cat-btn" onclick="toggleCat(\'c-logistics\')">' +
+                    '<span class="c-icon">🚚</span><span class="c-label">물류관리</span>' +
+                    '<span class="c-badge on">운영</span><span class="c-arrow">▼</span>' +
+                '</button>' +
+                '<div class="cat-body">' +
+                    '<div class="sub-item' + inventoryOpen + '" id="s-inventory">' +
+                        '<button class="sub-btn" onclick="toggleCat(\'s-inventory\')">' +
+                            '<span class="s-icon">📦</span><span class="s-label">재고관리</span>' +
+                            '<span class="s-badge c-badge on">1차</span><span class="s-arrow">▼</span>' +
+                        '</button>' +
+                        '<div class="sub-body">' +
+                            '<a class="nav-link' + invLayoutActive + '" href="inventory_layout.html"><span class="n-icon">🗺️</span>적재대 현황</a>' +
+                            '<a class="nav-link' + invRackActive + '" href="inventory_rack.html"><span class="n-icon">🗄️</span>랙 상세 현황</a>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
             '<div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">🔬</span><span class="c-label">R&D</span><span class="c-badge off">향후</span></button></div>' +
             '<div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">💼</span><span class="c-label">경영지원</span><span class="c-badge off">향후</span></button></div>' +
         '</div>' +
