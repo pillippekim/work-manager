@@ -1429,6 +1429,19 @@ function renderAllSections() {
           + (mold.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('성형')">전체 ${mold.length}건 보기 →</button></div>` : '')}
       </div>
     </div>
+    <div class="process-section">
+      <div class="section-header">
+        <span class="section-title">🔩 조립 작업일지</span>
+        <span class="section-count">${asm.length}건</span>
+      </div>
+      <div class="section-card">
+        ${asm.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
+          : asm.slice(0, 5).map(r => {
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.sabun||'-'} · ${r.worker_name||'-'}</span><span style="color:#243bb2;font-weight:500">${(r.production_qty||0).toLocaleString()} EA</span></div>`;
+            }).join('')
+          + (asm.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('조립')">전체 ${asm.length}건 보기 →</button></div>` : '')}
+      </div>
+    </div>
   `;
   document.getElementById('resultArea').innerHTML = html;
 }
