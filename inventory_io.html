@@ -8,28 +8,14 @@
   <link rel="stylesheet" href="common.css">
   <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
   <style>
-    .io-container { max-width: 1300px; margin: 0 auto; padding: 20px; }
-
-    /* 우측 상단 고정 버튼 */
-    .top-actions {
-      position: fixed; top: 12px; right: 20px; z-index: 1000;
-      display: flex; gap: 8px;
-    }
-    .top-btn {
-      padding: 10px 18px; border-radius: 6px; border: none;
-      font-size: 13px; font-weight: 600; cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.2s;
-    }
-    .top-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
-    .top-btn.home { background: #3d5a80; color: #fff; }
-    .top-btn.layout { background: #4A90D9; color: #fff; }
+    .io-container { max-width: 100%; margin: 0; padding: 16px 20px; }
 
     /* 메인 탭 */
     .io-tabs {
-      display: flex; gap: 0; margin-bottom: 24px; border-bottom: 3px solid #eee;
+      display: flex; gap: 0; margin-bottom: 20px; border-bottom: 3px solid #eee;
     }
     .io-tab {
-      padding: 14px 28px; font-size: 14px; font-weight: 600; color: #999;
+      padding: 12px 24px; font-size: 14px; font-weight: 600; color: #999;
       cursor: pointer; border-bottom: 3px solid transparent;
       margin-bottom: -3px; transition: all 0.2s;
     }
@@ -43,52 +29,58 @@
 
     /* 통계 카드 */
     .io-stats {
-      display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
+      display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;
     }
     .io-stat {
-      flex: 1; min-width: 130px; background: #fff; border-radius: 10px;
-      padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      flex: 1; min-width: 120px; background: #fff; border-radius: 8px;
+      padding: 12px 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
       border-left: 4px solid #4A90D9;
     }
-    .io-stat .is-label { font-size: 12px; color: #888; margin-bottom: 4px; }
-    .io-stat .is-value { font-size: 24px; font-weight: 700; color: #1a1a2e; }
+    .io-stat .is-label { font-size: 11px; color: #888; margin-bottom: 2px; }
+    .io-stat .is-value { font-size: 22px; font-weight: 700; color: #1a1a2e; }
     .io-stat.green { border-left-color: #27AE60; }
     .io-stat.orange { border-left-color: #F39C12; }
     .io-stat.red { border-left-color: #E74C3C; }
     .io-stat.purple { border-left-color: #9B59B6; }
 
+    /* 섹션 구분 */
+    .section-box {
+      background: #fff; border-radius: 8px; padding: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 14px; font-weight: 700; color: #1a1a2e; margin-bottom: 12px;
+      padding-bottom: 8px; border-bottom: 1px solid #f0f0f0;
+    }
+    .section-title .title-icon { margin-right: 6px; }
+
     /* 필터/검색 바 */
     .filter-bar {
-      display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;
+      display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center;
     }
     .filter-bar input, .filter-bar select {
-      padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 6px;
+      padding: 7px 10px; border: 1.5px solid #ddd; border-radius: 6px;
       font-size: 13px;
     }
     .filter-bar input:focus, .filter-bar select:focus { border-color: #4A90D9; outline: none; }
     .filter-bar .btn-filter {
-      padding: 8px 16px; border-radius: 6px; border: none;
+      padding: 7px 14px; border-radius: 6px; border: none;
       background: #4A90D9; color: #fff; font-size: 13px; font-weight: 600;
-      cursor: pointer;
-    }
-    .filter-bar .btn-secondary {
-      padding: 8px 16px; border-radius: 6px; border: 1.5px solid #ddd;
-      background: #fff; color: #555; font-size: 13px; font-weight: 600;
       cursor: pointer;
     }
 
     /* 데이터 테이블 */
-    .data-table-wrap { overflow-x: auto; margin-bottom: 20px; }
+    .data-table-wrap { overflow-x: auto; }
     .data-table {
       width: 100%; border-collapse: collapse; font-size: 13px;
     }
     .data-table th {
-      background: #f5f5f5; padding: 10px 8px; text-align: left;
+      background: #f5f5f5; padding: 8px 6px; text-align: left;
       font-weight: 600; color: #555; border-bottom: 2px solid #ddd;
       white-space: nowrap;
     }
     .data-table td {
-      padding: 8px; border-bottom: 1px solid #eee; vertical-align: middle;
+      padding: 7px 6px; border-bottom: 1px solid #eee; vertical-align: middle;
     }
     .data-table tr:hover { background: #f9f9f9; }
     .data-table .qty-cell { text-align: right; font-weight: 600; }
@@ -112,41 +104,38 @@
     }
     .row-btn.inbound { background: #4A90D9; color: #fff; }
     .row-btn.inbound:hover { background: #3a7bc8; }
+    .row-btn.all-inbound { background: #27AE60; color: #fff; }
+    .row-btn.all-inbound:hover { background: #219a52; }
 
     /* 업로드 영역 */
     .upload-area {
-      border: 2px dashed #ccc; border-radius: 12px; padding: 40px 20px;
+      border: 2px dashed #ccc; border-radius: 10px; padding: 28px 16px;
       text-align: center; cursor: pointer; transition: all 0.2s; background: #fafafa;
     }
     .upload-area:hover { border-color: #4A90D9; background: #f0f6ff; }
     .upload-area.dragover { border-color: #4A90D9; background: #e8f0fe; }
-    .upload-icon { font-size: 40px; margin-bottom: 10px; }
-    .upload-text { font-size: 14px; color: #555; margin-bottom: 4px; }
-    .upload-sub { font-size: 12px; color: #aaa; }
+    .upload-icon { font-size: 32px; margin-bottom: 6px; }
+    .upload-text { font-size: 13px; color: #555; margin-bottom: 2px; }
+    .upload-sub { font-size: 11px; color: #aaa; }
     .upload-area input[type="file"] { display: none; }
 
-    /* 수동 입고 폼 */
-    .manual-form {
-      background: #fff; border-radius: 10px; padding: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px;
-    }
-    .form-title { font-size: 15px; font-weight: 700; color: #1a1a2e; margin-bottom: 16px; }
-    .form-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
-    .form-group { flex: 1; min-width: 150px; }
-    .form-group label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; font-weight: 600; }
+    /* 수동 입고 폼 - 컴팩트 */
+    .form-row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+    .form-group { flex: 1; min-width: 130px; }
+    .form-group label { display: block; font-size: 11px; color: #888; margin-bottom: 3px; font-weight: 600; }
     .form-group input, .form-group select {
-      width: 100%; padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 6px;
-      font-size: 14px; box-sizing: border-box;
+      width: 100%; padding: 7px 10px; border: 1.5px solid #ddd; border-radius: 6px;
+      font-size: 13px; box-sizing: border-box;
     }
     .form-group input:focus, .form-group select:focus { border-color: #4A90D9; outline: none; }
 
     /* 액션 버튼 */
     .action-bar {
-      display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap;
+      display: flex; gap: 8px; justify-content: center; margin-top: 16px; flex-wrap: wrap;
     }
     .action-btn {
-      padding: 12px 28px; border-radius: 8px; border: none;
-      font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+      padding: 10px 24px; border-radius: 8px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;
     }
     .action-btn:hover { transform: translateY(-1px); }
     .action-btn.primary { background: #4A90D9; color: #fff; }
@@ -162,19 +151,19 @@
     }
     .modal-overlay.show { display: flex; }
     .modal-box {
-      background: #fff; border-radius: 12px; padding: 24px; width: 90%; max-width: 500px;
+      background: #fff; border-radius: 12px; padding: 20px; width: 90%; max-width: 480px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.2); max-height: 80vh; overflow-y: auto;
     }
-    .modal-title { font-size: 18px; font-weight: 700; color: #1a1a2e; margin-bottom: 16px; }
+    .modal-title { font-size: 16px; font-weight: 700; color: #1a1a2e; margin-bottom: 14px; }
 
     /* 매칭 결과 카드 */
-    .match-summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .match-summary { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
     .match-card {
-      flex: 1; min-width: 100px; background: #fff; border-radius: 8px;
-      padding: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); text-align: center;
+      flex: 1; min-width: 90px; background: #fff; border-radius: 8px;
+      padding: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); text-align: center;
     }
-    .match-card .mc-label { font-size: 12px; color: #888; margin-bottom: 4px; }
-    .match-card .mc-value { font-size: 20px; font-weight: 700; }
+    .match-card .mc-label { font-size: 11px; color: #888; margin-bottom: 2px; }
+    .match-card .mc-value { font-size: 18px; font-weight: 700; }
     .match-card .mc-value.blue { color: #4A90D9; }
     .match-card .mc-value.green { color: #27AE60; }
     .match-card .mc-value.red { color: #E74C3C; }
@@ -182,21 +171,21 @@
 
     /* 파일 정보 */
     .file-info {
-      background: #e8f5e9; border-radius: 8px; padding: 12px 16px;
-      display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+      background: #e8f5e9; border-radius: 8px; padding: 10px 14px;
+      display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
     }
-    .file-info .file-name { font-size: 14px; font-weight: 600; color: #2E7D32; }
-    .file-info .file-detail { font-size: 12px; color: #666; }
+    .file-info .file-name { font-size: 13px; font-weight: 600; color: #2E7D32; }
+    .file-info .file-detail { font-size: 11px; color: #666; }
     .file-info .btn-remove {
       margin-left: auto; background: none; border: none; color: #999;
       cursor: pointer; font-size: 16px;
     }
 
     /* 완료 영역 */
-    .complete-area { text-align: center; padding: 40px 20px; }
-    .complete-icon { font-size: 56px; margin-bottom: 12px; }
-    .complete-title { font-size: 20px; font-weight: 700; color: #27AE60; margin-bottom: 8px; }
-    .complete-sub { font-size: 13px; color: #888; }
+    .complete-area { text-align: center; padding: 30px 20px; }
+    .complete-icon { font-size: 48px; margin-bottom: 10px; }
+    .complete-title { font-size: 18px; font-weight: 700; color: #27AE60; margin-bottom: 6px; }
+    .complete-sub { font-size: 12px; color: #888; }
 
     /* 토스트/로딩 */
     .toast-msg {
@@ -217,38 +206,41 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .empty-msg { text-align: center; color: #aaa; padding: 50px 20px; font-size: 14px; }
+    .empty-msg { text-align: center; color: #aaa; padding: 40px 20px; font-size: 14px; }
+
+    /* 토글 버튼 (수동입고 폼 접기/펼치기) */
+    .toggle-btn {
+      background: none; border: none; color: #4A90D9; font-size: 12px;
+      cursor: pointer; font-weight: 600; padding: 0; margin-left: 8px;
+    }
+    .toggle-btn:hover { text-decoration: underline; }
 
     @media (max-width: 768px) {
-      .io-container { padding: 12px; }
+      .io-container { padding: 10px 12px; }
       .io-tabs { overflow-x: auto; }
-      .io-tab { padding: 10px 16px; font-size: 13px; white-space: nowrap; }
-      .io-stats { gap: 8px; }
-      .io-stat { min-width: 100px; padding: 12px; }
-      .io-stat .is-value { font-size: 20px; }
+      .io-tab { padding: 10px 14px; font-size: 13px; white-space: nowrap; }
+      .io-stats { gap: 6px; }
+      .io-stat { min-width: 90px; padding: 10px; }
+      .io-stat .is-value { font-size: 18px; }
       .form-row { flex-direction: column; }
+      .section-box { padding: 12px; }
     }
   </style>
 </head>
 <body>
-  <div id="sidebar"></div>
+  <div id="top-header" class="top-header"></div>
+  <nav id="sidebar-nav" class="sidebar"></nav>
 
-  <div class="top-actions">
-    <button class="top-btn home" onclick="location.href='index.html'">&#127968; 메인으로</button>
-    <button class="top-btn layout" onclick="location.href='inventory_layout.html'">&#9664; 적재대 현황</button>
-  </div>
-
-  <main>
+  <div class="main">
     <div class="page-header">
       <h1 class="page-title">입출고 관리</h1>
       <p class="page-desc">입고대기 처리 및 이카운트 출하 데이터 기반 출고 관리</p>
     </div>
 
     <div class="io-container">
-      <!-- 탭 -->
+      <!-- 3탭 -->
       <div class="io-tabs">
-        <div class="io-tab active" onclick="switchTab('waiting')" id="tabWaiting">입고대기 <span class="tab-badge" id="waitingCount">0</span></div>
-        <div class="io-tab" onclick="switchTab('register')" id="tabRegister">입고등록</div>
+        <div class="io-tab active" onclick="switchTab('inbound')" id="tabInbound">입고등록/대기관리 <span class="tab-badge" id="waitingCount">0</span></div>
         <div class="io-tab" onclick="switchTab('outbound')" id="tabOutbound">출고처리</div>
         <div class="io-tab" onclick="switchTab('history')" id="tabHistory">처리이력</div>
       </div>
@@ -256,7 +248,7 @@
       <!-- 컨텐츠 -->
       <div id="tabContent"></div>
     </div>
-  </main>
+  </div>
 
   <!-- 입고 모달 -->
   <div class="modal-overlay" id="inboundModal">
@@ -270,20 +262,20 @@
   <div class="toast-msg" id="toastMsg"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="sidebar.js"></script>
   <script src="auth_guard.js"></script>
   <script>
     var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
     var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
     var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    var currentTab = 'waiting';
+    var currentTab = 'inbound';
     var waitingLots = [];
     var allRacks = [];
     var allSlots = [];
     var parsedRows = [];
     var matchResults = [];
     var uploadedFile = null;
+    var manualFormOpen = false;
 
     document.addEventListener('DOMContentLoaded', function() {
       if (typeof checkAuth === 'function') { checkAuth(); }
@@ -314,19 +306,18 @@
     }
 
     function renderCurrentTab() {
-      if (currentTab === 'waiting') renderWaiting();
-      else if (currentTab === 'register') renderRegister();
+      if (currentTab === 'inbound') renderInbound();
       else if (currentTab === 'outbound') renderOutbound();
       else if (currentTab === 'history') renderHistory();
     }
 
     // ══════════════════════════════════════
-    // TAB 1: 입고대기
+    // TAB 1: 입고등록/대기관리 (통합)
     // ══════════════════════════════════════
-    function renderWaiting() {
+    function renderInbound() {
       var h = '';
 
-      // 통계
+      // ── 상단: 통계 ──
       var totalWaiting = waitingLots.length;
       var totalQty = 0;
       for (var i = 0; i < waitingLots.length; i++) { totalQty += waitingLots[i].quantity || 0; }
@@ -334,35 +325,96 @@
       h += '<div class="io-stats">';
       h += '<div class="io-stat orange"><div class="is-label">입고대기</div><div class="is-value">' + totalWaiting + '건</div></div>';
       h += '<div class="io-stat"><div class="is-label">대기 수량</div><div class="is-value">' + totalQty.toLocaleString() + '</div></div>';
+      h += '<div class="io-stat green"><div class="is-label">빈 슬롯</div><div class="is-value">' + countEmptySlots() + '</div></div>';
+      h += '</div>';
+
+      // ── 상단: 입고대기 목록 ──
+      h += '<div class="section-box">';
+      h += '<div class="section-title"><span class="title-icon">&#128230;</span>입고대기 목록';
+      if (totalWaiting > 0) {
+        h += ' <span style="font-size:12px;color:#E65100;font-weight:400;">(' + totalWaiting + '건 대기중)</span>';
+      }
       h += '</div>';
 
       if (waitingLots.length === 0) {
         h += '<div class="empty-msg">입고대기 항목이 없습니다</div>';
-        document.getElementById('tabContent').innerHTML = h;
-        return;
-      }
+      } else {
+        h += '<div class="data-table-wrap"><table class="data-table">';
+        h += '<thead><tr><th>No</th><th>사번</th><th>제품명</th><th>LOT</th>';
+        h += '<th style="text-align:right">수량</th><th>등록일</th><th>출처</th><th>처리</th></tr></thead><tbody>';
 
-      // 테이블
-      h += '<div class="data-table-wrap"><table class="data-table">';
-      h += '<thead><tr><th>No</th><th>사번</th><th>제품명</th><th>LOT</th>';
-      h += '<th style="text-align:right">수량</th><th>등록일</th><th>출처</th><th>처리</th></tr></thead><tbody>';
-
-      for (var j = 0; j < waitingLots.length; j++) {
-        var lot = waitingLots[j];
-        h += '<tr>';
-        h += '<td>' + (j + 1) + '</td>';
-        h += '<td><strong>' + (lot.product_code || '-') + '</strong></td>';
-        h += '<td>' + (lot.product_name || '-') + '</td>';
-        h += '<td>' + (lot.lot_no || '-') + '</td>';
-        h += '<td class="qty-cell">' + (lot.quantity || 0).toLocaleString() + '</td>';
-        h += '<td>' + (lot.created_at ? lot.created_at.slice(0, 10) : '-') + '</td>';
-        h += '<td>' + (lot.source_type || '-') + '</td>';
-        h += '<td><button class="row-btn inbound" onclick="openInboundModal(' + lot.id + ')">입고처리</button></td>';
-        h += '</tr>';
+        for (var j = 0; j < waitingLots.length; j++) {
+          var lot = waitingLots[j];
+          h += '<tr>';
+          h += '<td>' + (j + 1) + '</td>';
+          h += '<td><strong>' + (lot.product_code || '-') + '</strong></td>';
+          h += '<td>' + (lot.product_name || '-') + '</td>';
+          h += '<td>' + (lot.lot_no || '-') + '</td>';
+          h += '<td class="qty-cell">' + (lot.quantity || 0).toLocaleString() + '</td>';
+          h += '<td>' + (lot.created_at ? lot.created_at.slice(0, 10) : '-') + '</td>';
+          h += '<td>' + (lot.source_type || '-') + '</td>';
+          h += '<td><button class="row-btn inbound" onclick="openInboundModal(' + lot.id + ')">입고처리</button></td>';
+          h += '</tr>';
+        }
+        h += '</tbody></table></div>';
       }
-      h += '</tbody></table></div>';
+      h += '</div>';
+
+      // ── 하단: 수동 입고등록 + 엑셀 업로드 ──
+      h += '<div class="section-box">';
+      h += '<div class="section-title"><span class="title-icon">&#10133;</span>수동 입고대기 등록';
+      h += '<button class="toggle-btn" id="toggleManualBtn" onclick="toggleManualForm()">' + (manualFormOpen ? '&#9650; 접기' : '&#9660; 펼치기') + '</button>';
+      h += '</div>';
+      h += '<div id="manualFormArea" style="display:' + (manualFormOpen ? 'block' : 'none') + ';">';
+      h += '<div class="form-row">';
+      h += '<div class="form-group"><label>사번 *</label><input type="text" id="regProductCode" placeholder="제품 사번"></div>';
+      h += '<div class="form-group"><label>제품명</label><input type="text" id="regProductName" placeholder="제품명 (선택)"></div>';
+      h += '<div class="form-group"><label>LOT 번호 *</label><input type="text" id="regLotNo" placeholder="LOT 번호"></div>';
+      h += '</div>';
+      h += '<div class="form-row">';
+      h += '<div class="form-group"><label>수량 *</label><input type="number" id="regQty" placeholder="수량" min="1"></div>';
+      h += '<div class="form-group"><label>생산일</label><input type="date" id="regProducedAt"></div>';
+      h += '<div class="form-group"><label>비고</label><input type="text" id="regNote" placeholder="비고 (선택)"></div>';
+      h += '</div>';
+      h += '<div class="action-bar" style="justify-content:flex-end;margin-top:10px;">';
+      h += '<button class="action-btn primary" onclick="registerManual()">입고대기 등록</button>';
+      h += '</div>';
+      h += '</div>';
+      h += '</div>';
+
+      // 엑셀 일괄등록
+      h += '<div class="section-box">';
+      h += '<div class="section-title"><span class="title-icon">&#128196;</span>엑셀 일괄 등록</div>';
+      h += '<div class="upload-area" id="regUploadArea" onclick="document.getElementById(\'regFileInput\').click()">';
+      h += '<input type="file" id="regFileInput" accept=".xlsx,.xls,.csv" onchange="handleRegFile(event)">';
+      h += '<div class="upload-icon">&#128203;</div>';
+      h += '<div class="upload-text">입고 목록 엑셀 파일 업로드</div>';
+      h += '<div class="upload-sub">사번, LOT, 수량 컬럼이 포함된 파일 (.xlsx/.csv)</div>';
+      h += '</div>';
+      h += '</div>';
 
       document.getElementById('tabContent').innerHTML = h;
+    }
+
+    function countEmptySlots() {
+      var cnt = 0;
+      for (var i = 0; i < allSlots.length; i++) {
+        if (allSlots[i].status === 'empty') cnt++;
+      }
+      return cnt;
+    }
+
+    function toggleManualForm() {
+      manualFormOpen = !manualFormOpen;
+      var area = document.getElementById('manualFormArea');
+      var btn = document.getElementById('toggleManualBtn');
+      if (manualFormOpen) {
+        area.style.display = 'block';
+        btn.innerHTML = '&#9650; 접기';
+      } else {
+        area.style.display = 'none';
+        btn.innerHTML = '&#9660; 펼치기';
+      }
     }
 
     // ── 입고처리 모달 ──
@@ -373,29 +425,13 @@
       }
       if (!lot) return;
 
-      // 빈 슬롯 목록
-      var emptySlots = [];
-      for (var s = 0; s < allSlots.length; s++) {
-        if (allSlots[s].status === 'empty') {
-          emptySlots.push(allSlots[s]);
-        }
-      }
-
       var h = '';
-      h += '<div class="modal-title">입고처리 - ' + (lot.product_code || '-') + '</div>';
-      h += '<div class="form-row">';
-      h += '<div class="form-group"><label>사번</label><input type="text" value="' + (lot.product_code || '') + '" disabled></div>';
-      h += '<div class="form-group"><label>수량</label><input type="text" value="' + (lot.quantity || 0).toLocaleString() + '" disabled></div>';
-      h += '</div>';
-      h += '<div class="form-row">';
-      h += '<div class="form-group"><label>LOT</label><input type="text" value="' + (lot.lot_no || '') + '" disabled></div>';
-      h += '<div class="form-group"><label>제품명</label><input type="text" value="' + (lot.product_name || '') + '" disabled></div>';
+      h += '<div class="modal-title">입고처리</div>';
+      h += '<div style="background:#f8f9fa;border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:13px;">';
+      h += '<div><strong>' + (lot.product_code || '-') + '</strong> / ' + (lot.product_name || '-') + '</div>';
+      h += '<div style="color:#888;margin-top:2px;">LOT: ' + (lot.lot_no || '-') + ' | 수량: ' + (lot.quantity || 0).toLocaleString() + '</div>';
       h += '</div>';
 
-      h += '<hr style="margin:16px 0;border:none;border-top:1px solid #eee;">';
-      h += '<div class="form-title">랙 주소 배정</div>';
-
-      // 동 선택
       h += '<div class="form-row">';
       h += '<div class="form-group"><label>동 선택</label>';
       h += '<select id="modalRack" onchange="updateSlotOptions()">';
@@ -404,13 +440,11 @@
         h += '<option value="' + allRacks[r].id + '">' + allRacks[r].rack_name + '</option>';
       }
       h += '</select></div>';
-
-      // 슬롯 선택
       h += '<div class="form-group"><label>슬롯 선택</label>';
       h += '<select id="modalSlot"><option value="">-- 먼저 동을 선택 --</option></select></div>';
       h += '</div>';
 
-      h += '<div class="action-bar" style="margin-top:20px;">';
+      h += '<div class="action-bar" style="margin-top:16px;">';
       h += '<button class="action-btn secondary" onclick="closeInboundModal()">취소</button>';
       h += '<button class="action-btn success" onclick="processInbound(' + lotId + ')">입고 확정</button>';
       h += '</div>';
@@ -428,7 +462,6 @@
       for (var i = 0; i < allSlots.length; i++) {
         var s = allSlots[i];
         if (s.rack_id === rackId && s.status === 'empty') {
-          var rn = s.inventory_racks ? s.inventory_racks.rack_name : '';
           var opt = document.createElement('option');
           opt.value = s.id;
           opt.textContent = s.slot_code + ' (빈 슬롯)';
@@ -457,7 +490,6 @@
 
       showLoading('입고 처리 중...');
 
-      // 1. LOT 상태 업데이트
       var lotUpdate = supabase.from('inventory_lots').update({
         status: 'stocked',
         location_type: 'rack',
@@ -466,7 +498,6 @@
         stocked_at: new Date().toISOString()
       }).eq('id', lotId);
 
-      // 2. 슬롯 업데이트
       var slotUpdate = supabase.from('inventory_rack_slots').update({
         product_code: lot.product_code,
         lot_no: lot.lot_no,
@@ -474,7 +505,6 @@
         status: 'occupied'
       }).eq('id', slotId);
 
-      // 3. 이동이력
       var rackName = '';
       for (var r = 0; r < allRacks.length; r++) {
         if (allRacks[r].id === rackId) { rackName = allRacks[r].rack_name; break; }
@@ -504,46 +534,7 @@
       document.getElementById('inboundModal').className = 'modal-overlay';
     }
 
-    // ══════════════════════════════════════
-    // TAB 2: 입고등록
-    // ══════════════════════════════════════
-    function renderRegister() {
-      var h = '';
-
-      // 수동 입력
-      h += '<div class="manual-form">';
-      h += '<div class="form-title">수동 입고대기 등록</div>';
-      h += '<div class="form-row">';
-      h += '<div class="form-group"><label>사번 *</label><input type="text" id="regProductCode" placeholder="제품 사번"></div>';
-      h += '<div class="form-group"><label>제품명</label><input type="text" id="regProductName" placeholder="제품명 (선택)"></div>';
-      h += '</div>';
-      h += '<div class="form-row">';
-      h += '<div class="form-group"><label>LOT 번호 *</label><input type="text" id="regLotNo" placeholder="LOT 번호"></div>';
-      h += '<div class="form-group"><label>수량 *</label><input type="number" id="regQty" placeholder="수량" min="1"></div>';
-      h += '</div>';
-      h += '<div class="form-row">';
-      h += '<div class="form-group"><label>생산일</label><input type="date" id="regProducedAt"></div>';
-      h += '<div class="form-group"><label>비고</label><input type="text" id="regNote" placeholder="비고 (선택)"></div>';
-      h += '</div>';
-      h += '<div class="action-bar" style="justify-content:flex-end;">';
-      h += '<button class="action-btn primary" onclick="registerManual()">입고대기 등록</button>';
-      h += '</div>';
-      h += '</div>';
-
-      // 엑셀 업로드
-      h += '<div class="manual-form">';
-      h += '<div class="form-title">엑셀 일괄 등록</div>';
-      h += '<div class="upload-area" id="regUploadArea" onclick="document.getElementById(\'regFileInput\').click()">';
-      h += '<input type="file" id="regFileInput" accept=".xlsx,.xls,.csv" onchange="handleRegFile(event)">';
-      h += '<div class="upload-icon">📋</div>';
-      h += '<div class="upload-text">입고 목록 엑셀 파일 업로드</div>';
-      h += '<div class="upload-sub">사번, LOT, 수량 컬럼이 포함된 파일 (.xlsx/.csv)</div>';
-      h += '</div>';
-      h += '</div>';
-
-      document.getElementById('tabContent').innerHTML = h;
-    }
-
+    // ── 수동 등록 ──
     function registerManual() {
       var productCode = document.getElementById('regProductCode').value.trim();
       var productName = document.getElementById('regProductName').value.trim();
@@ -573,11 +564,12 @@
         hideLoading();
         if (res.error) { showToast('등록 오류: ' + res.error.message); return; }
         showToast('입고대기 등록 완료!');
+        manualFormOpen = false;
         loadInitialData();
-        switchTab('waiting');
       });
     }
 
+    // ── 엑셀 일괄등록 ──
     function handleRegFile(e) {
       if (e.target.files.length === 0) return;
       var file = e.target.files[0];
@@ -621,7 +613,6 @@
             if (res.error) { showToast('등록 오류: ' + res.error.message); return; }
             showToast(inserts.length + '건 입고대기 등록 완료!');
             loadInitialData();
-            switchTab('waiting');
           });
         } catch (err) {
           hideLoading();
@@ -632,15 +623,18 @@
     }
 
     // ══════════════════════════════════════
-    // TAB 3: 출고처리
+    // TAB 2: 출고처리
     // ══════════════════════════════════════
     function renderOutbound() {
       var h = '';
+      h += '<div class="section-box">';
+      h += '<div class="section-title"><span class="title-icon">&#128230;</span>이카운트 출하 엑셀 업로드</div>';
       h += '<div class="upload-area" id="outUploadArea" onclick="document.getElementById(\'outFileInput\').click()">';
       h += '<input type="file" id="outFileInput" accept=".xlsx,.xls" onchange="handleOutFile(event)">';
-      h += '<div class="upload-icon">📤</div>';
+      h += '<div class="upload-icon">&#128228;</div>';
       h += '<div class="upload-text">이카운트 출하 엑셀 파일을 업로드하세요</div>';
       h += '<div class="upload-sub">판매현황 Raw-Data (.xlsx) 파일을 드래그하거나 클릭하여 선택</div>';
+      h += '</div>';
       h += '</div>';
       document.getElementById('tabContent').innerHTML = h;
 
@@ -722,9 +716,9 @@
     function renderOutPreview() {
       var h = '';
       h += '<div class="file-info">';
-      h += '<div>📊</div><div><div class="file-name">' + uploadedFile.name + '</div>';
+      h += '<div>&#128202;</div><div><div class="file-name">' + uploadedFile.name + '</div>';
       h += '<div class="file-detail">' + parsedRows.length + '건의 출하 데이터</div></div>';
-      h += '<button class="btn-remove" onclick="renderOutbound()">✕</button></div>';
+      h += '<button class="btn-remove" onclick="renderOutbound()">&#10005;</button></div>';
 
       var totalQty = 0;
       for (var i = 0; i < parsedRows.length; i++) totalQty += parsedRows[i].quantity;
@@ -735,6 +729,7 @@
       h += '<div class="match-card"><div class="mc-label">총 수량</div><div class="mc-value orange">' + totalQty.toLocaleString() + '</div></div>';
       h += '</div>';
 
+      h += '<div class="section-box">';
       h += '<div class="data-table-wrap"><table class="data-table"><thead><tr>';
       h += '<th>No</th><th>거래처</th><th>사번</th><th>품목명</th><th style="text-align:right">수량</th><th>LOT기록</th>';
       h += '</tr></thead><tbody>';
@@ -745,6 +740,7 @@
         h += '<td class="qty-cell">' + row.quantity.toLocaleString() + '</td><td>' + row.lot_no_record + '</td></tr>';
       }
       h += '</tbody></table></div>';
+      h += '</div>';
 
       h += '<div class="action-bar">';
       h += '<button class="action-btn secondary" onclick="renderOutbound()">다시 선택</button>';
@@ -808,6 +804,7 @@
       h += '<div class="match-card"><div class="mc-label">미매칭</div><div class="mc-value red">' + unmatched + '</div></div>';
       h += '</div>';
 
+      h += '<div class="section-box">';
       h += '<div class="data-table-wrap"><table class="data-table"><thead><tr>';
       h += '<th>No</th><th>사번</th><th>품목명</th><th style="text-align:right">요청</th>';
       h += '<th style="text-align:right">매칭</th><th style="text-align:right">미매칭</th><th>상태</th><th>차감상세</th>';
@@ -831,6 +828,7 @@
         h += '</td></tr>';
       }
       h += '</tbody></table></div>';
+      h += '</div>';
 
       h += '<div class="action-bar">';
       h += '<button class="action-btn secondary" onclick="renderOutbound()">취소</button>';
@@ -895,7 +893,7 @@
     }
 
     // ══════════════════════════════════════
-    // TAB 4: 처리이력
+    // TAB 3: 처리이력
     // ══════════════════════════════════════
     function renderHistory() {
       var h = '<div class="empty-msg">이력을 조회합니다...</div>';
@@ -916,6 +914,7 @@
           h2 += '<option value="outbound">출고</option><option value="adjustment">조정</option>';
           h2 += '</select></div>';
 
+          h2 += '<div class="section-box">';
           h2 += '<div class="data-table-wrap"><table class="data-table" id="histTable"><thead><tr>';
           h2 += '<th>일시</th><th>유형</th><th>사번</th><th>LOT</th>';
           h2 += '<th style="text-align:right">수량</th><th>위치</th><th>사유</th>';
@@ -937,6 +936,7 @@
             h2 += '</tr>';
           }
           h2 += '</tbody></table></div>';
+          h2 += '</div>';
           document.getElementById('tabContent').innerHTML = h2;
         });
     }
@@ -969,5 +969,6 @@
       if (e.target === this) closeInboundModal();
     });
   </script>
+  <script src="sidebar.js"></script>
 </body>
 </html>
