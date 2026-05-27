@@ -126,6 +126,33 @@
     .toast-msg.show { display: block; }
     .no-slots { text-align: center; color: #aaa; padding: 60px 20px; font-size: 14px; }
 
+    /* 일괄 입고 모드 */
+    .batch-bar {
+      display: none; background: #eef2ff; border: 2px solid #4A90D9; border-radius: 10px;
+      padding: 16px 20px; margin-bottom: 16px;
+    }
+    .batch-bar.show { display: block; }
+    .batch-bar-title { font-size: 15px; font-weight: 700; color: #1a1a2e; margin-bottom: 12px; }
+    .batch-bar-sub { font-size: 12px; color: #666; margin-bottom: 12px; }
+    .batch-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; margin-bottom: 12px; }
+    .batch-form .bf-group { display: flex; flex-direction: column; gap: 3px; }
+    .batch-form .bf-group label { font-size: 11px; color: #888; font-weight: 600; }
+    .batch-form .bf-group input { padding: 8px 10px; border: 1.5px solid #ddd; border-radius: 6px; font-size: 13px; width: 140px; }
+    .batch-form .bf-group input:focus { border-color: #4A90D9; outline: none; }
+    .batch-selected { font-size: 13px; color: #1a1a2e; margin-bottom: 10px; }
+    .batch-selected strong { color: #4A90D9; }
+    .batch-btns { display: flex; gap: 8px; }
+    .batch-btn { padding: 10px 20px; border-radius: 6px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .batch-btn.submit { background: #4A90D9; color: #fff; }
+    .batch-btn.submit:hover { background: #3a7bc8; }
+    .batch-btn.cancel { background: #f5f5f5; color: #666; border: 1px solid #ddd; }
+    .slot-cell.batch-mode { cursor: pointer; }
+    .slot-cell.batch-selected { border: 3px solid #4A90D9 !important; background: #dbeafe !important; box-shadow: 0 0 0 2px rgba(74,144,217,0.3); }
+    .slot-cell.batch-mode.occupied { opacity: 0.4; cursor: not-allowed; }
+    .btn-batch { padding: 8px 16px; border-radius: 6px; border: 2px solid #4A90D9; background: #fff; color: #4A90D9; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-batch:hover { background: #eef2ff; }
+    .btn-batch.active { background: #4A90D9; color: #fff; }
+
     @media (max-width: 768px) {
       .rack-container { padding: 12px; }
       .slot-cell { min-height: 50px; padding: 4px; }
@@ -151,6 +178,7 @@
         <select class="rack-select" id="rackSelect" onchange="onRackChange()">
           <option value="">동 선택</option>
         </select>
+        <button class="btn-batch" id="batchBtn" onclick="toggleBatchMode()">📦 일괄 입고</button>
         <div style="flex:1;"></div>
         <div class="slot-legend">
           <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#fafafa;"></div> 빈 슬롯</div>
@@ -165,6 +193,20 @@
         <div class="rack-stat-item">빈칸 <strong id="sSEmpty">0</strong>칸</div>
         <div class="rack-stat-item">사용률 <strong id="sSRate">0%</strong></div>
         <div class="rack-stat-item highlight">마이너스 <strong id="sSNeg">0</strong>건</div>
+      </div>
+      <div class="batch-bar" id="batchBar">
+        <div class="batch-bar-title">📦 일괄 입고 모드</div>
+        <div class="batch-bar-sub">빈 슬롯을 클릭하여 선택하세요. 선택한 슬롯에 동일 제품을 한 번에 입고합니다.</div>
+        <div class="batch-form">
+          <div class="bf-group"><label>사번 *</label><input type="text" id="batchProductCode" placeholder="제품 사번"></div>
+          <div class="bf-group"><label>LOT 번호</label><input type="text" id="batchLotNo" placeholder="LOT 번호"></div>
+          <div class="bf-group"><label>슬롯당 수량 *</label><input type="number" id="batchQtyPerSlot" placeholder="각 슬롯 수량" min="1" oninput="updateBatchInfo()"></div>
+        </div>
+        <div class="batch-selected" id="batchSelectedInfo">선택된 슬롯: <strong>0</strong>개</div>
+        <div class="batch-btns">
+          <button class="batch-btn submit" onclick="doBatchInbound()">일괄 입고 실행</button>
+          <button class="batch-btn cancel" onclick="toggleBatchMode()">취소</button>
+        </div>
       </div>
       <div id="slotGridArea"><div class="no-slots">동을 선택해주세요</div></div>
     </div>
@@ -187,6 +229,8 @@
     var currentRack = null;
     var currentSlots = [];
     var allSlots = []; // 이동처리용 전체 슬롯
+    var batchMode = false;
+    var batchSelectedIds = [];
 
     document.addEventListener('DOMContentLoaded', function() {
       if (typeof checkAuth === 'function') { checkAuth(); }
@@ -259,7 +303,17 @@
           if (slot.quantity < 0) { cellClass = 'negative'; qtyClass = 'neg'; qtyText = slot.quantity.toLocaleString(); prodText = slot.product_code || ''; }
           else if (slot.status === 'occupied' && slot.quantity > 0) { cellClass = 'occupied'; qtyClass = 'positive'; qtyText = slot.quantity.toLocaleString(); prodText = slot.product_code || ''; }
           else if (slot.status === 'reserved') { cellClass = 'reserved'; prodText = slot.product_code || '예약'; }
-          h += '<div class="slot-cell ' + cellClass + '" onclick="openModal(' + slot.id + ')">';
+
+          // 일괄 입고 모드
+          if (batchMode) {
+            var isSelected = batchSelectedIds.indexOf(slot.id) !== -1;
+            var isOccupied = slot.status === 'occupied' && slot.quantity > 0;
+            var extraClass = ' batch-mode' + (isSelected ? ' batch-selected' : '') + (isOccupied ? ' occupied' : '');
+            h += '<div class="slot-cell ' + cellClass + extraClass + '" onclick="toggleBatchSlot(' + slot.id + ')">';
+            if (isSelected) h += '<div style="position:absolute;top:2px;right:4px;font-size:14px">✅</div>';
+          } else {
+            h += '<div class="slot-cell ' + cellClass + '" onclick="openModal(' + slot.id + ')">';
+          }
           h += '<div class="slot-code">' + slot.slot_code + '</div>';
           if (prodText) h += '<div class="slot-product">' + prodText + '</div>';
           h += '<div class="slot-qty ' + qtyClass + '">' + qtyText + '</div></div>';
@@ -539,6 +593,110 @@
           if (res.error) { showToast('오류: ' + res.error.message); return; }
           showToast('슬롯 초기화 완료!'); closeModal(); loadSlots();
         });
+    }
+
+    // ══════════════════════════════════════
+    // 일괄 입고 모드
+    // ══════════════════════════════════════
+    function toggleBatchMode() {
+      batchMode = !batchMode;
+      batchSelectedIds = [];
+      var btn = document.getElementById('batchBtn');
+      var bar = document.getElementById('batchBar');
+      if (batchMode) {
+        btn.classList.add('active');
+        btn.textContent = '📦 일괄 입고 모드 ON';
+        bar.classList.add('show');
+      } else {
+        btn.classList.remove('active');
+        btn.textContent = '📦 일괄 입고';
+        bar.classList.remove('show');
+      }
+      updateBatchInfo();
+      if (currentSlots.length > 0) renderSlotGrid();
+    }
+
+    function toggleBatchSlot(slotId) {
+      var slot = findSlotById(slotId);
+      if (!slot) return;
+      // 이미 적재중인 슬롯은 선택 불가
+      if (slot.status === 'occupied' && slot.quantity > 0) {
+        showToast('적재중인 슬롯은 선택할 수 없습니다');
+        return;
+      }
+      var idx = batchSelectedIds.indexOf(slotId);
+      if (idx === -1) {
+        batchSelectedIds.push(slotId);
+      } else {
+        batchSelectedIds.splice(idx, 1);
+      }
+      updateBatchInfo();
+      renderSlotGrid();
+    }
+
+    function updateBatchInfo() {
+      var info = document.getElementById('batchSelectedInfo');
+      if (!info) return;
+      var count = batchSelectedIds.length;
+      var qtyPerSlot = parseInt(document.getElementById('batchQtyPerSlot').value) || 0;
+      var totalQty = count * qtyPerSlot;
+      var text = '선택된 슬롯: <strong>' + count + '</strong>개';
+      if (qtyPerSlot > 0 && count > 0) {
+        text += ' &nbsp;·&nbsp; 총 입고 수량: <strong>' + totalQty.toLocaleString() + '</strong>개';
+      }
+      // 선택된 슬롯 번호 표시
+      if (count > 0) {
+        var codes = [];
+        for (var i = 0; i < batchSelectedIds.length; i++) {
+          var s = findSlotById(batchSelectedIds[i]);
+          if (s) codes.push(s.slot_code);
+        }
+        text += '<br><span style="font-size:11px;color:#888">' + codes.join(', ') + '</span>';
+      }
+      info.innerHTML = text;
+    }
+
+    function doBatchInbound() {
+      var pc = document.getElementById('batchProductCode').value.trim();
+      var ln = document.getElementById('batchLotNo').value.trim();
+      var qtyPerSlot = parseInt(document.getElementById('batchQtyPerSlot').value) || 0;
+
+      if (!pc) { showToast('사번을 입력해주세요'); return; }
+      if (qtyPerSlot <= 0) { showToast('슬롯당 수량을 입력해주세요'); return; }
+      if (batchSelectedIds.length === 0) { showToast('슬롯을 선택해주세요'); return; }
+
+      var totalQty = batchSelectedIds.length * qtyPerSlot;
+      if (!confirm(batchSelectedIds.length + '개 슬롯에 ' + pc + ' 각 ' + qtyPerSlot.toLocaleString() + '개씩\n(총 ' + totalQty.toLocaleString() + '개) 일괄 입고하시겠습니까?')) return;
+
+      var promises = [];
+      for (var i = 0; i < batchSelectedIds.length; i++) {
+        var slotId = batchSelectedIds[i];
+        var slot = findSlotById(slotId);
+        promises.push(
+          supabase.from('inventory_rack_slots').update({
+            product_code: pc, lot_no: ln, quantity: qtyPerSlot, status: 'occupied'
+          }).eq('id', slotId)
+        );
+        // 이동이력 기록
+        if (slot) {
+          logMovement(pc, 'inbound', null, currentRack.rack_name + '-' + slot.slot_code, qtyPerSlot, ln, '일괄 입고 (' + batchSelectedIds.length + '슬롯)');
+        }
+      }
+
+      Promise.all(promises).then(function(results) {
+        var errorCount = 0;
+        for (var i = 0; i < results.length; i++) {
+          if (results[i].error) errorCount++;
+        }
+        if (errorCount > 0) {
+          showToast(errorCount + '건 오류 발생');
+        } else {
+          showToast('일괄 입고 완료! ' + batchSelectedIds.length + '슬롯 × ' + qtyPerSlot.toLocaleString() + ' = ' + totalQty.toLocaleString() + '개');
+        }
+        // 모드 해제 및 새로고침
+        toggleBatchMode();
+        loadSlots();
+      });
     }
 
     // ── 이동이력 기록 ──
