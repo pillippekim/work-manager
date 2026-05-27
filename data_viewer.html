@@ -2414,7 +2414,7 @@ function renderAssemblyTable(data) {
         <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${r.defect_qty||0}</td>
         <td style="min-width:80px">${r.worker_name||''}</td><td style="font-size:11px">${r.note||''}</td>
         <td style="font-size:11px;color:#999">${fmtDatetime(r.created_at)}</td>
-        <td>${del ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : `<div class="row-actions"><button class="btn-row btn-row-edit" onclick='openEditAssembly(${JSON.stringify(r).replace(/'/g, "&#39;")})'>수정</button><button class="btn-row btn-row-del" onclick="deleteAssembly('${r.id}')">삭제</button></div>`}</td>
+        <td>${del ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : (() => { const canEdit = canEditDelete(r); const reason = canEdit ? '' : getCannotEditReason(r); return `<div class="row-actions"><button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditAssembly(${JSON.stringify(r).replace(/'/g, "&#39;")})'>수정` : `disabled title="${reason}">수정`}</button><button class="btn-row btn-row-del" ${canEdit ? `onclick="deleteAssembly('${r.id}')">삭제` : `disabled title="${reason}">삭제`}</button></div>`; })()}</td>
       </tr>`;
     }).join('')}
     </tbody></table></div></div>`;
