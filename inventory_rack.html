@@ -142,11 +142,10 @@
     .batch-selected { font-size: 13px; color: #1a1a2e; margin-bottom: 10px; }
     .batch-selected strong { color: #4A90D9; }
     .batch-btns { display: flex; gap: 8px; }
-    .batch-lot-list { margin: 10px 0; max-height: 180px; overflow-y: auto; border: 1px solid #e0e4ed; border-radius: 8px; padding: 8px; background: #fff; }
-    .batch-lot-row { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid #f0f0f0; }
-    .batch-lot-row:last-child { border-bottom: none; }
-    .batch-lot-row .blr-slot { font-size: 12px; font-weight: 700; color: #333; min-width: 50px; }
-    .batch-lot-row input { padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; width: 140px; }
+    .batch-lot-list { margin: 10px 0; max-height: 200px; overflow-y: auto; border: 1px solid #e0e4ed; border-radius: 8px; padding: 10px; background: #fff; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px; }
+    .batch-lot-row { display: flex; align-items: center; gap: 4px; padding: 4px; background: #f8fafc; border-radius: 4px; border: 1px solid #eee; }
+    .batch-lot-row .blr-slot { font-size: 11px; font-weight: 700; color: #4A90D9; min-width: 36px; }
+    .batch-lot-row input { padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; flex: 1; min-width: 0; }
     .batch-lot-row input:focus { border-color: #4A90D9; outline: none; }
     .batch-btn { padding: 10px 20px; border-radius: 6px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; }
     .batch-btn.submit { background: #4A90D9; color: #fff; }
