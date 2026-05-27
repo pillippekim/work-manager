@@ -306,9 +306,10 @@ table.data-table tr.row-danger { background:#fee2e2; }
         </h3>
         <div style="background:#f0f4ff;padding:14px;border-radius:8px;margin-bottom:16px;font-size:13px;color:#475569;line-height:1.6;">
             <strong>사용 방법:</strong><br>
-            1. 아래 <strong>양식 다운로드</strong> 버튼으로 엑셀 양식을 받으세요<br>
-            2. 엑셀에 사번, 누적타발수, 기준타발수를 입력하세요<br>
-            3. 완성된 엑셀을 아래에서 업로드하면 일괄 반영됩니다
+            1. 아래 <strong>양식 다운로드</strong> 또는 <strong>현재 타발수 내보내기</strong>를 받으세요<br>
+            2. 사번, 금형코드, 누적타발수, 기준타발수를 입력하세요<br>
+            3. <strong>동일 사번에 금형이 여러 개</strong>인 경우 금형코드 필수!<br>
+            4. 완성된 엑셀을 업로드하면 미리보기 후 일괄 반영됩니다
         </div>
         <div style="display:flex;gap:8px;margin-bottom:16px;">
             <button class="btn-primary" onclick="downloadTemplate()" style="background:#0ea5e9;">📥 양식 다운로드</button>
@@ -949,15 +950,15 @@ function closeUploadModal() {
 // 양식 다운로드
 function downloadTemplate() {
     var data = [
-        {'사번': '502264', '누적타발수': 15000, '기준타발수': 50000},
-        {'사번': '502270', '누적타발수': 48000, '기준타발수': 50000},
-        {'사번': '', '누적타발수': '', '기준타발수': ''}
+        {'사번': '502264', '금형코드': '502264', '누적타발수': 15000, '기준타발수': 50000},
+        {'사번': '502270', '금형코드': '502270-A', '누적타발수': 48000, '기준타발수': 50000},
+        {'사번': '', '금형코드': '', '누적타발수': '', '기준타발수': ''}
     ];
     var ws = XLSX.utils.json_to_sheet(data);
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '타발수입력');
     XLSX.writeFile(wb, '타발수_일괄등록_양식.xlsx');
-    showToast('양식 다운로드 완료 — 사번/누적타발수/기준타발수를 입력하세요', 'success');
+    showToast('양식 다운로드 완료 — 사번+금형코드로 매칭합니다', 'success');
 }
 
 // 현재 타발수 내보내기
@@ -974,7 +975,7 @@ function downloadCurrentShots() {
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '현재타발수');
     XLSX.writeFile(wb, '현재_타발수_현황.xlsx');
-    showToast('현재 타발수 내보내기 완료', 'success');
+    showToast('현재 타발수 내보내기 완료 — 이 파일을 수정하여 재업로드 가능', 'success');
 }
 
 // 파일 선택 시 미리보기
@@ -994,16 +995,31 @@ document.getElementById('uploadFile').addEventListener('change', function(e) {
                 var row = json[i];
                 var sabun = String(row['사번'] || '').trim();
                 if (!sabun) continue;
+                var moldCode = String(row['금형코드'] || '').trim();
                 var shots = parseInt(row['누적타발수']) || 0;
                 var threshold = parseInt(row['기준타발수']) || null;
-                // 해당 사번의 금형 찾기
-                var mold = allMolds.find(function(m) { return m.product_code === sabun; });
+                // 사번 + 금형코드로 매칭 (금형코드 있으면 정확 매칭, 없으면 사번만)
+                var mold = null;
+                if (moldCode) {
+                    mold = allMolds.find(function(m) { return m.product_code === sabun && m.mold_code === moldCode; });
+                }
+                if (!mold) {
+                    // 금형코드 없거나 매칭 실패 시 사번만으로 시도 (동일 사번 1개만 있으면 OK)
+                    var sabunMatches = allMolds.filter(function(m) { return m.product_code === sabun; });
+                    if (sabunMatches.length === 1) {
+                        mold = sabunMatches[0];
+                    } else if (sabunMatches.length > 1) {
+                        // 복수 금형: 금형코드 필수 → 미매칭 처리
+                        mold = null;
+                    }
+                }
                 uploadRows.push({
                     sabun: sabun,
+                    moldCode: moldCode,
                     shots: shots,
                     threshold: threshold,
                     moldId: mold ? mold.id : null,
-                    moldCode: mold ? mold.mold_code : '(미발견)',
+                    matchedCode: mold ? mold.mold_code : (allMolds.filter(function(m){return m.product_code===sabun;}).length > 1 ? '(복수금형-코드필요)' : '(미발견)'),
                     currentShots: mold ? (mold.total_shots || 0) : 0
                 });
             }
@@ -1013,11 +1029,11 @@ document.getElementById('uploadFile').addEventListener('change', function(e) {
             var matched = 0, notFound = 0;
             for (var i = 0; i < Math.min(uploadRows.length, 10); i++) {
                 var r = uploadRows[i];
-                var status = r.moldId ? '✅ 매칭' : '❌ 미발견';
+                var status = r.moldId ? '✅ 매칭' : '❌ ' + r.matchedCode;
                 if (r.moldId) matched++; else notFound++;
                 html += '<tr>'
                     + '<td>' + r.sabun + '</td>'
-                    + '<td>' + r.moldCode + '</td>'
+                    + '<td>' + (r.moldCode || '-') + '</td>'
                     + '<td>' + r.currentShots.toLocaleString() + '</td>'
                     + '<td style="color:#243bb2;font-weight:700;">' + r.shots.toLocaleString() + '</td>'
                     + '<td>' + (r.threshold ? r.threshold.toLocaleString() : '-') + '</td>'
@@ -1051,15 +1067,27 @@ async function submitUpload() {
         showToast('매칭된 금형이 없습니다', 'error');
         return;
     }
-    if (!confirm(matched.length + '건의 금형 타발수를 일괄 반영하시겠습니까?')) return;
+    if (!confirm(matched.length + '건의 금형 타발수를 일괄 반영하시겠습니까?\n(변경 이력이 mold_shot_logs에 기록됩니다)')) return;
 
     var success = 0, fail = 0;
+    var today = new Date().toISOString().split('T')[0];
     for (var i = 0; i < matched.length; i++) {
         var r = matched[i];
         try {
             var updateData = { total_shots: r.shots };
             if (r.threshold) updateData.maintenance_threshold = r.threshold;
             await supaUpdate('molds', r.moldId, updateData);
+
+            // 이력 기록 (변경 전후 차이를 기록)
+            var diff = r.shots - r.currentShots;
+            if (diff !== 0) {
+                await supaInsert('mold_shot_logs', {
+                    mold_id: r.moldId,
+                    shots: diff,
+                    cumulative_shots: r.shots,
+                    work_date: today
+                });
+            }
             success++;
         } catch(e) {
             fail++;
