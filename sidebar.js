@@ -23,7 +23,7 @@ function initSidebar() {
     var isQualityPage = ['inspection_round_viewer.html'].indexOf(page) !== -1;
     var isDataPage = ['data_viewer.html','safety_viewer.html','docs_manager.html'].indexOf(page) !== -1;
     var isSystemPage = ['master_data.html','users.html'].indexOf(page) !== -1;
-    var isInventoryPage = ['inventory_layout.html','inventory_rack.html','inventory_io.html','inventory_viewer.html'].indexOf(page) !== -1;
+    var isInventoryPage = ['inventory_layout.html','inventory_rack.html','inventory_io.html','inventory_viewer.html','inventory_zone.html'].indexOf(page) !== -1;
 
     // 금형관리 active
     var dashActive = (page === 'mold_dashboard.html') ? ' nav-active' : '';
@@ -45,6 +45,7 @@ function initSidebar() {
     // 재고관리 active
     var invLayoutActive = (page === 'inventory_layout.html') ? ' nav-active' : '';
     var invRackActive = (page === 'inventory_rack.html') ? ' nav-active' : '';
+    var invZoneActive = (page === 'inventory_zone.html') ? ' nav-active' : '';
     var invOutboundActive = (page === 'inventory_io.html') ? ' nav-active' : '';
     var invViewerActive = (page === 'inventory_viewer.html') ? ' nav-active' : '';
 
@@ -165,6 +166,7 @@ function initSidebar() {
                         '<div class="sub-body">' +
                             '<a class="nav-link' + invLayoutActive + '" href="inventory_layout.html"><span class="n-icon">🗺️</span>적재대 현황</a>' +
                             '<a class="nav-link' + invRackActive + '" href="inventory_rack.html"><span class="n-icon">🗄️</span>랙 상세 현황</a>' +
+                            '<a class="nav-link' + invZoneActive + '" href="inventory_rack.html?type=zone"><span class="n-icon">🚚</span>대차 현황</a>' +
                             '<a class="nav-link' + invOutboundActive + '" href="inventory_io.html"><span class="n-icon">📤</span>입출고 관리</a>' +
                             '<a class="nav-link' + invViewerActive + '" href="inventory_viewer.html"><span class="n-icon">📊</span>재고 조회</a>' +
                         '</div>' +
@@ -259,6 +261,7 @@ function applyAccessRestrictions() {
             allowedPages = [
                 'inventory_layout.html',
                 'inventory_rack.html',
+                'inventory_zone.html',
                 'inventory_io.html',
                 'inventory_viewer.html'
             ];
