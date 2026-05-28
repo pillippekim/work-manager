@@ -12,6 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 /* ── master_data 고유 스타일 ── */
+.container { max-width: 100% !important; margin: 0 !important; padding: 16px 20px !important; }
 .excel-preview { margin-bottom: 12px; }
 .preview-count { font-size: 12px; color: #555; margin-bottom: 8px; }
 .count-badge { display: inline-block; font-size: 11px; background: #f3f4f6; color: #555; border-radius: 10px; padding: 2px 8px; margin-left: 6px; }
@@ -314,7 +315,7 @@
             <input class="form-input" id="eq_name" placeholder="예: 성형가류기(인젝션)" />
           </div>
           <div class="form-group">
-            <span class="form-label">호기/표시명</span>
+            <span class="form-label">호기/표시명 *</span>
             <input class="form-input" id="eq_no" placeholder="예: A반-03호기" />
           </div>
           <div class="form-group">
@@ -332,16 +333,19 @@
         </div>
         <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-top:8px">
           <div class="form-group">
+            <span class="form-label">반(그룹) *</span>
+            <select class="form-select" id="eq_group">
+              <option value="A반">A반</option>
+              <option value="B반">B반</option>
+            </select>
+          </div>
+          <div class="form-group">
             <span class="form-label">설비 유형</span>
             <input class="form-input" id="eq_type" placeholder="예: injection, vacuum" />
           </div>
           <div class="form-group">
             <span class="form-label">사양/규격</span>
             <input class="form-input" id="eq_spec" placeholder="예: 350t 1U3P" />
-          </div>
-          <div class="form-group">
-            <span class="form-label">설치 위치</span>
-            <input class="form-input" id="eq_location" placeholder="예: A동 1층" />
           </div>
           <div class="form-group">
             <span class="form-label">비고</span>
@@ -362,6 +366,7 @@
               <th>관리번호</th>
               <th>설비명</th>
               <th>호기</th>
+              <th>반</th>
               <th>공정</th>
               <th>유형</th>
               <th>사양</th>
@@ -657,10 +662,10 @@ function renderWorkers(data, isSearch) {
       '<td style="font-weight:500">' + r.name + '</td>' +
       '<td style="font-size:12px;color:' + (r.name_local ? '#555' : '#ccc') + '">' + (r.name_local || '-') + '</td>' +
       '<td>' + r.process + '</td>' +
-      '<td><span class="active-badge ' + (r.active ? 'active-y' : 'active-n') + '">' + (r.active ? '재직중' : '퇴직') + '</span></td>' +
+      '<td><span class="active-badge ' + (r.is_active ? 'active-y' : 'active-n') + '">' + (r.is_active ? '재직중' : '퇴직') + '</span></td>' +
       '<td style="color:#aaa;font-size:12px">' + fmtDate(r.created_at) + '</td>' +
       '<td style="display:flex;gap:4px">' +
-        '<button class="btn-edit-sm" onclick="toggleWorker(' + r.id + ', ' + r.active + ')">' + (r.active ? '비활성화' : '활성화') + '</button>' +
+        '<button class="btn-edit-sm" onclick="toggleWorker(' + r.id + ', ' + r.is_active + ')">' + (r.is_active ? '비활성화' : '활성화') + '</button>' +
         '<button class="btn-del" onclick="deleteWorker(' + r.id + ')">삭제</button>' +
       '</td></tr>';
   }
@@ -693,7 +698,7 @@ async function saveWorker() {
 }
 
 async function toggleWorker(id, current) {
-  await db.from('workers').update({ active: !current }).eq('id', id);
+  await db.from('workers').update({ is_active: !current }).eq('id', id);
   showToast(current ? '비활성화됐어요.' : '활성화됐어요.');
   loadWorkers();
 }
@@ -1057,7 +1062,7 @@ loadEquip();
 var equipData = [];
 
 async function loadEquip() {
-  var result = await db.from('equipment_master').select('*').order('process').order('sort_order');
+  var result = await db.from('equipments').select('*').order('process').order('sort_order');
   equipData = result.data || [];
   renderEquip();
 }
@@ -1071,9 +1076,9 @@ function filterEquip() {
   }
   if (q) {
     filtered = filtered.filter(function(r) {
-      return (r.equip_code || '').toLowerCase().indexOf(q) !== -1 ||
-        (r.equip_name || '').toLowerCase().indexOf(q) !== -1 ||
-        (r.equip_no || '').toLowerCase().indexOf(q) !== -1;
+      return (r.equipment_id || '').toLowerCase().indexOf(q) !== -1 ||
+        (r.equipment_name || '').toLowerCase().indexOf(q) !== -1 ||
+        (r.equipment_no || '').toLowerCase().indexOf(q) !== -1;
     });
   }
   renderEquip(filtered);
@@ -1083,25 +1088,27 @@ function renderEquip(filtered) {
   var list = filtered || equipData;
   var tbody = document.getElementById('equipTable');
   if (!list.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">등록된 설비가 없어요.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">등록된 설비가 없어요.</td></tr>';
     return;
   }
   var html = '';
   for (var i = 0; i < list.length; i++) {
     var r = list[i];
-    var statusClass = r.active ? 'active-y' : 'active-n';
-    var statusText = r.active ? '사용중' : '미사용';
+    var statusClass = r.is_active ? 'active-y' : 'active-n';
+    var statusText = r.is_active ? '사용중' : '미사용';
+    var dormantBadge = r.is_dormant ? ' <span style="font-size:10px;padding:1px 6px;border-radius:8px;background:#fef3c7;color:#92400e;">휴면</span>' : '';
     html += '<tr>' +
-      '<td style="font-weight:600;font-size:12px">' + r.equip_code + '</td>' +
-      '<td>' + (r.equip_name || '-') + '</td>' +
-      '<td style="color:#555">' + (r.equip_no || '-') + '</td>' +
+      '<td style="font-weight:600;font-size:12px">' + (r.equipment_id || '-') + '</td>' +
+      '<td>' + (r.equipment_name || '-') + '</td>' +
+      '<td style="font-weight:500">' + (r.equipment_no || '-') + '</td>' +
+      '<td style="color:#555;font-size:12px">' + (r.group_name || '-') + '</td>' +
       '<td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:#eff6ff;color:#243bb2">' + r.process + '</span></td>' +
       '<td style="font-size:11px;color:#888">' + (r.equip_type || '-') + '</td>' +
       '<td style="font-size:11px;color:#888">' + (r.spec || '-') + '</td>' +
-      '<td><span class="active-badge ' + statusClass + '">' + statusText + '</span></td>' +
+      '<td><span class="active-badge ' + statusClass + '">' + statusText + '</span>' + dormantBadge + '</td>' +
       '<td style="white-space:nowrap">' +
         '<button class="btn-edit-sm" onclick="openEditEquip(' + r.id + ')">수정</button>' +
-        '<button class="btn-edit-sm" style="background:#fef3c7;color:#92400e" onclick="toggleEquipActive(' + r.id + ', ' + r.active + ')">' + (r.active ? '비활성' : '활성') + '</button>' +
+        '<button class="btn-edit-sm" style="background:#fef3c7;color:#92400e" onclick="toggleEquipActive(' + r.id + ', ' + r.is_active + ')">' + (r.is_active ? '비활성' : '활성') + '</button>' +
         '<button class="btn-del" onclick="deleteEquip(' + r.id + ')">삭제</button>' +
       '</td></tr>';
   }
@@ -1113,21 +1120,23 @@ async function saveEquip() {
   var name = document.getElementById('eq_name').value.trim();
   var no = document.getElementById('eq_no').value.trim();
   var process = document.getElementById('eq_process').value;
+  var group = document.getElementById('eq_group').value;
   var type = document.getElementById('eq_type').value.trim();
   var spec = document.getElementById('eq_spec').value.trim();
-  var location = document.getElementById('eq_location').value.trim();
   var note = document.getElementById('eq_note').value.trim();
   if (!code) { showToast('관리번호를 입력해주세요.'); return; }
   if (!name) { showToast('설비명을 입력해주세요.'); return; }
+  if (!no) { showToast('호기/표시명을 입력해주세요.'); return; }
   var payload = {
-    equip_code: code, equip_name: name, equip_no: no || null,
-    process: process, equip_type: type || null, spec: spec || null,
-    location: location || null, note: note || null
+    equipment_id: code, equipment_name: name, equipment_no: no,
+    process: process, group_name: group, equip_type: type || null,
+    spec: spec || null, is_active: true, is_dormant: false,
+    sort_order: equipData.length + 1
   };
-  var result = await db.from('equipment_master').insert(payload);
+  var result = await db.from('equipments').insert(payload);
   if (result.error) {
     if (result.error.message.indexOf('duplicate') !== -1 || result.error.message.indexOf('unique') !== -1) {
-      showToast('이미 등록된 관리번호입니다.');
+      showToast('이미 등록된 호기명입니다.');
     } else {
       showToast('저장 실패: ' + result.error.message);
     }
@@ -1138,7 +1147,6 @@ async function saveEquip() {
   document.getElementById('eq_no').value = '';
   document.getElementById('eq_type').value = '';
   document.getElementById('eq_spec').value = '';
-  document.getElementById('eq_location').value = '';
   document.getElementById('eq_note').value = '';
   toggleForm('equip');
   showToast('설비가 추가됐어요 ✓');
@@ -1150,14 +1158,14 @@ function openEditEquip(id) {
   for (var i = 0; i < equipData.length; i++) { if (equipData[i].id === id) { r = equipData[i]; break; } }
   if (!r) return;
   document.getElementById('eeq_id').value = r.id;
-  document.getElementById('eeq_code').value = r.equip_code;
-  document.getElementById('eeq_name').value = r.equip_name || '';
-  document.getElementById('eeq_no').value = r.equip_no || '';
+  document.getElementById('eeq_code').value = r.equipment_id || '';
+  document.getElementById('eeq_name').value = r.equipment_name || '';
+  document.getElementById('eeq_no').value = r.equipment_no || '';
   document.getElementById('eeq_process').value = r.process || '성형';
   document.getElementById('eeq_type').value = r.equip_type || '';
   document.getElementById('eeq_spec').value = r.spec || '';
-  document.getElementById('eeq_location').value = r.location || '';
-  document.getElementById('eeq_note').value = r.note || '';
+  document.getElementById('eeq_location').value = r.group_name || 'A반';
+  document.getElementById('eeq_note').value = '';
   document.getElementById('editEquipModal').classList.add('open');
 }
 
@@ -1168,13 +1176,12 @@ async function saveEditEquip() {
   var process = document.getElementById('eeq_process').value;
   var type = document.getElementById('eeq_type').value.trim();
   var spec = document.getElementById('eeq_spec').value.trim();
-  var loc = document.getElementById('eeq_location').value.trim();
-  var note = document.getElementById('eeq_note').value.trim();
+  var group = document.getElementById('eeq_location').value.trim();
   if (!name) { showToast('설비명을 입력해주세요.'); return; }
-  var result = await db.from('equipment_master').update({
-    equip_name: name, equip_no: no || null, process: process,
+  var result = await db.from('equipments').update({
+    equipment_name: name, equipment_no: no || null, process: process,
     equip_type: type || null, spec: spec || null,
-    location: loc || null, note: note || null
+    group_name: group || null
   }).eq('id', id);
   if (result.error) { showToast('수정 실패: ' + result.error.message); return; }
   showToast('설비 정보가 수정됐어요 ✓');
@@ -1183,14 +1190,14 @@ async function saveEditEquip() {
 }
 
 async function toggleEquipActive(id, current) {
-  await db.from('equipment_master').update({ active: !current }).eq('id', id);
+  await db.from('equipments').update({ is_active: !current }).eq('id', id);
   showToast(current ? '비활성화됐어요.' : '활성화됐어요.');
   loadEquip();
 }
 
 async function deleteEquip(id) {
   if (!confirm('이 설비를 삭제하시겠습니까?')) return;
-  await db.from('equipment_master').delete().eq('id', id);
+  await db.from('equipments').delete().eq('id', id);
   showToast('삭제됐어요.');
   loadEquip();
 }
