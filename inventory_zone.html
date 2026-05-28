@@ -178,8 +178,14 @@
         <a href="inventory_viewer.html" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#27AE60;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">&#128202; 재고 조회</a>
       </div>
 
+      <!-- A동/B동 탭 -->
+      <div style="display:flex;gap:0;margin-bottom:0;border-bottom:3px solid #eee;">
+        <div class="zone-tab" id="tabZA" onclick="switchZone('ZA')" style="padding:10px 24px;font-size:14px;font-weight:600;color:#4A90D9;cursor:pointer;border-bottom:3px solid #4A90D9;margin-bottom:-3px;">&#128666; A동</div>
+        <div class="zone-tab" id="tabZB" onclick="switchZone('ZB')" style="padding:10px 24px;font-size:14px;font-weight:600;color:#999;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-3px;">&#128666; B동</div>
+      </div>
+
       <!-- 라인 탭 -->
-      <div class="lane-tabs" id="laneTabs"></div>
+      <div class="lane-tabs" id="laneTabs" style="margin-top:10px;"></div>
 
       <!-- 통계 -->
       <div class="zone-stats" id="zoneStats"></div>
@@ -217,62 +223,103 @@
     var zoneCode = params.get('zone') || 'ZA';
     var currentLane = parseInt(params.get('lane')) || 1;
 
-    var zoneData = [];
     var zoneLots = [];
-    var allZones = [];
+    var allZonesAll = [];  // 전체 zone (A+B)
+    var allZones = [];     // 현재 동의 zone
+    var allLotsAll = [];   // 전체 LOT
     var inboundFormOpen = false;
 
     document.addEventListener('DOMContentLoaded', function() {
       if (typeof checkAuth === 'function') { checkAuth(); }
-      loadZoneData();
+      loadAllZoneData();
     });
 
-    function loadZoneData() {
+    function loadAllZoneData() {
       showLoading('데이터 로드 중...');
       Promise.all([
-        supabase.from('inventory_zones').select('*').eq('zone_code', zoneCode).eq('active', true).order('lane_no'),
+        supabase.from('inventory_zones').select('*').eq('active', true).order('zone_code').order('lane_no'),
         supabase.from('inventory_lots').select('*').eq('location_type', 'zone').in('status', ['stocked', 'waiting']).order('created_at', { ascending: false })
       ]).then(function(res) {
         hideLoading();
-        allZones = res[0].data || [];
-        var allLots = res[1].data || [];
+        allZonesAll = res[0].data || [];
+        allLotsAll = res[1].data || [];
 
-        if (allZones.length === 0) {
-          document.getElementById('zoneContent').innerHTML = '<div class="empty-msg">해당 구역 정보가 없습니다</div>';
+        if (allZonesAll.length === 0) {
+          document.getElementById('zoneContent').innerHTML = '<div class="empty-msg">대차 구역 정보가 없습니다</div>';
           return;
         }
 
-        // 제목 업데이트
-        var zoneName = allZones[0].zone_name || (zoneCode === 'ZA' ? 'A동' : 'B동');
-        document.getElementById('pageTitle').textContent = zoneName + ' 대차 구역';
-        document.getElementById('pageDesc').textContent = zoneName + ' 대차 전용 구역의 LOT 현황 및 입출고 관리';
-
-        // 라인 탭 생성
-        renderLaneTabs();
-
-        // 현재 라인의 zone_id 찾기
-        var currentZone = null;
-        for (var i = 0; i < allZones.length; i++) {
-          if (allZones[i].lane_no === currentLane) { currentZone = allZones[i]; break; }
-        }
-
-        // 해당 zone의 LOT 필터
-        zoneLots = [];
-        if (currentZone) {
-          for (var j = 0; j < allLots.length; j++) {
-            if (allLots[j].zone_id === currentZone.id) {
-              zoneLots.push(allLots[j]);
-            }
-          }
-        }
-
-        renderStats();
-        renderContent();
+        updateZoneTabs();
+        applyCurrentZone();
       }).catch(function(err) {
         hideLoading();
         console.error(err);
         document.getElementById('zoneContent').innerHTML = '<div class="empty-msg">데이터 로드 실패</div>';
       });
+    }
+
+    // A동/B동 탭 전환
+    function switchZone(code) {
+      zoneCode = code;
+      currentLane = 1;
+      updateZoneTabs();
+      applyCurrentZone();
+      // URL 업데이트 (히스토리 안 남김)
+      window.history.replaceState(null, '', 'inventory_zone.html?zone=' + zoneCode + '&lane=' + currentLane);
+    }
+
+    function updateZoneTabs() {
+      var tabZA = document.getElementById('tabZA');
+      var tabZB = document.getElementById('tabZB');
+      if (zoneCode === 'ZA') {
+        tabZA.style.color = '#4A90D9';
+        tabZA.style.borderBottomColor = '#4A90D9';
+        tabZB.style.color = '#999';
+        tabZB.style.borderBottomColor = 'transparent';
+      } else {
+        tabZB.style.color = '#4A90D9';
+        tabZB.style.borderBottomColor = '#4A90D9';
+        tabZA.style.color = '#999';
+        tabZA.style.borderBottomColor = 'transparent';
+      }
+    }
+
+    function applyCurrentZone() {
+      // 현재 동의 zone 필터
+      allZones = [];
+      for (var i = 0; i < allZonesAll.length; i++) {
+        if (allZonesAll[i].zone_code === zoneCode) allZones.push(allZonesAll[i]);
+      }
+
+      // 제목 업데이트
+      var zoneName = allZones.length > 0 ? allZones[0].zone_name : (zoneCode === 'ZA' ? 'A동' : 'B동');
+      document.getElementById('pageTitle').textContent = zoneName + ' 대차 구역';
+      document.getElementById('pageDesc').textContent = zoneName + ' 대차 전용 구역의 LOT 현황 및 입출고 관리';
+
+      // 라인 탭 생성
+      renderLaneTabs();
+
+      // 현재 라인 LOT 필터
+      filterCurrentLaneLots();
+
+      renderStats();
+      renderContent();
+    }
+
+    function filterCurrentLaneLots() {
+      var currentZone = null;
+      for (var i = 0; i < allZones.length; i++) {
+        if (allZones[i].lane_no === currentLane) { currentZone = allZones[i]; break; }
+      }
+
+      zoneLots = [];
+      if (currentZone) {
+        for (var j = 0; j < allLotsAll.length; j++) {
+          if (allLotsAll[j].zone_id === currentZone.id) {
+            zoneLots.push(allLotsAll[j]);
+          }
+        }
+      }
     }
 
     function renderLaneTabs() {
@@ -289,10 +336,11 @@
 
     function switchLane(laneNo) {
       currentLane = laneNo;
-      // URL 업데이트 (히스토리 안 남김)
-      var newUrl = 'inventory_zone.html?zone=' + zoneCode + '&lane=' + laneNo;
-      window.history.replaceState(null, '', newUrl);
-      loadZoneData();
+      window.history.replaceState(null, '', 'inventory_zone.html?zone=' + zoneCode + '&lane=' + laneNo);
+      filterCurrentLaneLots();
+      renderLaneTabs();
+      renderStats();
+      renderContent();
     }
 
     function renderStats() {
@@ -445,7 +493,7 @@
           hideLoading();
           showToast('입고 등록 완료!');
           inboundFormOpen = false;
-          loadZoneData();
+          loadAllZoneData();
         });
       });
     }
@@ -541,7 +589,7 @@
         if (results[0].error) { showToast('출고 오류: ' + results[0].error.message); return; }
         showToast(outQty + '개 출고 완료!');
         closeModal('outModal');
-        loadZoneData();
+        loadAllZoneData();
       });
     }
 
@@ -639,7 +687,7 @@
         if (results[0].error) { showToast('수정 오류: ' + results[0].error.message); return; }
         showToast('수량 수정 완료!');
         closeModal('editModal');
-        loadZoneData();
+        loadAllZoneData();
       });
     }
 
