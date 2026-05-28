@@ -384,13 +384,9 @@ function editRecord(id) {
 }
 
 async function deleteRecord(id) {
-    if (!confirm('이 검사 기록을 삭제하시겠습니까?')) return;
+    if (!confirm('이 검사 기록(해당 면)을 삭제하시겠습니까?')) return;
     try {
-        var r = await fetch(SU+'/rest/v1/inspection_rounds?id=eq.'+id, {headers:HR});
-        var rec = (await r.json())[0];
-        if (rec) {
-            await fetch(SU+'/rest/v1/inspection_rounds?inspect_date=eq.'+rec.inspect_date+'&equipment=eq.'+rec.equipment+'&inspector=eq.'+rec.inspector, {method:'DELETE',headers:HR});
-        }
+        await fetch(SU+'/rest/v1/inspection_rounds?id=eq.'+id, {method:'DELETE',headers:HR});
         showToast('삭제 완료','success');
         loadData();
     } catch(e) { showToast('삭제 실패','error'); }
