@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>대차 구역 상세 - 업무포탈</title>
+  <link rel="stylesheet" href="sidebar.css">
+  <link rel="stylesheet" href="common.css">
+  <style>
+    .zone-container { max-width: 100%; margin: 0; padding: 16px 20px; }
+
+    /* 뒤로가기 */
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 13px; color: #4A90D9; text-decoration: none; margin-bottom: 14px;
+      font-weight: 600;
+    }
+    .back-link:hover { text-decoration: underline; }
+
+    /* 통계 카드 */
+    .zone-stats { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .zone-stat {
+      flex: 1; min-width: 110px; background: #fff; border-radius: 8px;
+      padding: 12px 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      border-left: 4px solid #4A90D9;
+    }
+    .zone-stat .zs-label { font-size: 11px; color: #888; margin-bottom: 2px; }
+    .zone-stat .zs-value { font-size: 22px; font-weight: 700; color: #1a1a2e; }
+    .zone-stat.green { border-left-color: #27AE60; }
+    .zone-stat.orange { border-left-color: #F39C12; }
+    .zone-stat.red { border-left-color: #E74C3C; }
+    .zone-stat.purple { border-left-color: #9B59B6; }
+
+    /* 라인 탭 */
+    .lane-tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 3px solid #eee; }
+    .lane-tab {
+      padding: 10px 20px; font-size: 14px; font-weight: 600; color: #999;
+      cursor: pointer; border-bottom: 3px solid transparent;
+      margin-bottom: -3px; transition: all 0.2s;
+    }
+    .lane-tab:hover { color: #555; }
+    .lane-tab.active { color: #4A90D9; border-bottom-color: #4A90D9; }
+    .lane-tab .lane-count {
+      display: inline-block; background: #eee; color: #666;
+      font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px;
+      margin-left: 6px;
+    }
+    .lane-tab.active .lane-count { background: #4A90D9; color: #fff; }
+
+    /* 섹션 */
+    .section-box {
+      background: #fff; border-radius: 8px; padding: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 14px; font-weight: 700; color: #1a1a2e; margin-bottom: 12px;
+      padding-bottom: 8px; border-bottom: 1px solid #f0f0f0;
+    }
+    .section-title .title-icon { margin-right: 6px; }
+
+    /* 테이블 */
+    .data-table-wrap { overflow-x: auto; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table th {
+      background: #f5f5f5; padding: 8px 6px; text-align: left;
+      font-weight: 600; color: #555; border-bottom: 2px solid #ddd; white-space: nowrap;
+    }
+    .data-table td { padding: 7px 6px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    .data-table tr:hover { background: #f9f9f9; }
+    .data-table .qty-cell { text-align: right; font-weight: 600; }
+
+    /* 상태 배지 */
+    .status-badge {
+      display: inline-block; padding: 2px 10px; border-radius: 10px;
+      font-size: 11px; font-weight: 600;
+    }
+    .status-badge.stocked { background: #e8f5e9; color: #2E7D32; }
+    .status-badge.waiting { background: #fff3e0; color: #E65100; }
+
+    /* 행 액션 버튼 */
+    .row-btn {
+      padding: 4px 10px; border-radius: 4px; border: none;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+    }
+    .row-btn.outbound { background: #E74C3C; color: #fff; }
+    .row-btn.outbound:hover { background: #c0392b; }
+    .row-btn.edit { background: #F39C12; color: #fff; }
+    .row-btn.edit:hover { background: #d68910; }
+
+    /* 폼 */
+    .form-row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+    .form-group { flex: 1; min-width: 130px; }
+    .form-group label { display: block; font-size: 11px; color: #888; margin-bottom: 3px; font-weight: 600; }
+    .form-group input, .form-group select {
+      width: 100%; padding: 7px 10px; border: 1.5px solid #ddd; border-radius: 6px;
+      font-size: 13px; box-sizing: border-box;
+    }
+    .form-group input:focus, .form-group select:focus { border-color: #4A90D9; outline: none; }
+
+    /* 액션 버튼 */
+    .action-bar { display: flex; gap: 8px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+    .action-btn {
+      padding: 10px 24px; border-radius: 8px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .action-btn:hover { transform: translateY(-1px); }
+    .action-btn.primary { background: #4A90D9; color: #fff; }
+    .action-btn.danger { background: #E74C3C; color: #fff; }
+    .action-btn.success { background: #27AE60; color: #fff; }
+    .action-btn.secondary { background: #f5f5f5; color: #666; border: 1px solid #ddd; }
+
+    /* 토글 */
+    .toggle-btn {
+      background: none; border: none; color: #4A90D9; font-size: 12px;
+      cursor: pointer; font-weight: 600; padding: 0; margin-left: 8px;
+    }
+    .toggle-btn:hover { text-decoration: underline; }
+
+    /* 모달 */
+    .modal-overlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-box {
+      background: #fff; border-radius: 12px; padding: 20px; width: 90%; max-width: 420px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2); max-height: 80vh; overflow-y: auto;
+    }
+    .modal-title { font-size: 16px; font-weight: 700; color: #1a1a2e; margin-bottom: 14px; }
+
+    .empty-msg { text-align: center; color: #aaa; padding: 40px 20px; font-size: 14px; }
+
+    /* 토스트/로딩 */
+    .toast-msg {
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+      background: #333; color: #fff; padding: 12px 24px; border-radius: 8px;
+      font-size: 14px; z-index: 99999; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .toast-msg.show { display: block; }
+    .loading-overlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.4); z-index: 9999; justify-content: center; align-items: center;
+    }
+    .loading-overlay.show { display: flex; }
+    .loading-box { background: #fff; border-radius: 12px; padding: 30px 40px; text-align: center; }
+    .loading-box .spinner {
+      width: 40px; height: 40px; border: 4px solid #eee; border-top-color: #4A90D9;
+      border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 768px) {
+      .zone-container { padding: 10px 12px; }
+      .zone-stats { gap: 6px; }
+      .zone-stat { min-width: 90px; padding: 10px; }
+      .zone-stat .zs-value { font-size: 18px; }
+      .form-row { flex-direction: column; }
+      .section-box { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="top-header" class="top-header"></div>
+  <nav id="sidebar-nav" class="sidebar"></nav>
+
+  <div class="main">
+    <div class="page-header">
+      <h1 class="page-title" id="pageTitle">대차 구역 상세</h1>
+      <p class="page-desc" id="pageDesc">대차 전용 구역의 LOT 현황 및 입출고 관리</p>
+    </div>
+
+    <div class="zone-container">
+      <a href="inventory_layout.html" class="back-link">&#9664; 적재대 현황으로 돌아가기</a>
+
+      <!-- 라인 탭 -->
+      <div class="lane-tabs" id="laneTabs"></div>
+
+      <!-- 통계 -->
+      <div class="zone-stats" id="zoneStats"></div>
+
+      <!-- 컨텐츠 -->
+      <div id="zoneContent"></div>
+    </div>
+  </div>
+
+  <!-- 출고 모달 -->
+  <div class="modal-overlay" id="outModal">
+    <div class="modal-box" id="outModalBody"></div>
+  </div>
+
+  <!-- 수량 수정 모달 -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal-box" id="editModalBody"></div>
+  </div>
+
+  <!-- 로딩/토스트 -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-box"><div class="spinner"></div><div id="loadingText">처리 중...</div></div>
+  </div>
+  <div class="toast-msg" id="toastMsg"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="auth_guard.js"></script>
+  <script>
+    var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+    var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+    var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // URL 파라미터 파싱
+    var params = new URLSearchParams(window.location.search);
+    var zoneCode = params.get('zone') || 'ZA';
+    var currentLane = parseInt(params.get('lane')) || 1;
+
+    var zoneData = [];
+    var zoneLots = [];
+    var allZones = [];
+    var inboundFormOpen = false;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof checkAuth === 'function') { checkAuth(); }
+      loadZoneData();
+    });
+
+    function loadZoneData() {
+      showLoading('데이터 로드 중...');
+      Promise.all([
+        supabase.from('inventory_zones').select('*').eq('zone_code', zoneCode).eq('active', true).order('lane_no'),
+        supabase.from('inventory_lots').select('*').eq('location_type', 'zone').in('status', ['stocked', 'waiting']).order('created_at', { ascending: false })
+      ]).then(function(res) {
+        hideLoading();
+        allZones = res[0].data || [];
+        var allLots = res[1].data || [];
+
+        if (allZones.length === 0) {
+          document.getElementById('zoneContent').innerHTML = '<div class="empty-msg">해당 구역 정보가 없습니다</div>';
+          return;
+        }
+
+        // 제목 업데이트
+        var zoneName = allZones[0].zone_name || (zoneCode === 'ZA' ? 'A동' : 'B동');
+        document.getElementById('pageTitle').textContent = zoneName + ' 대차 구역';
+        document.getElementById('pageDesc').textContent = zoneName + ' 대차 전용 구역의 LOT 현황 및 입출고 관리';
+
+        // 라인 탭 생성
+        renderLaneTabs();
+
+        // 현재 라인의 zone_id 찾기
+        var currentZone = null;
+        for (var i = 0; i < allZones.length; i++) {
+          if (allZones[i].lane_no === currentLane) { currentZone = allZones[i]; break; }
+        }
+
+        // 해당 zone의 LOT 필터
+        zoneLots = [];
+        if (currentZone) {
+          for (var j = 0; j < allLots.length; j++) {
+            if (allLots[j].zone_id === currentZone.id) {
+              zoneLots.push(allLots[j]);
+            }
+          }
+        }
+
+        renderStats();
+        renderContent();
+      }).catch(function(err) {
+        hideLoading();
+        console.error(err);
+        document.getElementById('zoneContent').innerHTML = '<div class="empty-msg">데이터 로드 실패</div>';
+      });
+    }
+
+    function renderLaneTabs() {
+      var h = '';
+      for (var i = 0; i < allZones.length; i++) {
+        var z = allZones[i];
+        var active = (z.lane_no === currentLane) ? ' active' : '';
+        h += '<div class="lane-tab' + active + '" onclick="switchLane(' + z.lane_no + ')">';
+        h += z.lane_name || (z.lane_no + '라인');
+        h += '</div>';
+      }
+      document.getElementById('laneTabs').innerHTML = h;
+    }
+
+    function switchLane(laneNo) {
+      currentLane = laneNo;
+      // URL 업데이트 (히스토리 안 남김)
+      var newUrl = 'inventory_zone.html?zone=' + zoneCode + '&lane=' + laneNo;
+      window.history.replaceState(null, '', newUrl);
+      loadZoneData();
+    }
+
+    function renderStats() {
+      var totalLots = zoneLots.length;
+      var totalQty = 0;
+      var productSet = {};
+      for (var i = 0; i < zoneLots.length; i++) {
+        totalQty += zoneLots[i].quantity || 0;
+        if (zoneLots[i].product_code) productSet[zoneLots[i].product_code] = true;
+      }
+      var productCount = Object.keys(productSet).length;
+
+      var h = '';
+      h += '<div class="zone-stat"><div class="zs-label">LOT 수</div><div class="zs-value">' + totalLots + '</div></div>';
+      h += '<div class="zone-stat green"><div class="zs-label">총 수량</div><div class="zs-value">' + totalQty.toLocaleString() + '</div></div>';
+      h += '<div class="zone-stat purple"><div class="zs-label">품목 종류</div><div class="zs-value">' + productCount + '</div></div>';
+      document.getElementById('zoneStats').innerHTML = h;
+    }
+
+    function renderContent() {
+      var h = '';
+
+      // LOT 목록
+      h += '<div class="section-box">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+      h += '<div class="section-title" style="margin-bottom:0;padding-bottom:0;border-bottom:none;"><span class="title-icon">&#128230;</span>LOT 목록</div>';
+      h += '</div>';
+      h += '<div style="height:8px;"></div>';
+
+      if (zoneLots.length === 0) {
+        h += '<div class="empty-msg">이 라인에 적재된 LOT이 없습니다</div>';
+      } else {
+        h += '<div class="data-table-wrap"><table class="data-table"><thead><tr>';
+        h += '<th>No</th><th>사번</th><th>제품명</th><th>LOT</th>';
+        h += '<th style="text-align:right;">수량</th><th>상태</th><th>입고일</th><th>처리</th>';
+        h += '</tr></thead><tbody>';
+
+        for (var i = 0; i < zoneLots.length; i++) {
+          var lot = zoneLots[i];
+          var statusText = lot.status === 'stocked' ? '적재' : '대기';
+          var statusClass = lot.status === 'stocked' ? 'stocked' : 'waiting';
+          h += '<tr>';
+          h += '<td>' + (i + 1) + '</td>';
+          h += '<td><strong>' + (lot.product_code || '-') + '</strong></td>';
+          h += '<td>' + (lot.product_name || '-') + '</td>';
+          h += '<td>' + (lot.lot_no || '-') + '</td>';
+          h += '<td class="qty-cell">' + (lot.quantity || 0).toLocaleString() + '</td>';
+          h += '<td><span class="status-badge ' + statusClass + '">' + statusText + '</span></td>';
+          h += '<td>' + (lot.stocked_at ? lot.stocked_at.slice(0, 10) : (lot.created_at ? lot.created_at.slice(0, 10) : '-')) + '</td>';
+          h += '<td>';
+          h += '<button class="row-btn edit" onclick="openEditModal(' + lot.id + ')" style="margin-right:4px;">수정</button>';
+          h += '<button class="row-btn outbound" onclick="openOutModal(' + lot.id + ')">출고</button>';
+          h += '</td>';
+          h += '</tr>';
+        }
+        h += '</tbody></table></div>';
+      }
+      h += '</div>';
+
+      // 입고 등록 폼
+      h += '<div class="section-box">';
+      h += '<div class="section-title"><span class="title-icon">&#10133;</span>LOT 입고 등록';
+      h += '<button class="toggle-btn" id="toggleInboundBtn" onclick="toggleInboundForm()">' + (inboundFormOpen ? '&#9650; 접기' : '&#9660; 펼치기') + '</button>';
+      h += '</div>';
+      h += '<div id="inboundFormArea" style="display:' + (inboundFormOpen ? 'block' : 'none') + ';">';
+      h += '<div class="form-row">';
+      h += '<div class="form-group"><label>사번 *</label><input type="text" id="inProductCode" placeholder="제품 사번"></div>';
+      h += '<div class="form-group"><label>제품명</label><input type="text" id="inProductName" placeholder="제품명 (선택)"></div>';
+      h += '<div class="form-group"><label>LOT 번호 *</label><input type="text" id="inLotNo" placeholder="LOT 번호"></div>';
+      h += '</div>';
+      h += '<div class="form-row">';
+      h += '<div class="form-group"><label>수량 *</label><input type="number" id="inQty" placeholder="수량" min="1"></div>';
+      h += '<div class="form-group"><label>생산일</label><input type="date" id="inProducedAt"></div>';
+      h += '<div class="form-group"><label>비고</label><input type="text" id="inNote" placeholder="비고 (선택)"></div>';
+      h += '</div>';
+      h += '<div class="action-bar" style="justify-content:flex-end;margin-top:10px;">';
+      h += '<button class="action-btn success" onclick="registerInbound()">입고 등록</button>';
+      h += '</div>';
+      h += '</div>';
+      h += '</div>';
+
+      document.getElementById('zoneContent').innerHTML = h;
+    }
+
+    function toggleInboundForm() {
+      inboundFormOpen = !inboundFormOpen;
+      var area = document.getElementById('inboundFormArea');
+      var btn = document.getElementById('toggleInboundBtn');
+      if (inboundFormOpen) {
+        area.style.display = 'block';
+        btn.innerHTML = '&#9650; 접기';
+      } else {
+        area.style.display = 'none';
+        btn.innerHTML = '&#9660; 펼치기';
+      }
+    }
+
+    // ── 입고 등록 ──
+    function registerInbound() {
+      var productCode = document.getElementById('inProductCode').value.trim();
+      var productName = document.getElementById('inProductName').value.trim();
+      var lotNo = document.getElementById('inLotNo').value.trim();
+      var qty = parseInt(document.getElementById('inQty').value) || 0;
+      var producedAt = document.getElementById('inProducedAt').value || null;
+      var note = document.getElementById('inNote').value.trim();
+
+      if (!productCode) { showToast('사번을 입력해주세요'); return; }
+      if (!lotNo) { showToast('LOT 번호를 입력해주세요'); return; }
+      if (qty <= 0) { showToast('수량을 입력해주세요'); return; }
+
+      // 현재 라인의 zone_id 찾기
+      var currentZone = null;
+      for (var i = 0; i < allZones.length; i++) {
+        if (allZones[i].lane_no === currentLane) { currentZone = allZones[i]; break; }
+      }
+      if (!currentZone) { showToast('라인 정보를 찾을 수 없습니다'); return; }
+
+      showLoading('입고 등록 중...');
+
+      var zoneName = currentZone.zone_name || '';
+      var laneName = currentZone.lane_name || '';
+
+      supabase.from('inventory_lots').insert({
+        product_code: productCode,
+        product_name: productName,
+        lot_no: lotNo,
+        quantity: qty,
+        initial_quantity: qty,
+        status: 'stocked',
+        location_type: 'zone',
+        zone_id: currentZone.id,
+        produced_at: producedAt,
+        note: note,
+        source_type: 'manual',
+        stocked_at: new Date().toISOString(),
+        created_by: 'system'
+      }).then(function(res) {
+        if (res.error) { hideLoading(); showToast('등록 오류: ' + res.error.message); return; }
+
+        // 이동 이력 기록
+        supabase.from('inventory_movements').insert({
+          product_code: productCode,
+          movement_type: 'inbound',
+          to_location: zoneName + ' ' + laneName,
+          quantity: qty,
+          lot_no: lotNo,
+          reason: '대차 구역 직접 입고',
+          moved_by: 'system'
+        }).then(function() {
+          hideLoading();
+          showToast('입고 등록 완료!');
+          inboundFormOpen = false;
+          loadZoneData();
+        });
+      });
+    }
+
+    // ── 출고 모달 ──
+    function openOutModal(lotId) {
+      var lot = null;
+      for (var i = 0; i < zoneLots.length; i++) {
+        if (zoneLots[i].id === lotId) { lot = zoneLots[i]; break; }
+      }
+      if (!lot) return;
+
+      var h = '';
+      h += '<div class="modal-title">LOT 출고 처리</div>';
+      h += '<div style="background:#f8f9fa;border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:13px;">';
+      h += '<div><strong>' + (lot.product_code || '-') + '</strong> / ' + (lot.product_name || '-') + '</div>';
+      h += '<div style="color:#888;margin-top:2px;">LOT: ' + (lot.lot_no || '-') + ' | 현재 수량: ' + (lot.quantity || 0).toLocaleString() + '</div>';
+      h += '</div>';
+
+      h += '<div class="form-group" style="margin-bottom:10px;">';
+      h += '<label>출고 수량 *</label>';
+      h += '<input type="number" id="outQty" value="' + (lot.quantity || 0) + '" min="1" max="' + (lot.quantity || 0) + '" style="width:100%;padding:7px 10px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;">';
+      h += '<div style="font-size:11px;color:#888;margin-top:3px;">전량 출고 시 LOT이 삭제됩니다</div>';
+      h += '</div>';
+
+      h += '<div class="form-group" style="margin-bottom:10px;">';
+      h += '<label>출고 사유</label>';
+      h += '<input type="text" id="outReason" placeholder="예: 거래처 납품, 라인 이동 등" style="width:100%;padding:7px 10px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;">';
+      h += '</div>';
+
+      h += '<div class="action-bar" style="margin-top:16px;">';
+      h += '<button class="action-btn secondary" onclick="closeModal(\'outModal\')">취소</button>';
+      h += '<button class="action-btn danger" onclick="processOutbound(' + lotId + ')">출고 확정</button>';
+      h += '</div>';
+
+      document.getElementById('outModalBody').innerHTML = h;
+      document.getElementById('outModal').className = 'modal-overlay show';
+    }
+
+    function processOutbound(lotId) {
+      var lot = null;
+      for (var i = 0; i < zoneLots.length; i++) {
+        if (zoneLots[i].id === lotId) { lot = zoneLots[i]; break; }
+      }
+      if (!lot) return;
+
+      var outQty = parseInt(document.getElementById('outQty').value) || 0;
+      var reason = document.getElementById('outReason').value.trim() || '출고';
+
+      if (outQty <= 0) { showToast('출고 수량을 입력해주세요'); return; }
+      if (outQty > lot.quantity) { showToast('현재 수량보다 많이 출고할 수 없습니다'); return; }
+
+      if (!confirm(outQty + '개를 출고하시겠습니까?')) return;
+
+      showLoading('출고 처리 중...');
+
+      var currentZone = null;
+      for (var z = 0; z < allZones.length; z++) {
+        if (allZones[z].lane_no === currentLane) { currentZone = allZones[z]; break; }
+      }
+      var locName = currentZone ? (currentZone.zone_name + ' ' + currentZone.lane_name) : '';
+
+      var promises = [];
+      var remaining = lot.quantity - outQty;
+
+      if (remaining <= 0) {
+        // 전량 출고 → LOT 상태 변경
+        promises.push(supabase.from('inventory_lots').update({
+          status: 'shipped',
+          quantity: 0
+        }).eq('id', lotId));
+      } else {
+        // 부분 출고 → 수량 차감
+        promises.push(supabase.from('inventory_lots').update({
+          quantity: remaining
+        }).eq('id', lotId));
+      }
+
+      // 이동 이력
+      promises.push(supabase.from('inventory_movements').insert({
+        lot_id: lotId,
+        product_code: lot.product_code,
+        movement_type: 'outbound',
+        from_location: locName,
+        quantity: outQty,
+        lot_no: lot.lot_no,
+        reason: reason,
+        moved_by: 'system'
+      }));
+
+      Promise.all(promises).then(function(results) {
+        hideLoading();
+        if (results[0].error) { showToast('출고 오류: ' + results[0].error.message); return; }
+        showToast(outQty + '개 출고 완료!');
+        closeModal('outModal');
+        loadZoneData();
+      });
+    }
+
+    // ── 수량 수정 모달 ──
+    function openEditModal(lotId) {
+      var lot = null;
+      for (var i = 0; i < zoneLots.length; i++) {
+        if (zoneLots[i].id === lotId) { lot = zoneLots[i]; break; }
+      }
+      if (!lot) return;
+
+      var h = '';
+      h += '<div class="modal-title">LOT 수량 수정</div>';
+      h += '<div style="background:#f8f9fa;border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:13px;">';
+      h += '<div><strong>' + (lot.product_code || '-') + '</strong> / ' + (lot.product_name || '-') + '</div>';
+      h += '<div style="color:#888;margin-top:2px;">LOT: ' + (lot.lot_no || '-') + '</div>';
+      h += '</div>';
+
+      h += '<div class="form-group" style="margin-bottom:10px;">';
+      h += '<label>현재 수량</label>';
+      h += '<div style="font-size:18px;font-weight:700;color:#1a1a2e;">' + (lot.quantity || 0).toLocaleString() + '</div>';
+      h += '</div>';
+
+      h += '<div class="form-group" style="margin-bottom:10px;">';
+      h += '<label>변경 수량 *</label>';
+      h += '<input type="number" id="editQty" value="' + (lot.quantity || 0) + '" min="0" style="width:100%;padding:7px 10px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;">';
+      h += '</div>';
+
+      h += '<div class="form-group" style="margin-bottom:10px;">';
+      h += '<label>변경 사유 *</label>';
+      h += '<input type="text" id="editReason" placeholder="예: 실사 조정, 수량 오류 정정" style="width:100%;padding:7px 10px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;">';
+      h += '</div>';
+
+      h += '<div class="action-bar" style="margin-top:16px;">';
+      h += '<button class="action-btn secondary" onclick="closeModal(\'editModal\')">취소</button>';
+      h += '<button class="action-btn primary" onclick="processEdit(' + lotId + ')">수정 확정</button>';
+      h += '</div>';
+
+      document.getElementById('editModalBody').innerHTML = h;
+      document.getElementById('editModal').className = 'modal-overlay show';
+    }
+
+    function processEdit(lotId) {
+      var lot = null;
+      for (var i = 0; i < zoneLots.length; i++) {
+        if (zoneLots[i].id === lotId) { lot = zoneLots[i]; break; }
+      }
+      if (!lot) return;
+
+      var newQty = parseInt(document.getElementById('editQty').value);
+      var reason = document.getElementById('editReason').value.trim();
+
+      if (isNaN(newQty) || newQty < 0) { showToast('올바른 수량을 입력해주세요'); return; }
+      if (!reason) { showToast('변경 사유를 입력해주세요'); return; }
+      if (newQty === lot.quantity) { showToast('수량이 변경되지 않았습니다'); return; }
+
+      showLoading('수정 중...');
+
+      var currentZone = null;
+      for (var z = 0; z < allZones.length; z++) {
+        if (allZones[z].lane_no === currentLane) { currentZone = allZones[z]; break; }
+      }
+      var locName = currentZone ? (currentZone.zone_name + ' ' + currentZone.lane_name) : '';
+      var diffQty = newQty - lot.quantity;
+
+      var promises = [];
+
+      // LOT 수량 업데이트
+      var updateData = { quantity: newQty };
+      if (newQty <= 0) {
+        updateData.status = 'shipped';
+        updateData.quantity = 0;
+      }
+      promises.push(supabase.from('inventory_lots').update(updateData).eq('id', lotId));
+
+      // 조정 이력
+      var movementData = {
+        lot_id: lotId,
+        product_code: lot.product_code,
+        movement_type: 'adjustment',
+        quantity: Math.abs(diffQty),
+        lot_no: lot.lot_no,
+        reason: '[수량수정] ' + reason + ' (기존:' + lot.quantity + ' -> 변경:' + newQty + ')',
+        moved_by: 'system'
+      };
+      if (diffQty > 0) {
+        movementData.to_location = locName;
+      } else {
+        movementData.from_location = locName;
+      }
+      promises.push(supabase.from('inventory_movements').insert(movementData));
+
+      Promise.all(promises).then(function(results) {
+        hideLoading();
+        if (results[0].error) { showToast('수정 오류: ' + results[0].error.message); return; }
+        showToast('수량 수정 완료!');
+        closeModal('editModal');
+        loadZoneData();
+      });
+    }
+
+    // ── 유틸 ──
+    function closeModal(id) {
+      document.getElementById(id).className = 'modal-overlay';
+    }
+    function showToast(msg) {
+      var t = document.getElementById('toastMsg');
+      t.textContent = msg; t.className = 'toast-msg show';
+      setTimeout(function() { t.className = 'toast-msg'; }, 2500);
+    }
+    function showLoading(text) {
+      document.getElementById('loadingText').textContent = text || '처리 중...';
+      document.getElementById('loadingOverlay').className = 'loading-overlay show';
+    }
+    function hideLoading() { document.getElementById('loadingOverlay').className = 'loading-overlay'; }
+
+    document.getElementById('outModal').addEventListener('click', function(e) { if (e.target === this) closeModal('outModal'); });
+    document.getElementById('editModal').addEventListener('click', function(e) { if (e.target === this) closeModal('editModal'); });
+  </script>
+  <script src="sidebar.js"></script>
+</body>
+</html>
