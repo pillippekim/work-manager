@@ -208,6 +208,35 @@
 
     .empty-msg { text-align: center; color: #aaa; padding: 40px 20px; font-size: 14px; }
 
+    /* 실사/조정 관련 */
+    .audit-input {
+      width: 80px; padding: 5px 8px; border: 1.5px solid #ddd; border-radius: 5px;
+      font-size: 13px; text-align: right; font-weight: 600;
+    }
+    .audit-input:focus { border-color: #4A90D9; outline: none; }
+    .audit-input.diff { border-color: #E74C3C; background: #fff5f5; }
+    .diff-cell { font-weight: 700; }
+    .diff-cell.plus { color: #27AE60; }
+    .diff-cell.minus { color: #E74C3C; }
+    .diff-cell.zero { color: #aaa; }
+    .audit-reason {
+      width: 120px; padding: 5px 8px; border: 1.5px solid #ddd; border-radius: 5px;
+      font-size: 12px;
+    }
+    .audit-reason:focus { border-color: #4A90D9; outline: none; }
+    .audit-check { width: 16px; height: 16px; cursor: pointer; }
+    .audit-progress {
+      background: #e9ecef; border-radius: 10px; height: 8px; overflow: hidden; margin-top: 4px;
+    }
+    .audit-progress-fill {
+      height: 100%; border-radius: 10px; background: #4A90D9; transition: width 0.3s;
+    }
+    .slot-status-dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px;
+    }
+    .slot-status-dot.occupied { background: #4A90D9; }
+    .slot-status-dot.empty { background: #ccc; }
+
     /* 토글 버튼 (수동입고 폼 접기/펼치기) */
     .toggle-btn {
       background: none; border: none; color: #4A90D9; font-size: 12px;
@@ -238,10 +267,11 @@
     </div>
 
     <div class="io-container">
-      <!-- 3탭 -->
+      <!-- 4탭 -->
       <div class="io-tabs">
         <div class="io-tab active" onclick="switchTab('inbound')" id="tabInbound">입고등록/대기관리 <span class="tab-badge" id="waitingCount">0</span></div>
         <div class="io-tab" onclick="switchTab('outbound')" id="tabOutbound">출고처리</div>
+        <div class="io-tab" onclick="switchTab('audit')" id="tabAudit">재고 실사/조정</div>
         <div class="io-tab" onclick="switchTab('history')" id="tabHistory">처리이력</div>
       </div>
 
@@ -276,6 +306,9 @@
     var matchResults = [];
     var uploadedFile = null;
     var manualFormOpen = false;
+    var auditRackId = null;
+    var auditSlots = [];
+    var auditCheckedCount = 0;
 
     document.addEventListener('DOMContentLoaded', function() {
       if (typeof checkAuth === 'function') { checkAuth(); }
@@ -308,6 +341,7 @@
     function renderCurrentTab() {
       if (currentTab === 'inbound') renderInbound();
       else if (currentTab === 'outbound') renderOutbound();
+      else if (currentTab === 'audit') renderAudit();
       else if (currentTab === 'history') renderHistory();
     }
 
@@ -893,7 +927,314 @@
     }
 
     // ══════════════════════════════════════
-    // TAB 3: 처리이력
+    // TAB 4: 재고 실사/조정
+    // ══════════════════════════════════════
+    function renderAudit() {
+      var h = '';
+
+      // 상단: 동 선택
+      h += '<div class="section-box">';
+      h += '<div class="section-title"><span class="title-icon">&#128270;</span>재고 실사 - 랙/슬롯별 순회</div>';
+      h += '<div class="form-row">';
+      h += '<div class="form-group" style="max-width:200px;">';
+      h += '<label>동 선택</label>';
+      h += '<select id="auditRackSelect" onchange="loadAuditSlots()">';
+      h += '<option value="">-- 동을 선택하세요 --</option>';
+      for (var r = 0; r < allRacks.length; r++) {
+        var sel = (auditRackId && allRacks[r].id === auditRackId) ? ' selected' : '';
+        h += '<option value="' + allRacks[r].id + '"' + sel + '>' + allRacks[r].rack_name + '</option>';
+      }
+      h += '</select>';
+      h += '</div>';
+      h += '<div class="form-group" style="flex:none;align-self:flex-end;">';
+      h += '<button class="action-btn primary" onclick="loadAuditSlots()" style="padding:7px 16px;">&#128260; 조회</button>';
+      h += '</div>';
+      h += '</div>';
+      h += '</div>';
+
+      // 실사 테이블 영역
+      h += '<div id="auditTableArea"></div>';
+
+      document.getElementById('tabContent').innerHTML = h;
+
+      // 이전에 선택된 동이 있으면 자동 로드
+      if (auditRackId) {
+        loadAuditSlots();
+      }
+    }
+
+    function loadAuditSlots() {
+      var sel = document.getElementById('auditRackSelect');
+      var rackId = parseInt(sel ? sel.value : 0);
+      if (!rackId) {
+        document.getElementById('auditTableArea').innerHTML = '<div class="empty-msg">동을 선택하면 슬롯별 실사를 시작할 수 있어요</div>';
+        return;
+      }
+      auditRackId = rackId;
+
+      // 해당 동의 슬롯만 필터
+      var rackName = '';
+      for (var r = 0; r < allRacks.length; r++) {
+        if (allRacks[r].id === rackId) { rackName = allRacks[r].rack_name; break; }
+      }
+
+      auditSlots = [];
+      for (var i = 0; i < allSlots.length; i++) {
+        if (allSlots[i].rack_id === rackId) {
+          auditSlots.push({
+            id: allSlots[i].id,
+            slot_code: allSlots[i].slot_code,
+            rack_name: rackName,
+            status: allSlots[i].status,
+            product_code: allSlots[i].product_code || '',
+            lot_no: allSlots[i].lot_no || '',
+            system_qty: allSlots[i].quantity || 0,
+            actual_qty: null,
+            checked: false,
+            reason: ''
+          });
+        }
+      }
+
+      // 슬롯코드 정렬 (높은번호 = 상단 → 낮은번호 = 하단)
+      auditSlots.sort(function(a, b) {
+        var na = parseInt(a.slot_code.replace(/[^0-9]/g, '')) || 0;
+        var nb = parseInt(b.slot_code.replace(/[^0-9]/g, '')) || 0;
+        return nb - na;
+      });
+
+      renderAuditTable();
+    }
+
+    function renderAuditTable() {
+      if (auditSlots.length === 0) {
+        document.getElementById('auditTableArea').innerHTML = '<div class="empty-msg">해당 동에 슬롯이 없습니다</div>';
+        return;
+      }
+
+      // 통계 계산
+      var totalSlots = auditSlots.length;
+      var occupiedSlots = 0;
+      var checkedCount = 0;
+      var diffCount = 0;
+      for (var c = 0; c < auditSlots.length; c++) {
+        if (auditSlots[c].status === 'occupied') occupiedSlots++;
+        if (auditSlots[c].checked) checkedCount++;
+        if (auditSlots[c].actual_qty !== null && auditSlots[c].actual_qty !== auditSlots[c].system_qty) diffCount++;
+      }
+      auditCheckedCount = checkedCount;
+      var progress = totalSlots > 0 ? Math.round((checkedCount / totalSlots) * 100) : 0;
+
+      var h = '';
+
+      // 진행률 + 통계
+      h += '<div class="io-stats">';
+      h += '<div class="io-stat"><div class="is-label">전체 슬롯</div><div class="is-value">' + totalSlots + '</div></div>';
+      h += '<div class="io-stat green"><div class="is-label">적재중</div><div class="is-value">' + occupiedSlots + '</div></div>';
+      h += '<div class="io-stat purple"><div class="is-label">실사 완료</div><div class="is-value">' + checkedCount + '/' + totalSlots + '</div></div>';
+      h += '<div class="io-stat' + (diffCount > 0 ? ' red' : '') + '"><div class="is-label">차이 발견</div><div class="is-value">' + diffCount + '</div></div>';
+      h += '</div>';
+
+      // 진행바
+      h += '<div class="section-box" style="padding:12px 16px;">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
+      h += '<span style="font-size:12px;color:#888;">실사 진행률</span>';
+      h += '<span style="font-size:12px;font-weight:600;color:#4A90D9;">' + progress + '%</span>';
+      h += '</div>';
+      h += '<div class="audit-progress"><div class="audit-progress-fill" style="width:' + progress + '%;"></div></div>';
+      h += '</div>';
+
+      // 테이블
+      h += '<div class="section-box">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
+      h += '<div class="section-title" style="margin-bottom:0;padding-bottom:0;border-bottom:none;"><span class="title-icon">&#128203;</span>' + auditSlots[0].rack_name + ' 슬롯 실사</div>';
+      h += '<div style="display:flex;gap:6px;">';
+      h += '<button class="action-btn secondary" style="padding:6px 12px;font-size:12px;" onclick="auditFillSystem()">시스템값 일괄입력</button>';
+      h += '<button class="action-btn primary" style="padding:6px 12px;font-size:12px;" onclick="auditCheckAll()">전체 확인</button>';
+      h += '</div>';
+      h += '</div>';
+
+      h += '<div class="data-table-wrap"><table class="data-table"><thead><tr>';
+      h += '<th style="width:30px;">&#10004;</th>';
+      h += '<th>슬롯</th><th>상태</th><th>사번</th><th>LOT</th>';
+      h += '<th style="text-align:right;">시스템 수량</th>';
+      h += '<th style="text-align:right;">실물 수량</th>';
+      h += '<th style="text-align:right;">차이</th>';
+      h += '<th>조정 사유</th>';
+      h += '</tr></thead><tbody>';
+
+      for (var i = 0; i < auditSlots.length; i++) {
+        var s = auditSlots[i];
+        var diff = '';
+        var diffClass = 'zero';
+        var diffVal = '';
+        var inputClass = 'audit-input';
+
+        if (s.actual_qty !== null) {
+          var d = s.actual_qty - s.system_qty;
+          if (d > 0) { diffVal = '+' + d; diffClass = 'plus'; inputClass += ' diff'; }
+          else if (d < 0) { diffVal = String(d); diffClass = 'minus'; inputClass += ' diff'; }
+          else { diffVal = '0'; diffClass = 'zero'; }
+        }
+
+        var statusDot = s.status === 'occupied' ? 'occupied' : 'empty';
+        var statusText = s.status === 'occupied' ? '적재' : '빈칸';
+
+        h += '<tr style="' + (s.checked ? 'background:#f0fff4;' : '') + '">';
+        h += '<td><input type="checkbox" class="audit-check"' + (s.checked ? ' checked' : '') + ' onchange="auditToggleCheck(' + i + ', this.checked)"></td>';
+        h += '<td><strong>' + s.slot_code + '</strong></td>';
+        h += '<td><span class="slot-status-dot ' + statusDot + '"></span>' + statusText + '</td>';
+        h += '<td>' + (s.product_code || '<span style="color:#ccc;">-</span>') + '</td>';
+        h += '<td>' + (s.lot_no || '<span style="color:#ccc;">-</span>') + '</td>';
+        h += '<td class="qty-cell">' + s.system_qty.toLocaleString() + '</td>';
+        h += '<td><input type="number" class="' + inputClass + '" value="' + (s.actual_qty !== null ? s.actual_qty : '') + '" min="0" onchange="auditUpdateQty(' + i + ', this.value)" placeholder="-"></td>';
+        h += '<td class="diff-cell ' + diffClass + '">' + diffVal + '</td>';
+        h += '<td><input type="text" class="audit-reason" value="' + s.reason + '" onchange="auditUpdateReason(' + i + ', this.value)" placeholder="사유 입력"></td>';
+        h += '</tr>';
+      }
+
+      h += '</tbody></table></div>';
+      h += '</div>';
+
+      // 하단 액션 버튼
+      h += '<div class="action-bar">';
+      h += '<button class="action-btn secondary" onclick="auditReset()">초기화</button>';
+      if (diffCount > 0) {
+        h += '<button class="action-btn danger" onclick="auditApplyAll()">차이 항목 일괄 조정 (' + diffCount + '건)</button>';
+      }
+      h += '</div>';
+
+      document.getElementById('auditTableArea').innerHTML = h;
+    }
+
+    function auditToggleCheck(idx, checked) {
+      auditSlots[idx].checked = checked;
+      renderAuditTable();
+    }
+
+    function auditUpdateQty(idx, val) {
+      var v = val.trim();
+      if (v === '') {
+        auditSlots[idx].actual_qty = null;
+      } else {
+        auditSlots[idx].actual_qty = parseInt(v) || 0;
+      }
+      auditSlots[idx].checked = true;
+      renderAuditTable();
+    }
+
+    function auditUpdateReason(idx, val) {
+      auditSlots[idx].reason = val;
+    }
+
+    function auditFillSystem() {
+      for (var i = 0; i < auditSlots.length; i++) {
+        if (auditSlots[i].actual_qty === null) {
+          auditSlots[i].actual_qty = auditSlots[i].system_qty;
+        }
+      }
+      renderAuditTable();
+      showToast('시스템 수량으로 일괄 입력됨');
+    }
+
+    function auditCheckAll() {
+      for (var i = 0; i < auditSlots.length; i++) {
+        auditSlots[i].checked = true;
+        if (auditSlots[i].actual_qty === null) {
+          auditSlots[i].actual_qty = auditSlots[i].system_qty;
+        }
+      }
+      renderAuditTable();
+      showToast('전체 슬롯 확인 완료');
+    }
+
+    function auditReset() {
+      if (!confirm('실사 입력 내용을 모두 초기화하시겠습니까?')) return;
+      for (var i = 0; i < auditSlots.length; i++) {
+        auditSlots[i].actual_qty = null;
+        auditSlots[i].checked = false;
+        auditSlots[i].reason = '';
+      }
+      renderAuditTable();
+      showToast('초기화 완료');
+    }
+
+    function auditApplyAll() {
+      // 차이 있는 항목 추출
+      var diffs = [];
+      for (var i = 0; i < auditSlots.length; i++) {
+        var s = auditSlots[i];
+        if (s.actual_qty !== null && s.actual_qty !== s.system_qty) {
+          if (!s.reason.trim()) {
+            showToast(s.slot_code + ' 슬롯의 조정 사유를 입력해주세요');
+            return;
+          }
+          diffs.push(s);
+        }
+      }
+      if (diffs.length === 0) { showToast('조정할 항목이 없습니다'); return; }
+
+      var msg = diffs.length + '건의 재고를 조정하시겠습니까?\n';
+      for (var d = 0; d < Math.min(diffs.length, 5); d++) {
+        var dd = diffs[d];
+        var diffVal = dd.actual_qty - dd.system_qty;
+        msg += dd.slot_code + ': ' + dd.system_qty + ' -> ' + dd.actual_qty + ' (' + (diffVal > 0 ? '+' : '') + diffVal + ')\n';
+      }
+      if (diffs.length > 5) msg += '... 외 ' + (diffs.length - 5) + '건';
+
+      if (!confirm(msg)) return;
+
+      showLoading('재고 조정 중...');
+
+      var promises = [];
+      for (var j = 0; j < diffs.length; j++) {
+        var slot = diffs[j];
+        var newQty = slot.actual_qty;
+        var diffQty = newQty - slot.system_qty;
+
+        // 슬롯 수량 업데이트
+        var updateData = { quantity: newQty };
+        if (newQty <= 0) {
+          updateData.status = 'empty';
+          updateData.product_code = null;
+          updateData.lot_no = null;
+          updateData.quantity = 0;
+        } else if (slot.status === 'empty' && newQty > 0) {
+          updateData.status = 'occupied';
+        }
+        promises.push(supabase.from('inventory_rack_slots').update(updateData).eq('id', slot.id));
+
+        // 이동 이력 기록
+        var movementData = {
+          product_code: slot.product_code || 'AUDIT',
+          movement_type: 'adjustment',
+          quantity: Math.abs(diffQty),
+          lot_no: slot.lot_no || null,
+          reason: '[실사조정] ' + slot.reason + ' (시스템:' + slot.system_qty + ' -> 실물:' + newQty + ')',
+          moved_by: 'system'
+        };
+        if (diffQty > 0) {
+          movementData.to_location = slot.rack_name + '-' + slot.slot_code;
+        } else {
+          movementData.from_location = slot.rack_name + '-' + slot.slot_code;
+        }
+        promises.push(supabase.from('inventory_movements').insert(movementData));
+      }
+
+      Promise.all(promises).then(function() {
+        hideLoading();
+        showToast(diffs.length + '건 재고 조정 완료!');
+        // 데이터 갱신 후 다시 로드
+        auditRackId = parseInt(document.getElementById('auditRackSelect').value) || null;
+        loadInitialData();
+      }).catch(function(err) {
+        hideLoading();
+        showToast('조정 오류: ' + (err.message || err));
+      });
+    }
+
+    // ══════════════════════════════════════
+    // TAB 3: 처리이력 (기존 TAB 4에서 번호만 변경)
     // ══════════════════════════════════════
     function renderHistory() {
       var h = '<div class="empty-msg">이력을 조회합니다...</div>';
