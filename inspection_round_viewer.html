@@ -54,11 +54,14 @@
   th {
     padding: 9px 8px; background: #f5f5f5; text-align: left; font-weight: 600;
     color: #555; font-size: 12px; border-bottom: 2px solid #ddd; white-space: nowrap;
-    position: sticky; top: 0; z-index: 5; cursor: pointer; user-select: none;
+    position: sticky; top: 0; z-index: 5;
   }
-  th:hover { background: #eef2ff; }
-  th .sort-icon { font-size: 10px; margin-left: 3px; color: #aaa; }
+  th[data-sort] { cursor: pointer; user-select: none; }
+  th[data-sort]:hover { background: #e8eeff; color: #4A90D9; }
+  th .sort-icon { font-size: 10px; margin-left: 4px; color: #ccc; vertical-align: middle; }
+  th.sorted-asc { background: #e8eeff !important; color: #4A90D9; }
   th.sorted-asc .sort-icon { color: #4A90D9; }
+  th.sorted-desc { background: #e8eeff !important; color: #4A90D9; }
   th.sorted-desc .sort-icon { color: #4A90D9; }
   td { padding: 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
   tr:hover td { background: #f9f9f9; }
@@ -144,6 +147,10 @@
       <input type="date" id="startDate">
       <span style="color:#aaa;">~</span>
       <input type="date" id="endDate">
+      <button class="btn-period" onclick="setPeriod('today',this)">당일</button>
+      <button class="btn-period" onclick="setPeriod('yesterday',this)">전일</button>
+      <button class="btn-period" onclick="setPeriod('today',this)">당일</button>
+      <button class="btn-period" onclick="setPeriod('yesterday',this)">전일</button>
       <button class="btn-period" onclick="setPeriod('thisMonth',this)">당월</button>
       <button class="btn-period" onclick="setPeriod('lastMonth',this)">전월</button>
       <button class="btn-period" onclick="setPeriod('3month',this)">3개월</button>
@@ -165,15 +172,15 @@
       <div style="overflow-x:auto;">
         <table id="dataTable">
           <thead><tr>
-            <th data-sort="inspect_date" onclick="sortTable('inspect_date')">검사일 <span class="sort-icon">&#9650;&#9660;</span></th>
-            <th data-sort="inspector" onclick="sortTable('inspector')">작성자 <span class="sort-icon">&#9650;&#9660;</span></th>
-            <th data-sort="equipment" onclick="sortTable('equipment')">설비 <span class="sort-icon">&#9650;&#9660;</span></th>
-            <th data-sort="equip_type" onclick="sortTable('equip_type')">타입 <span class="sort-icon">&#9650;&#9660;</span></th>
-            <th data-sort="face" onclick="sortTable('face')">면 <span class="sort-icon">&#9650;&#9660;</span></th>
-            <th data-sort="sabun" onclick="sortTable('sabun')">사번 <span class="sort-icon">&#9650;&#9660;</span></th>
-            <th data-sort="material" onclick="sortTable('material')">재질 <span class="sort-icon">&#9650;&#9660;</span></th>
+            <th data-sort="inspect_date" onclick="sortTable('inspect_date')">검사일 <span class="sort-icon" id="si_inspect_date">&#9660;</span></th>
+            <th data-sort="inspector" onclick="sortTable('inspector')">작성자 <span class="sort-icon" id="si_inspector">&#9650;&#9660;</span></th>
+            <th data-sort="equipment" onclick="sortTable('equipment')">설비 <span class="sort-icon" id="si_equipment">&#9650;&#9660;</span></th>
+            <th data-sort="equip_type" onclick="sortTable('equip_type')">타입 <span class="sort-icon" id="si_equip_type">&#9650;&#9660;</span></th>
+            <th data-sort="face" onclick="sortTable('face')">면 <span class="sort-icon" id="si_face">&#9650;&#9660;</span></th>
+            <th data-sort="sabun" onclick="sortTable('sabun')">사번 <span class="sort-icon" id="si_sabun">&#9650;&#9660;</span></th>
+            <th data-sort="material" onclick="sortTable('material')">재질 <span class="sort-icon" id="si_material">&#9650;&#9660;</span></th>
             <th>외관불량</th>
-            <th data-sort="action_detail" onclick="sortTable('action_detail')">비고 <span class="sort-icon">&#9650;&#9660;</span></th>
+            <th data-sort="action_detail" onclick="sortTable('action_detail')">비고 <span class="sort-icon" id="si_action_detail">&#9650;&#9660;</span></th>
             <th>관리</th>
           </tr></thead>
           <tbody id="tableBody"><tr><td colspan="10" class="empty-msg">조회 버튼을 눌러주세요</td></tr></tbody>
@@ -221,7 +228,9 @@ function initPeriod() {
 function setPeriod(type, btn) {
     var now = new Date();
     var s='', e=fmtLocal(now);
-    if (type==='thisMonth') { s=fmtLocal(new Date(now.getFullYear(),now.getMonth(),1)); }
+    if (type==='today') { s=fmtLocal(now); e=fmtLocal(now); }
+    else if (type==='yesterday') { var yd = new Date(now); yd.setDate(yd.getDate()-1); s=fmtLocal(yd); e=fmtLocal(yd); }
+    else if (type==='thisMonth') { s=fmtLocal(new Date(now.getFullYear(),now.getMonth(),1)); }
     else if (type==='lastMonth') { s=fmtLocal(new Date(now.getFullYear(),now.getMonth()-1,1)); e=fmtLocal(new Date(now.getFullYear(),now.getMonth(),0)); }
     else if (type==='3month') { s=fmtLocal(new Date(now.getFullYear(),now.getMonth()-2,1)); }
     document.getElementById('startDate').value=s;
@@ -280,12 +289,17 @@ function sortTable(key) {
         return result;
     });
 
-    // 헤더 스타일 업데이트
+    // 헤더 스타일 + 아이콘 업데이트
     var ths = document.querySelectorAll('#dataTable th[data-sort]');
     for (var i = 0; i < ths.length; i++) {
-        ths[i].className = '';
-        if (ths[i].getAttribute('data-sort') === key) {
+        var thKey = ths[i].getAttribute('data-sort');
+        var icon = ths[i].querySelector('.sort-icon');
+        if (thKey === key) {
             ths[i].className = currentSort.dir === 'asc' ? 'sorted-asc' : 'sorted-desc';
+            if (icon) icon.innerHTML = currentSort.dir === 'asc' ? '&#9650;' : '&#9660;';
+        } else {
+            ths[i].className = '';
+            if (icon) icon.innerHTML = '&#9650;&#9660;';
         }
     }
 
