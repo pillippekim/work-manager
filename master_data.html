@@ -1062,9 +1062,21 @@ loadEquip();
 var equipData = [];
 
 async function loadEquip() {
-  var result = await db.from('equipments').select('*').order('process').order('sort_order');
-  equipData = result.data || [];
-  renderEquip();
+  try {
+    var result = await db.from('equipments').select('*').order('sort_order', { ascending: true });
+    console.log('loadEquip result:', result);
+    if (result.error) {
+      console.error('loadEquip error:', result.error);
+      document.getElementById('equipTable').innerHTML = '<tr class="empty-row"><td colspan="9">로드 실패: ' + result.error.message + '</td></tr>';
+      return;
+    }
+    equipData = result.data || [];
+    console.log('equipData count:', equipData.length);
+    renderEquip();
+  } catch(e) {
+    console.error('loadEquip catch:', e);
+    document.getElementById('equipTable').innerHTML = '<tr class="empty-row"><td colspan="9">로드 오류: ' + e.message + '</td></tr>';
+  }
 }
 
 function filterEquip() {
