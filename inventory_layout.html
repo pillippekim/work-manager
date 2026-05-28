@@ -175,11 +175,17 @@
       <p class="page-desc">영업슈트 적재대 전체 배치도 &#8212; 동을 클릭하면 상세 현황을 확인할 수 있습니다</p>
     </div>
     <div class="layout-container">
+      <!-- 빠른 이동 버튼 -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+        <a href="inventory_io.html" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#4A90D9;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">&#128230; 입출고 관리</a>
+        <a href="inventory_viewer.html" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#27AE60;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">&#128202; 재고 조회</a>
+      </div>
+
       <div class="stats-row">
         <div class="stat-card blue"><div class="stat-label">전체 슬롯</div><div class="stat-value" id="statTotal">-</div><div class="stat-sub">고정랙 기준</div></div>
         <div class="stat-card green"><div class="stat-label">사용 중</div><div class="stat-value" id="statUsed">-</div><div class="stat-sub">적재 슬롯</div></div>
         <div class="stat-card orange"><div class="stat-label">빈 슬롯</div><div class="stat-value" id="statEmpty">-</div><div class="stat-sub">사용 가능</div></div>
-        <div class="stat-card red"><div class="stat-label">입고대기</div><div class="stat-value" id="statWaiting">-</div><div class="stat-sub">랙 배정 필요</div></div>
+        <div class="stat-card red" style="cursor:pointer;" onclick="window.location.href='inventory_io.html'" title="입출고 관리로 이동"><div class="stat-label">입고대기</div><div class="stat-value" id="statWaiting">-</div><div class="stat-sub">클릭하여 처리 &#10132;</div></div>
         <div class="stat-card purple"><div class="stat-label">사용률</div><div class="stat-value" id="statRate">-</div><div class="stat-sub">전체 기준</div></div>
       </div>
       <div class="layout-map">
