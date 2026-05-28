@@ -230,7 +230,7 @@ function toggleCat(id) {
     document.getElementById(id).classList.toggle('open');
 }
 
-// 모니터/worker 계정: 허용 페이지 외 링크 비활성화
+// 모니터/worker/물류기사 계정: 허용 페이지 외 링크 비활성화
 function applyAccessRestrictions() {
     try {
         var cached = sessionStorage.getItem('userInfo');
@@ -240,14 +240,34 @@ function applyAccessRestrictions() {
 
         var isMonitor = (u.process === '모니터');
         var isWorker = (u.user_type === 'worker');
-        if (!isMonitor && !isWorker) return;
+
+        // 물류기사 판별: 사번 기준 (추가 시 여기에 사번 추가)
+        var logisticsIds = ['25120901', '24010201'];
+        var empId = String(u.employee_id || u.id || '');
+        var isLogistics = false;
+        for (var k = 0; k < logisticsIds.length; k++) {
+            if (empId === logisticsIds[k]) { isLogistics = true; break; }
+        }
+
+        if (!isMonitor && !isWorker && !isLogistics) return;
 
         // 모니터: 적치대+대시보드만
         // worker: 적치대+대시보드+공정검사(작성/조회)+작업일지
-        var allowedPages = ['mold_layout.html', 'mold_dashboard.html'];
-        if (isWorker) {
-            allowedPages.push('inspection_round.html');
-            allowedPages.push('inspection_round_viewer.html');
+        // 물류기사: 재고관리 4개 페이지만
+        var allowedPages = [];
+        if (isLogistics) {
+            allowedPages = [
+                'inventory_layout.html',
+                'inventory_rack.html',
+                'inventory_io.html',
+                'inventory_viewer.html'
+            ];
+        } else {
+            allowedPages = ['mold_layout.html', 'mold_dashboard.html'];
+            if (isWorker) {
+                allowedPages.push('inspection_round.html');
+                allowedPages.push('inspection_round_viewer.html');
+            }
         }
 
         var links = document.querySelectorAll('#sidebar-nav a.nav-link, #sidebar-nav a.cat-btn');

@@ -7,47 +7,38 @@
   <link rel="stylesheet" href="sidebar.css">
   <link rel="stylesheet" href="common.css">
   <style>
-    .layout-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-    .stats-row { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+    .layout-container { max-width: 100%; margin: 0; padding: 16px 20px; }
+    .stats-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
     .stat-card {
-      flex: 1; min-width: 140px; background: #fff; border-radius: 10px;
-      padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-left: 4px solid #4A90D9;
+      flex: 1; min-width: 120px; background: #fff; border-radius: 8px;
+      padding: 12px 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border-left: 4px solid #4A90D9;
     }
-    .stat-card .stat-label { font-size: 12px; color: #888; margin-bottom: 4px; }
-    .stat-card .stat-value { font-size: 24px; font-weight: 700; color: #1a1a2e; }
-    .stat-card .stat-sub { font-size: 11px; color: #aaa; margin-top: 2px; }
+    .stat-card .stat-label { font-size: 11px; color: #888; margin-bottom: 2px; }
+    .stat-card .stat-value { font-size: 22px; font-weight: 700; color: #1a1a2e; }
+    .stat-card .stat-sub { font-size: 10px; color: #aaa; margin-top: 2px; }
     .stat-card.green { border-left-color: #27AE60; }
     .stat-card.orange { border-left-color: #F39C12; }
     .stat-card.red { border-left-color: #E74C3C; }
     .stat-card.blue { border-left-color: #3498DB; }
     .stat-card.purple { border-left-color: #9B59B6; }
 
-    .layout-map { background: #1a1a2e; border-radius: 12px; padding: 28px; overflow: hidden; }
-    .layout-map-title { color: #fff; font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    .layout-map { background: #1a1a2e; border-radius: 12px; padding: 24px; overflow: hidden; }
+    .layout-map-title { color: #fff; font-size: 17px; font-weight: 700; margin-bottom: 6px; }
     .layout-map-title span { font-size: 12px; color: #888; font-weight: 400; margin-left: 10px; }
-    .legend-row { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+    .legend-row { display: flex; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
     .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #ccc; }
     .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
 
-    .map-outer { display: flex; flex-direction: column; gap: 14px; }
+    .map-outer { display: flex; flex-direction: column; gap: 12px; }
 
     /* 적재불가 */
     .zone-restricted {
       background: rgba(74,144,217,0.15); border: 1.5px solid rgba(74,144,217,0.3);
-      border-radius: 8px; padding: 24px; text-align: center; color: rgba(255,255,255,0.7);
+      border-radius: 8px; padding: 20px; text-align: center; color: rgba(255,255,255,0.7);
     }
-    .zone-restricted-title { font-size: 22px; font-weight: 700; color: rgba(255,255,255,0.85); }
-    .zone-restricted-sub { font-size: 15px; color: rgba(255,255,255,0.5); margin-top: 4px; }
+    .zone-restricted-title { font-size: 20px; font-weight: 700; color: rgba(255,255,255,0.85); }
+    .zone-restricted-sub { font-size: 14px; color: rgba(255,255,255,0.5); margin-top: 4px; }
 
-    /*
-      출입구 기준 메인 그리드 6열:
-      col1: 11동 (60px) - 좌측
-      col2: 중앙좌=A/1/2/5/6동 (1fr)
-      col3: 간격 (28px)
-      col4: 중앙우=B/3/4/7/8동 (1fr)
-      col5: 12동 (60px) - 우측
-      col6: 13동 (60px) - 우측
-    */
     .map-main {
       display: grid;
       grid-template-columns: 60px 1fr 28px 1fr 60px 60px;
@@ -55,24 +46,18 @@
       gap: 10px;
     }
 
-    /* 11동: col1, row1~3 */
     .g-left { grid-column: 1; grid-row: 1 / 4; display: flex; }
-    /* 12동: col5, row1~3 */
     .g-right1 { grid-column: 5; grid-row: 1 / 4; display: flex; }
-    /* 13동: col6, row1~3 */
     .g-right2 { grid-column: 6; grid-row: 1 / 4; display: flex; }
 
-    /* 중앙 좌 */
     .cl { grid-column: 2; }
     .cl.r1 { grid-row: 1; }
     .cl.r2 { grid-row: 2; }
     .cl.r3 { grid-row: 3; }
-    /* 간격 */
     .cg { grid-column: 3; }
     .cg.r1 { grid-row: 1; }
     .cg.r2 { grid-row: 2; }
     .cg.r3 { grid-row: 3; }
-    /* 중앙 우 */
     .cr { grid-column: 4; }
     .cr.r1 { grid-row: 1; }
     .cr.r2 { grid-row: 2; }
@@ -80,15 +65,6 @@
 
     .rack-stack { display: flex; flex-direction: column; gap: 10px; }
 
-    /*
-      하단 그리드:
-      col1: 13동 아래(빈공간, 60px)
-      col2: 불량폐기 (12동 아래, 60px)
-      col3: 10동 (1fr)
-      col4: 간격 (28px)
-      col5: 9동 (1fr)
-      col6: 출하준비 (11동 아래, 60px)
-    */
     .bottom-row {
       display: grid;
       grid-template-columns: 60px 1fr 28px 1fr 60px 60px;
@@ -102,34 +78,31 @@
     .bt-scrap { grid-column: 5; display: flex; align-items: stretch; }
     .bt-empty { grid-column: 6; }
 
-    /* 공정라벨 */
-    .process-row { display: flex; justify-content: space-between; margin-top: 14px; padding: 0 4px; }
+    .process-row { display: flex; justify-content: space-between; margin-top: 12px; padding: 0 4px; }
     .process-tag {
       background: rgba(180,60,60,0.7); color: #fff;
       padding: 6px 20px; border-radius: 4px; font-size: 13px; font-weight: 600;
     }
-    .process-tag.entrance {
-      background: rgba(39,174,96,0.7); color: #fff;
-    }
+    .process-tag.entrance { background: rgba(39,174,96,0.7); color: #fff; }
 
     /* 랙 카드 */
     .rack-card {
       background: rgba(74,144,217,0.12); border: 1.5px solid rgba(74,144,217,0.35);
-      border-radius: 8px; padding: 12px 14px; cursor: pointer;
+      border-radius: 8px; padding: 10px 12px; cursor: pointer;
       transition: all 0.2s ease; position: relative;
     }
     .rack-card:hover {
       background: rgba(74,144,217,0.22); border-color: rgba(74,144,217,0.7);
       transform: translateY(-1px); box-shadow: 0 4px 16px rgba(74,144,217,0.25);
     }
-    .rack-card .rack-name { font-size: 17px; font-weight: 700; color: #fff; }
+    .rack-card .rack-name { font-size: 16px; font-weight: 700; color: #fff; }
     .rack-card .rack-info { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
     .rack-card .rack-info-item { font-size: 11px; color: rgba(255,255,255,0.55); }
     .rack-card .rack-info-item strong { color: #fff; font-weight: 600; }
-    .rack-card .rack-usage-bar { margin-top: 8px; height: 5px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+    .rack-card .rack-usage-bar { margin-top: 6px; height: 5px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
     .rack-usage-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
     .rack-card .rack-badge {
-      position: absolute; top: 8px; right: 10px;
+      position: absolute; top: 6px; right: 8px;
       padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600;
     }
     .rack-badge.active { background: rgba(39,174,96,0.2); color: #27AE60; }
@@ -153,13 +126,13 @@
     /* 대차 카드 */
     .zone-card {
       background: rgba(39,174,96,0.12); border: 1.5px solid rgba(39,174,96,0.35);
-      border-radius: 8px; padding: 14px; cursor: pointer; transition: all 0.2s ease;
+      border-radius: 8px; padding: 12px; cursor: pointer; transition: all 0.2s ease;
     }
     .zone-card:hover {
       background: rgba(39,174,96,0.22); border-color: rgba(39,174,96,0.7);
       transform: translateY(-1px); box-shadow: 0 4px 16px rgba(39,174,96,0.25);
     }
-    .zone-card .zone-name { font-size: 16px; font-weight: 700; color: #fff; }
+    .zone-card .zone-name { font-size: 15px; font-weight: 700; color: #fff; }
     .zone-card .zone-lane { font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 2px; }
 
     /* 라벨 박스 */
@@ -174,25 +147,8 @@
 
     .layout-loading { text-align: center; color: #888; padding: 60px 20px; font-size: 14px; }
 
-    /* 우측 상단 고정 버튼 */
-    .top-actions {
-      position: fixed; top: 12px; right: 20px; z-index: 1000;
-      display: flex; gap: 8px;
-    }
-    .top-btn {
-      padding: 10px 18px; border-radius: 6px; border: none;
-      font-size: 13px; font-weight: 600; cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.2s;
-    }
-    .top-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
-    .top-btn.home { background: #3d5a80; color: #fff; }
-    .top-btn.home:hover { background: #2c4a6e; }
-    .top-btn.view { background: #f0ad4e; color: #fff; }
-    .top-btn.view:hover { background: #d4952e; }
-    .top-btn.view.disabled { background: #ccc; color: #999; cursor: default; pointer-events: none; }
-
     @media (max-width: 768px) {
-      .layout-container { padding: 12px; }
+      .layout-container { padding: 10px 12px; }
       .layout-map { padding: 14px; }
       .map-main { grid-template-columns: 1fr; gap: 10px; }
       .g-left, .g-right1, .g-right2 { grid-column: 1; grid-row: auto; height: 60px; }
@@ -202,26 +158,21 @@
       .bt-empty { display: none; }
       .bt-scrap, .bt-10, .bt-9, .bt-ship { grid-column: 1; }
       .bt-gap { display: none; }
-      .stats-row { gap: 8px; }
-      .stat-card { min-width: 100px; padding: 12px; }
-      .stat-card .stat-value { font-size: 20px; }
+      .stats-row { gap: 6px; }
+      .stat-card { min-width: 90px; padding: 10px; }
+      .stat-card .stat-value { font-size: 18px; }
       .rack-v { height: 60px; }
     }
   </style>
 </head>
 <body>
-  <div id="sidebar"></div>
+  <div id="top-header" class="top-header"></div>
+  <nav id="sidebar-nav" class="sidebar"></nav>
 
-  <!-- 우측 상단 고정 버튼 -->
-  <div class="top-actions">
-    <button class="top-btn home" onclick="location.href='index.html'">&#127968; 메인으로</button>
-    <button class="top-btn view disabled">&#128194; 조회</button>
-  </div>
-
-  <main>
+  <div class="main">
     <div class="page-header">
       <h1 class="page-title">적재대 현황</h1>
-      <p class="page-desc">영업슈트 적재대 전체 배치도 — 동을 클릭하면 상세 현황을 확인할 수 있습니다</p>
+      <p class="page-desc">영업슈트 적재대 전체 배치도 &#8212; 동을 클릭하면 상세 현황을 확인할 수 있습니다</p>
     </div>
     <div class="layout-container">
       <div class="stats-row">
@@ -242,10 +193,9 @@
         <div id="mapGrid"><div class="layout-loading">데이터를 불러오는 중...</div></div>
       </div>
     </div>
-  </main>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="sidebar.js"></script>
   <script src="auth_guard.js"></script>
   <script>
     var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
@@ -353,14 +303,12 @@
       var h = '';
       h += '<div class="map-outer">';
 
-      // ① 상단 공정라벨: 포장 > 검사 > 조립
       h += '<div class="process-row">';
       h += '<div class="process-tag">포장</div>';
       h += '<div class="process-tag">검사</div>';
       h += '<div class="process-tag">조립</div>';
       h += '</div>';
 
-      // ② 출하준비 + 9동 | gap | 10동 + 불량폐기
       h += '<div class="bottom-row">';
       h += '<div class="bt-ship"><div class="label-box shipment">출하<br>준비<div class="label-sub">관리 제외</div></div></div>';
       h += '<div class="bt-9">' + rc('R9') + '</div>';
@@ -369,27 +317,21 @@
       h += '<div class="bt-scrap"><div class="label-box scrap">불량<br>폐기<div class="label-sub">관리 제외</div></div></div>';
       h += '</div>';
 
-      // ③ 메인 그리드: 11동(좌) | A/1/2/5/6동 | gap | B/3/4/7/8동 | 12동(우) | 13동(우)
       h += '<div class="map-main">';
 
-      // 11동 (col1 좌측)
       var r11 = findRack('R11');
       h += '<div class="g-left">' + (r11 ? buildVertical(r11) : '') + '</div>';
 
-      // row1: 6/5동 | gap | 8/7동
       h += '<div class="cl r1"><div class="rack-stack">' + rc('R6') + rc('R5') + '</div></div>';
       h += '<div class="cg r1"></div>';
       h += '<div class="cr r1"><div class="rack-stack">' + rc('R8') + rc('R7') + '</div></div>';
 
-      // 12동 (col5 우측)
       var r12 = findRack('R12');
       h += '<div class="g-right1">' + (r12 ? buildVertical(r12) : '') + '</div>';
 
-      // 13동 (col6 우측)
       var r13 = findRack('R13');
       h += '<div class="g-right2">' + (r13 ? buildVertical(r13) : '') + '</div>';
 
-      // row2: A동 | gap | B동
       var az = findZones('ZA'), bz = findZones('ZB');
       h += '<div class="cl r2"><div class="rack-stack">';
       for (var a = az.length - 1; a >= 0; a--) h += buildZoneCard(az[a]);
@@ -399,14 +341,12 @@
       for (var b = bz.length - 1; b >= 0; b--) h += buildZoneCard(bz[b]);
       h += '</div></div>';
 
-      // row3: 1/2동 | gap | 3/4동
       h += '<div class="cl r3"><div class="rack-stack">' + rc('R2') + rc('R1') + '</div></div>';
       h += '<div class="cg r3"></div>';
       h += '<div class="cr r3"><div class="rack-stack">' + rc('R4') + rc('R3') + '</div></div>';
 
-      h += '</div>'; // map-main
+      h += '</div>';
 
-      // ④ 하단: 출입구(좌측) + 적재불가
       h += '<div style="display:flex;gap:14px;align-items:stretch;">';
       h += '<div class="process-tag entrance" style="display:flex;align-items:center;padding:12px 20px;border-radius:6px;font-size:14px;">출입구</div>';
       h += '<div class="zone-restricted" style="flex:1;">';
@@ -422,5 +362,6 @@
     function goToRack(rackCode) { window.location.href = 'inventory_rack.html?rack=' + rackCode; }
     function goToZone(zoneCode, laneNo) { window.location.href = 'inventory_zone.html?zone=' + zoneCode + '&lane=' + laneNo; }
   </script>
+  <script src="sidebar.js"></script>
 </body>
 </html>
