@@ -1118,11 +1118,11 @@ function renderEquip(filtered) {
       '<td style="font-size:11px;color:#888">' + (r.equip_type || '-') + '</td>' +
       '<td style="font-size:11px;color:#888">' + (r.spec || '-') + '</td>' +
       '<td><span class="active-badge ' + statusClass + '">' + statusText + '</span>' + dormantBadge + '</td>' +
-      '<td style="white-space:nowrap">' +
-        '<button class="btn-edit-sm" onclick="openEditEquip(' + r.id + ')">수정</button>' +
-        '<button class="btn-edit-sm" style="background:#fef3c7;color:#92400e" onclick="toggleEquipActive(' + r.id + ', ' + r.is_active + ')">' + (r.is_active ? '비활성' : '활성') + '</button>' +
-        '<button class="btn-del" onclick="deleteEquip(' + r.id + ')">삭제</button>' +
-      '</td></tr>';
+      '<td style="white-space:nowrap"><div style="display:flex;gap:4px;">' +
+        '<button class="btn-edit-sm" style="padding:4px 10px;font-size:11px;border-radius:5px;" onclick="openEditEquip(' + r.id + ')">수정</button>' +
+        '<button class="btn-edit-sm" style="padding:4px 10px;font-size:11px;border-radius:5px;background:#fef3c7;color:#92400e;" onclick="toggleEquipActive(' + r.id + ', ' + r.is_active + ')">' + (r.is_active ? '비활성' : '활성화') + '</button>' +
+        '<button class="btn-del" style="padding:4px 10px;font-size:11px;border-radius:5px;" onclick="deleteEquip(' + r.id + ')">삭제</button>' +
+      '</div></td></tr>';
   }
   tbody.innerHTML = html;
 }
