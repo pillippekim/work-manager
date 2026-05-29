@@ -92,11 +92,23 @@ table.dt tr:hover { background:#f8fafc; }
 .btn-submit { width:100%; padding:12px; background:#243bb2; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; margin-top:8px; font-family:inherit; }
 .btn-submit:hover { background:#1e32a0; }
 
+/* 모달 공통 */
+.modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:flex-start; padding-top:60px; overflow-y:auto; }
+.modal-overlay.show { display:flex; }
+.modal-content { background:#fff; border-radius:12px; padding:24px; width:90%; max-width:560px; max-height:calc(100vh - 100px); overflow-y:auto; margin-bottom:40px; box-shadow:0 20px 60px rgba(0,0,0,0.2); }
+.modal-content h3 { display:flex; justify-content:space-between; align-items:center; font-size:18px; font-weight:700; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #e2e8f0; }
+.modal-close { background:none; border:none; font-size:20px; cursor:pointer; color:#94a3b8; padding:4px 8px; }
+.modal-close:hover { color:#1a1a2e; }
+.form-row { display:flex; gap:12px; margin-bottom:0; }
+.form-row .form-group { flex:1; }
+.form-group { margin-bottom:12px; }
+
 .card-list { max-height:160px; overflow-y:auto; }
 
 @media(max-width:768px) {
     .top-row { grid-template-columns:1fr; }
     .form-row-inline { flex-direction:column; gap:0; }
+    .form-row { flex-direction:column; gap:0; }
     .tab { padding:10px 14px; font-size:13px; }
     table.dt { font-size:11px; }
     .period-filter { gap:6px; }
