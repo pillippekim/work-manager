@@ -190,6 +190,12 @@
     .slot-cell.search-hit { border:3px solid #f59e0b !important; background:#fef3c7 !important; box-shadow:0 0 8px rgba(245,158,11,0.4); z-index:2; position:relative; }
     .slot-cell.search-dim { opacity:0.25; }
     .search-result-info { font-size:12px; color:#64748b; margin-left:8px; font-weight:500; }
+    .search-result-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .search-result-table th { background:#f8fafc; padding:6px 8px; text-align:left; font-weight:600; color:#475569; font-size:11px; border-bottom:2px solid #e2e8f0; }
+    .search-result-table td { padding:6px 8px; border-bottom:1px solid #f1f5f9; }
+    .search-result-table tr:hover { background:#f8fafc; }
+    .btn-go { padding:3px 10px; background:#4A90D9; color:#fff; border:none; border-radius:4px; font-size:11px; cursor:pointer; font-family:inherit; }
+    .btn-go:hover { background:#3a7bc8; }
 
     @media (max-width: 768px) {
       .rack-container { padding: 12px; }
@@ -265,6 +271,7 @@
           <button class="batch-btn cancel" onclick="toggleBatchMode()">취소</button>
         </div>
       </div>
+      <div id="searchResultPanel" style="display:none;background:#fff;border-radius:8px;padding:12px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-height:200px;overflow-y:auto;"></div>
       <div id="slotGridArea"><div class="no-slots">동을 선택해주세요</div></div>
     </div>
   </div><!-- main -->
@@ -391,49 +398,112 @@
     }
 
     // ══════════════════════════════════════
-    // 사번 검색 (슬롯 하이라이트)
+    // 사번 검색 (전체 동 DB 조회)
     // ══════════════════════════════════════
-    function searchSlotByCode() {
-      var keyword = (document.getElementById('slotSearchInput').value || '').trim().toUpperCase();
-      var cells = document.querySelectorAll('.slot-cell');
+    async function searchSlotByCode() {
+      var keyword = (document.getElementById('slotSearchInput').value || '').trim();
       var infoEl = document.getElementById('searchResultInfo');
+      var resultEl = document.getElementById('searchResultPanel');
 
-      if (!keyword) {
-        clearSlotSearch();
-        return;
+      if (!keyword) { clearSlotSearch(); return; }
+
+      infoEl.textContent = '검색 중...';
+      infoEl.style.color = '#64748b';
+
+      try {
+        // DB에서 전체 동 검색
+        var res = await supabase.from('inventory_rack_slots')
+          .select('*, inventory_racks(rack_name, rack_code)')
+          .ilike('product_code', '%' + keyword + '%')
+          .gt('quantity', 0)
+          .order('rack_id');
+
+        var results = res.data || [];
+
+        if (results.length === 0) {
+          infoEl.textContent = '"' + keyword + '" 검색 결과 없음';
+          infoEl.style.color = '#ef4444';
+          resultEl.style.display = 'none';
+          // 현재 그리드 하이라이트도 클리어
+          clearGridHighlight();
+          return;
+        }
+
+        // 결과 표시
+        infoEl.textContent = results.length + '개 슬롯 발견';
+        infoEl.style.color = '#d97706';
+
+        var totalQty = 0;
+        var h = '<table class="search-result-table"><thead><tr><th>동</th><th>슬롯</th><th>사번</th><th style="text-align:right">수량</th><th>LOT</th><th></th></tr></thead><tbody>';
+        for (var i = 0; i < results.length; i++) {
+          var r = results[i];
+          var rackName = (r.inventory_racks && r.inventory_racks.rack_name) || '-';
+          var rackCode = (r.inventory_racks && r.inventory_racks.rack_code) || '';
+          totalQty += (r.quantity || 0);
+          h += '<tr>';
+          h += '<td><strong>' + rackName + '</strong></td>';
+          h += '<td>' + (r.slot_code || '-') + '</td>';
+          h += '<td>' + (r.product_code || '-') + '</td>';
+          h += '<td style="text-align:right;font-weight:700;color:#243bb2">' + (r.quantity || 0).toLocaleString() + '</td>';
+          h += '<td style="font-size:11px;color:#888">' + (r.lot_no || '-') + '</td>';
+          h += '<td><button class="btn-go" onclick="goToRack(\'' + rackCode + '\',\'' + keyword + '\')">이동</button></td>';
+          h += '</tr>';
+        }
+        h += '</tbody></table>';
+        h += '<div style="margin-top:6px;font-size:12px;color:#475569;font-weight:600;">합계: ' + totalQty.toLocaleString() + ' EA (' + results.length + '개 슬롯)</div>';
+
+        resultEl.innerHTML = h;
+        resultEl.style.display = 'block';
+
+        // 현재 보이는 그리드에서도 하이라이트
+        highlightCurrentGrid(keyword);
+
+      } catch(e) {
+        infoEl.textContent = '검색 오류';
+        infoEl.style.color = '#ef4444';
+        console.error(e);
       }
+    }
 
-      var hitCount = 0;
+    function goToRack(rackCode, keyword) {
+      var sel = document.getElementById('rackSelect');
+      sel.value = rackCode;
+      onRackChange();
+      // 약간의 딜레이 후 하이라이트
+      setTimeout(function() { highlightCurrentGrid(keyword); }, 300);
+    }
+
+    function highlightCurrentGrid(keyword) {
+      var cells = document.querySelectorAll('.slot-cell');
+      var kw = keyword.toUpperCase();
       for (var i = 0; i < cells.length; i++) {
         var prodEl = cells[i].querySelector('.slot-product');
         var prodCode = prodEl ? prodEl.textContent.toUpperCase() : '';
         cells[i].classList.remove('search-hit', 'search-dim');
-        if (prodCode && prodCode.indexOf(keyword) !== -1) {
+        if (prodCode && prodCode.indexOf(kw) !== -1) {
           cells[i].classList.add('search-hit');
-          hitCount++;
         } else {
           cells[i].classList.add('search-dim');
         }
       }
-
-      if (infoEl) {
-        infoEl.textContent = hitCount > 0 ? hitCount + '개 슬롯 발견' : '일치하는 슬롯 없음';
-        infoEl.style.color = hitCount > 0 ? '#d97706' : '#ef4444';
-      }
-
-      // 첫 번째 일치 슬롯으로 스크롤
       var firstHit = document.querySelector('.slot-cell.search-hit');
       if (firstHit) firstHit.scrollIntoView({ behavior:'smooth', block:'center' });
     }
 
-    function clearSlotSearch() {
-      document.getElementById('slotSearchInput').value = '';
+    function clearGridHighlight() {
       var cells = document.querySelectorAll('.slot-cell');
       for (var i = 0; i < cells.length; i++) {
         cells[i].classList.remove('search-hit', 'search-dim');
       }
+    }
+
+    function clearSlotSearch() {
+      document.getElementById('slotSearchInput').value = '';
+      clearGridHighlight();
       var infoEl = document.getElementById('searchResultInfo');
       if (infoEl) infoEl.textContent = '';
+      var resultEl = document.getElementById('searchResultPanel');
+      if (resultEl) { resultEl.style.display = 'none'; resultEl.innerHTML = ''; }
     }
 
     // Enter키 지원

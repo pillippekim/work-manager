@@ -365,8 +365,13 @@
 
       // LOT 목록
       h += '<div class="section-box">';
-      h += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">';
       h += '<div class="section-title" style="margin-bottom:0;padding-bottom:0;border-bottom:none;"><span class="title-icon">&#128230;</span>LOT 목록</div>';
+      h += '<div style="display:flex;gap:6px;align-items:center;">';
+      h += '<input type="text" id="zoneSearch" placeholder="사번 검색" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;width:140px;outline:none;">';
+      h += '<button onclick="filterZoneTable()" style="padding:6px 12px;background:#4A90D9;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">🔍 조회</button>';
+      h += '<button onclick="clearZoneSearch()" style="padding:6px 10px;background:#94a3b8;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">초기화</button>';
+      h += '</div>';
       h += '</div>';
       h += '<div style="height:8px;"></div>';
 
@@ -382,7 +387,7 @@
           var lot = zoneLots[i];
           var statusText = lot.status === 'stocked' ? '적재' : '대기';
           var statusClass = lot.status === 'stocked' ? 'stocked' : 'waiting';
-          h += '<tr>';
+          h += '<tr data-code="' + (lot.product_code || '') + '">';
           h += '<td>' + (i + 1) + '</td>';
           h += '<td><strong>' + (lot.product_code || '-') + '</strong></td>';
           h += '<td>' + (lot.product_name || '-') + '</td>';
@@ -594,6 +599,35 @@
     }
 
     // ── 수량 수정 모달 ──
+    // ══════════════════════════════════════
+    // 대차 구역 사번 검색
+    // ══════════════════════════════════════
+    function filterZoneTable() {
+      var keyword = (document.getElementById('zoneSearch') || {}).value;
+      if (!keyword) return;
+      keyword = keyword.trim().toUpperCase();
+      var rows = document.querySelectorAll('.data-table tbody tr[data-code]');
+      var shown = 0;
+      for (var i = 0; i < rows.length; i++) {
+        var code = (rows[i].getAttribute('data-code') || '').toUpperCase();
+        var visible = (!keyword || code.indexOf(keyword) !== -1);
+        rows[i].style.display = visible ? '' : 'none';
+        if (visible) shown++;
+      }
+    }
+
+    function clearZoneSearch() {
+      var el = document.getElementById('zoneSearch');
+      if (el) el.value = '';
+      var rows = document.querySelectorAll('.data-table tbody tr[data-code]');
+      for (var i = 0; i < rows.length; i++) { rows[i].style.display = ''; }
+    }
+
+    // Enter키 지원
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && e.target.id === 'zoneSearch') filterZoneTable();
+    });
+
     function openEditModal(lotId) {
       var lot = null;
       for (var i = 0; i < zoneLots.length; i++) {

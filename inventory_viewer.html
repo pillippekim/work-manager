@@ -11,19 +11,7 @@
     .iv-container { max-width: 100%; margin: 0; padding: 20px; }
 
     /* 우측 상단 고정 버튼 */
-    .top-actions {
-      position: fixed; top: 12px; right: 20px; z-index: 1000;
-      display: flex; gap: 8px;
-    }
-    .top-btn {
-      padding: 10px 18px; border-radius: 6px; border: none;
-      font-size: 13px; font-weight: 600; cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.2s;
-    }
-    .top-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
-    .top-btn.home { background: #3d5a80; color: #fff; }
-    .top-btn.layout { background: #4A90D9; color: #fff; }
-    .top-btn.excel { background: #27AE60; color: #fff; }
+    /* top-actions 제거 (사이드바로 대체) */
 
     /* 메인 탭 */
     .iv-tabs {
@@ -152,11 +140,6 @@
   <div id="top-header" class="top-header"></div>
   <nav id="sidebar-nav" class="sidebar"></nav>
 
-  <div class="top-actions">
-    <button class="top-btn home" onclick="location.href='index.html'">🏠 메인</button>
-    <button class="top-btn layout" onclick="location.href='inventory_layout.html'">🗺️ 적재대</button>
-  </div>
-
   <div class="main">
     <div class="page-header">
       <h1>📦 재고 조회 및 추출</h1>
@@ -232,15 +215,15 @@
     // ── 통계 카드 ──
     function renderStats() {
       // 적재 슬롯 (수량 > 0)
-      var usedSlots = allSlots.filter(function(s) { return s.current_product_code && s.current_quantity > 0; });
+      var usedSlots = allSlots.filter(function(s) { return s.product_code && s.quantity > 0; });
       var totalSlots = allSlots.length;
       var totalQty = 0;
-      for (var i = 0; i < usedSlots.length; i++) { totalQty += (usedSlots[i].current_quantity || 0); }
+      for (var i = 0; i < usedSlots.length; i++) { totalQty += (usedSlots[i].quantity || 0); }
 
       // 제품 종류 (사번 기준)
       var productSet = {};
       for (var i = 0; i < usedSlots.length; i++) {
-        if (usedSlots[i].current_product_code) productSet[usedSlots[i].current_product_code] = true;
+        if (usedSlots[i].product_code) productSet[usedSlots[i].product_code] = true;
       }
       var productCount = Object.keys(productSet).length;
 
@@ -280,15 +263,15 @@
       var productMap = {};
       for (var i = 0; i < allSlots.length; i++) {
         var s = allSlots[i];
-        if (!s.current_product_code || !s.current_quantity || s.current_quantity <= 0) continue;
-        var pc = s.current_product_code;
+        if (!s.product_code || !s.quantity || s.quantity <= 0) continue;
+        var pc = s.product_code;
         if (!productMap[pc]) {
           productMap[pc] = { code: pc, totalQty: 0, slotCount: 0, locations: [], lots: [] };
         }
-        productMap[pc].totalQty += s.current_quantity;
+        productMap[pc].totalQty += s.quantity;
         productMap[pc].slotCount += 1;
         var rackName = s.inventory_racks ? s.inventory_racks.rack_name : '';
-        productMap[pc].locations.push(rackName + '-' + s.slot_code + '(' + s.current_quantity + ')');
+        productMap[pc].locations.push(rackName + '-' + s.slot_code + '(' + s.quantity + ')');
         if (s.current_lot_no) productMap[pc].lots.push(s.current_lot_no);
       }
 
@@ -381,16 +364,16 @@
         var s = allSlots[i];
         var rackName = s.inventory_racks ? s.inventory_racks.rack_name : '-';
         var rackId = s.rack_id || '';
-        var isOccupied = s.current_product_code && s.current_quantity > 0;
+        var isOccupied = s.product_code && s.quantity > 0;
         var statusBadge = isOccupied ? '<span class="status-badge stocked">적재중</span>' : '<span class="status-badge empty">비어있음</span>';
 
-        h += '<tr data-rack="' + rackId + '" data-status="' + (isOccupied ? 'occupied' : 'empty') + '" data-code="' + (s.current_product_code || '') + '">';
+        h += '<tr data-rack="' + rackId + '" data-status="' + (isOccupied ? 'occupied' : 'empty') + '" data-code="' + (s.product_code || '') + '">';
         h += '<td>' + rackName + '</td>';
         h += '<td><strong>' + (s.slot_code || '') + '</strong></td>';
         h += '<td>' + statusBadge + '</td>';
-        h += '<td>' + (s.current_product_code || '-') + '</td>';
+        h += '<td>' + (s.product_code || '-') + '</td>';
         h += '<td>' + (s.current_lot_no || '-') + '</td>';
-        h += '<td class="qty-cell">' + (s.current_quantity || 0).toLocaleString() + '</td>';
+        h += '<td class="qty-cell">' + (s.quantity || 0).toLocaleString() + '</td>';
         h += '</tr>';
       }
       h += '</tbody></table></div>';
