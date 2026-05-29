@@ -1011,24 +1011,37 @@ async function submitClnMigration() {
     if (clnMigData.length === 0) return;
     if (!confirm(clnMigData.length + '건을 일괄 등록하시겠습니까?\n(중복 체크 없이 전부 등록됩니다)')) return;
 
-    var batchSize = 50;
     var total = clnMigData.length;
     var success = 0, fail = 0;
+    var batchSize = 50;
 
+    // 데이터 전처리
+    for (var k=0; k<total; k++) {
+        var d = clnMigData[k];
+        var mold = moldsData.find(function(m){ return m.product_code === d.product_code; });
+        d.mold_id = mold ? mold.id : null;
+        if (!d.requester) d.requester = null;
+        if (!d.cleaning_reason) d.cleaning_reason = null;
+        if (!d.cleaning_method) d.cleaning_method = null;
+        if (!d.complete_date) d.complete_date = null;
+        if (!d.completed_by) d.completed_by = null;
+        if (!d.note) d.note = null;
+    }
+
+    // 배치 삽입 (REST API는 배열 전송 지원)
     for (var i=0; i<total; i+=batchSize) {
         var batch = clnMigData.slice(i, i+batchSize);
-        // mold_id 매칭
-        for (var j=0; j<batch.length; j++) {
-            var mold = moldsData.find(function(m){ return m.product_code === batch[j].product_code; });
-            batch[j].mold_id = mold ? mold.id : null;
-        }
         try {
-            var res = await supabase.from('mold_cleaning_logs').insert(batch);
-            if (res.error) throw res.error;
-            success += batch.length;
+            var r = await fetch(SU+'/rest/v1/mold_cleaning_logs', {
+                method:'POST',
+                headers: supaHeaders(),
+                body: JSON.stringify(batch)
+            });
+            if (r.ok) { success += batch.length; }
+            else { fail += batch.length; console.error('배치 실패:', await r.text()); }
         } catch(e) {
             fail += batch.length;
-            console.error('배치 실패:', e);
+            console.error('배치 오류:', e);
         }
         document.getElementById('clnMigInfo').textContent = '진행 중... ' + Math.min(i+batchSize, total) + '/' + total;
     }
