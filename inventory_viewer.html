@@ -304,7 +304,8 @@
 
       var h = '';
       h += '<div class="filter-bar">';
-      h += '<input type="text" id="prodSearch" placeholder="사번 검색" oninput="filterProductTable()" style="width:200px">';
+      h += '<input type="text" id="prodSearch" placeholder="사번 검색" style="width:200px">';
+      h += '<button class="btn-filter" onclick="filterProductTable()">🔍 조회</button>';
       h += '<button class="btn-excel" onclick="exportProduct()">📥 엑셀 다운로드</button>';
       h += '</div>';
 
@@ -333,10 +334,15 @@
     function filterProductTable() {
       var keyword = document.getElementById('prodSearch').value.trim().toUpperCase();
       var rows = document.querySelectorAll('#productTable tbody tr');
+      var shown = 0;
       for (var i = 0; i < rows.length; i++) {
         var code = rows[i].getAttribute('data-code') || '';
-        rows[i].style.display = (!keyword || code.toUpperCase().indexOf(keyword) !== -1) ? '' : 'none';
+        var visible = (!keyword || code.toUpperCase().indexOf(keyword) !== -1);
+        rows[i].style.display = visible ? '' : 'none';
+        if (visible) shown++;
       }
+      var info = document.querySelector('.page-info');
+      if (info) info.textContent = '총 ' + shown + '개 제품' + (keyword ? ' (검색: ' + keyword + ')' : '');
     }
 
     function exportProduct() {
@@ -361,7 +367,8 @@
       h += '<div class="filter-bar">';
       h += '<select id="slotRackFilter" onchange="filterSlotTable()">' + rackOptions + '</select>';
       h += '<select id="slotStatusFilter" onchange="filterSlotTable()"><option value="">전체</option><option value="occupied">적재중</option><option value="empty">비어있음</option></select>';
-      h += '<input type="text" id="slotSearch" placeholder="사번 검색" oninput="filterSlotTable()" style="width:200px">';
+      h += '<input type="text" id="slotSearch" placeholder="사번 검색" style="width:200px">';
+      h += '<button class="btn-filter" onclick="filterSlotTable()">🔍 조회</button>';
       h += '<button class="btn-excel" onclick="exportSlot()">📥 엑셀 다운로드</button>';
       h += '</div>';
 
@@ -421,8 +428,9 @@
     function renderLot() {
       var h = '';
       h += '<div class="filter-bar">';
-      h += '<input type="text" id="lotSearch" placeholder="LOT번호 또는 사번 검색" oninput="filterLotTable()" style="width:250px">';
+      h += '<input type="text" id="lotSearch" placeholder="LOT번호 또는 사번 검색" style="width:250px">';
       h += '<select id="lotStatusFilter" onchange="filterLotTable()"><option value="">전체</option><option value="waiting">입고대기</option><option value="stocked">적재중</option><option value="shipped">출고완료</option></select>';
+      h += '<button class="btn-filter" onclick="filterLotTable()">🔍 조회</button>';
       h += '<button class="btn-excel" onclick="exportLot()">📥 엑셀 다운로드</button>';
       h += '</div>';
 
@@ -681,6 +689,16 @@
       document.getElementById('loadingOverlay').className = 'loading-overlay show';
     }
     function hideLoading() { document.getElementById('loadingOverlay').className = 'loading-overlay'; }
+
+    // Enter키로 조회 지원
+    document.addEventListener('keydown', function(e) {
+      if (e.key !== 'Enter') return;
+      var id = e.target.id;
+      if (id === 'prodSearch') filterProductTable();
+      else if (id === 'slotSearch') filterSlotTable();
+      else if (id === 'lotSearch') filterLotTable();
+      else if (id === 'histSearch') filterHistoryTable();
+    });
   </script>
   <script src="sidebar.js"></script>
 </body>

@@ -179,6 +179,18 @@
     .btn-batch:hover { background: #eef2ff; }
     .btn-batch.active { background: #4A90D9; color: #fff; }
 
+    /* 사번 검색 */
+    .search-group { display:flex; gap:6px; align-items:center; }
+    .search-group input { padding:7px 12px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; width:160px; outline:none; font-family:inherit; }
+    .search-group input:focus { border-color:#4A90D9; box-shadow:0 0 0 3px rgba(74,144,217,0.15); }
+    .search-group button { padding:7px 14px; background:#4A90D9; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; font-family:inherit; }
+    .search-group button:hover { background:#3a7bc8; }
+    .search-group .btn-clear { background:#94a3b8; }
+    .search-group .btn-clear:hover { background:#64748b; }
+    .slot-cell.search-hit { border:3px solid #f59e0b !important; background:#fef3c7 !important; box-shadow:0 0 8px rgba(245,158,11,0.4); z-index:2; position:relative; }
+    .slot-cell.search-dim { opacity:0.25; }
+    .search-result-info { font-size:12px; color:#64748b; margin-left:8px; font-weight:500; }
+
     @media (max-width: 768px) {
       .rack-container { padding: 12px; }
       .slot-cell { min-height: 50px; padding: 4px; }
@@ -201,77 +213,59 @@
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
         <a href="inventory_layout.html" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#1a1a2e;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">&#128506; 적재대 현황</a>
         <a href="inventory_io.html" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#4A90D9;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">&#128230; 입출고 관리</a>
-        <a href="inventory_viewer.html" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#27AE60;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">&#128202; 재고 조회</a>
+        <a href="inventory_viewer.html" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#7c3aed;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">&#128202; 재고 조회</a>
       </div>
 
-      <!-- 랙/대차 탭 -->
-      <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:3px solid #eee;">
-        <div class="type-tab active" id="tabRack" onclick="switchType('rack')" style="padding:10px 24px;font-size:14px;font-weight:600;color:#4A90D9;cursor:pointer;border-bottom:3px solid #4A90D9;margin-bottom:-3px;">&#128451; 고정 랙</div>
-        <div class="type-tab" id="tabZone" onclick="switchType('zone')" style="padding:10px 24px;font-size:14px;font-weight:600;color:#999;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-3px;">&#128666; 대차 구역</div>
+      <!-- 입고대기 패널 -->
+      <div class="waiting-panel" id="waitingPanel" style="display:none;">
+        <div class="waiting-panel-title">
+          <span>&#128680; 입고대기 LOT</span>
+          <span class="wp-count" id="wpCount"></span>
+        </div>
+        <div class="waiting-list" id="waitingList"></div>
       </div>
 
-      <!-- 랙 모드 -->
-      <div id="rackModeArea">
-        <!-- 입고대기 패널 -->
-        <div class="waiting-panel" id="waitingPanel" style="display:none;">
-          <div class="waiting-panel-title">
-            <span>&#128680; 입고대기 LOT</span>
-            <span class="wp-count" id="wpCount"></span>
-          </div>
-          <div class="waiting-list" id="waitingList"></div>
+      <div class="rack-controls">
+        <select class="rack-select" id="rackSelect" onchange="onRackChange()">
+          <option value="">동 선택</option>
+        </select>
+        <button class="btn-batch" id="batchBtn" onclick="toggleBatchMode()">📦 일괄 입고</button>
+        <div class="search-group">
+          <input type="text" id="slotSearchInput" placeholder="사번 검색">
+          <button onclick="searchSlotByCode()">🔍 조회</button>
+          <button class="btn-clear" onclick="clearSlotSearch()">초기화</button>
+          <span class="search-result-info" id="searchResultInfo"></span>
         </div>
-
-        <div class="rack-controls">
-          <select class="rack-select" id="rackSelect" onchange="onRackChange()">
-            <option value="">동 선택</option>
-          </select>
-          <button class="btn-batch" id="batchBtn" onclick="toggleBatchMode()">&#128230; 일괄 입고</button>
-          <div style="flex:1;"></div>
-          <div class="slot-legend">
-            <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#fafafa;"></div> 빈 슬롯</div>
-            <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#e8f5e9;border-color:#81C784;"></div> 적재중</div>
-            <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#fff3e0;border-color:#FFB74D;"></div> 예약</div>
-            <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#ffebee;border-color:#E57373;"></div> 마이너스</div>
-          </div>
-        </div>
-        <div class="rack-stats">
-          <div class="rack-stat-item">전체 <strong id="sSTotal">0</strong>칸</div>
-          <div class="rack-stat-item">사용 <strong id="sSUsed">0</strong>칸</div>
-          <div class="rack-stat-item">빈칸 <strong id="sSEmpty">0</strong>칸</div>
-          <div class="rack-stat-item">사용률 <strong id="sSRate">0%</strong></div>
-          <div class="rack-stat-item highlight">마이너스 <strong id="sSNeg">0</strong>건</div>
-        </div>
-        <div class="batch-bar" id="batchBar">
-          <div class="batch-bar-title">&#128230; 일괄 입고 모드</div>
-          <div class="batch-bar-sub">빈 슬롯을 클릭하여 선택하세요. 선택한 슬롯에 동일 제품을 한 번에 입고합니다.</div>
-          <div class="batch-form">
-            <div class="bf-group"><label>사번 *</label><input type="text" id="batchProductCode" placeholder="제품 사번"></div>
-            <div class="bf-group"><label>슬롯당 수량 *</label><input type="number" id="batchQtyPerSlot" placeholder="각 슬롯 수량" min="1" oninput="updateBatchInfo()"></div>
-          </div>
-          <div class="batch-selected" id="batchSelectedInfo">선택된 슬롯: <strong>0</strong>개</div>
-          <div id="batchLotArea"></div>
-          <div class="batch-btns">
-            <button class="batch-btn submit" onclick="doBatchInbound()">일괄 입고 실행</button>
-            <button class="batch-btn cancel" onclick="toggleBatchMode()">취소</button>
-          </div>
-        </div>
-        <div id="slotGridArea"><div class="no-slots">동을 선택해주세요</div></div>
-      </div>
-
-      <!-- 대차 모드 -->
-      <div id="zoneModeArea" style="display:none;">
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
-          <select class="rack-select" id="zoneSelect" onchange="onZoneChange()" style="min-width:180px;">
-            <option value="">-- 대차 구역 선택 --</option>
-          </select>
-          <span style="font-size:12px;color:#888;" id="zoneHint">구역을 선택하면 상세 페이지로 이동합니다</span>
-        </div>
-        <div id="zoneGridArea" style="background:#f8f9fa;border-radius:10px;padding:30px;text-align:center;">
-          <div style="font-size:40px;margin-bottom:10px;">&#128666;</div>
-          <div style="font-size:15px;font-weight:600;color:#555;margin-bottom:6px;">대차 구역 선택</div>
-          <div style="font-size:13px;color:#aaa;">위 드롭다운에서 A동/B동 라인을 선택하세요</div>
+        <div style="flex:1;"></div>
+        <div class="slot-legend">
+          <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#fafafa;"></div> 빈 슬롯</div>
+          <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#e8f5e9;border-color:#81C784;"></div> 적재중</div>
+          <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#fff3e0;border-color:#FFB74D;"></div> 예약</div>
+          <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#ffebee;border-color:#E57373;"></div> 마이너스</div>
         </div>
       </div>
+      <div class="rack-stats">
+        <div class="rack-stat-item">전체 <strong id="sSTotal">0</strong>칸</div>
+        <div class="rack-stat-item">사용 <strong id="sSUsed">0</strong>칸</div>
+        <div class="rack-stat-item">빈칸 <strong id="sSEmpty">0</strong>칸</div>
+        <div class="rack-stat-item">사용률 <strong id="sSRate">0%</strong></div>
+        <div class="rack-stat-item highlight">마이너스 <strong id="sSNeg">0</strong>건</div>
+      </div>
+      <div class="batch-bar" id="batchBar">
+        <div class="batch-bar-title">📦 일괄 입고 모드</div>
+        <div class="batch-bar-sub">빈 슬롯을 클릭하여 선택하세요. 선택한 슬롯에 동일 제품을 한 번에 입고합니다.</div>
+        <div class="batch-form">
+          <div class="bf-group"><label>사번 *</label><input type="text" id="batchProductCode" placeholder="제품 사번"></div>
+          <div class="bf-group"><label>슬롯당 수량 *</label><input type="number" id="batchQtyPerSlot" placeholder="각 슬롯 수량" min="1" oninput="updateBatchInfo()"></div>
+        </div>
+        <div class="batch-selected" id="batchSelectedInfo">선택된 슬롯: <strong>0</strong>개</div>
+        <div id="batchLotArea"></div>
+        <div class="batch-btns">
+          <button class="batch-btn submit" onclick="doBatchInbound()">일괄 입고 실행</button>
+          <button class="batch-btn cancel" onclick="toggleBatchMode()">취소</button>
+        </div>
+      </div>
+      <div id="slotGridArea"><div class="no-slots">동을 선택해주세요</div></div>
     </div>
   </div><!-- main -->
 
@@ -290,76 +284,16 @@
     var allRacks = [];
     var currentRack = null;
     var currentSlots = [];
-    var allSlots = [];
+    var allSlots = []; // 이동처리용 전체 슬롯
     var batchMode = false;
     var batchSelectedIds = [];
     var waitingLots = [];
-    var currentType = 'rack';
 
     document.addEventListener('DOMContentLoaded', function() {
       if (typeof checkAuth === 'function') { checkAuth(); }
       loadRacks();
       loadWaitingLots();
-      loadZoneOptions();
     });
-
-    // ── 랙/대차 탭 전환 ──
-    function switchType(type) {
-      currentType = type;
-      var tabRack = document.getElementById('tabRack');
-      var tabZone = document.getElementById('tabZone');
-      var rackArea = document.getElementById('rackModeArea');
-      var zoneArea = document.getElementById('zoneModeArea');
-
-      if (type === 'rack') {
-        tabRack.style.color = '#4A90D9';
-        tabRack.style.borderBottomColor = '#4A90D9';
-        tabZone.style.color = '#999';
-        tabZone.style.borderBottomColor = 'transparent';
-        rackArea.style.display = 'block';
-        zoneArea.style.display = 'none';
-        document.getElementById('pageTitle').textContent = '랙 상세 현황';
-      } else {
-        tabZone.style.color = '#4A90D9';
-        tabZone.style.borderBottomColor = '#4A90D9';
-        tabRack.style.color = '#999';
-        tabRack.style.borderBottomColor = 'transparent';
-        rackArea.style.display = 'none';
-        zoneArea.style.display = 'block';
-        document.getElementById('pageTitle').textContent = '대차 구역 현황';
-      }
-    }
-
-    // ── 대차 드롭다운 로드 ──
-    function loadZoneOptions() {
-      supabase.from('inventory_zones').select('*').eq('active', true).order('zone_code').order('lane_no')
-        .then(function(res) {
-          var zones = res.data || [];
-          var sel = document.getElementById('zoneSelect');
-          for (var i = 0; i < zones.length; i++) {
-            var z = zones[i];
-            var opt = document.createElement('option');
-            opt.value = z.zone_code + '_' + z.lane_no;
-            opt.textContent = z.zone_name + ' - ' + z.lane_name;
-            sel.appendChild(opt);
-          }
-
-          // URL 파라미터로 대차 모드 자동 전환
-          var params = new URLSearchParams(window.location.search);
-          if (params.get('type') === 'zone') {
-            switchType('zone');
-          }
-        });
-    }
-
-    function onZoneChange() {
-      var val = document.getElementById('zoneSelect').value;
-      if (!val) return;
-      var parts = val.split('_');
-      var zoneCode = parts[0];
-      var laneNo = parts[1] || 1;
-      window.location.href = 'inventory_zone.html?zone=' + zoneCode + '&lane=' + laneNo;
-    }
 
     function loadRacks() {
       supabase.from('inventory_racks').select('*').eq('active', true).order('sort_order')
@@ -455,6 +389,57 @@
       for (var i = 0; i < currentSlots.length; i++) { if (currentSlots[i].id === id) return currentSlots[i]; }
       return null;
     }
+
+    // ══════════════════════════════════════
+    // 사번 검색 (슬롯 하이라이트)
+    // ══════════════════════════════════════
+    function searchSlotByCode() {
+      var keyword = (document.getElementById('slotSearchInput').value || '').trim().toUpperCase();
+      var cells = document.querySelectorAll('.slot-cell');
+      var infoEl = document.getElementById('searchResultInfo');
+
+      if (!keyword) {
+        clearSlotSearch();
+        return;
+      }
+
+      var hitCount = 0;
+      for (var i = 0; i < cells.length; i++) {
+        var prodEl = cells[i].querySelector('.slot-product');
+        var prodCode = prodEl ? prodEl.textContent.toUpperCase() : '';
+        cells[i].classList.remove('search-hit', 'search-dim');
+        if (prodCode && prodCode.indexOf(keyword) !== -1) {
+          cells[i].classList.add('search-hit');
+          hitCount++;
+        } else {
+          cells[i].classList.add('search-dim');
+        }
+      }
+
+      if (infoEl) {
+        infoEl.textContent = hitCount > 0 ? hitCount + '개 슬롯 발견' : '일치하는 슬롯 없음';
+        infoEl.style.color = hitCount > 0 ? '#d97706' : '#ef4444';
+      }
+
+      // 첫 번째 일치 슬롯으로 스크롤
+      var firstHit = document.querySelector('.slot-cell.search-hit');
+      if (firstHit) firstHit.scrollIntoView({ behavior:'smooth', block:'center' });
+    }
+
+    function clearSlotSearch() {
+      document.getElementById('slotSearchInput').value = '';
+      var cells = document.querySelectorAll('.slot-cell');
+      for (var i = 0; i < cells.length; i++) {
+        cells[i].classList.remove('search-hit', 'search-dim');
+      }
+      var infoEl = document.getElementById('searchResultInfo');
+      if (infoEl) infoEl.textContent = '';
+    }
+
+    // Enter키 지원
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && e.target.id === 'slotSearchInput') searchSlotByCode();
+    });
 
     // ══════════════════════════════════════
     // 통합 모달
