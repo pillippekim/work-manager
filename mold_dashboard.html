@@ -39,6 +39,11 @@
 .period-filter label { font-size:13px; font-weight:700; color:#475569; white-space:nowrap; }
 .period-filter input[type="date"] { padding:7px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; outline:none; font-family:inherit; }
 .period-filter input[type="date"]:focus { border-color:#243bb2; box-shadow:0 0 0 3px rgba(36,59,178,0.15); }
+.period-btn { padding:6px 14px; border:1px solid #d1d5db; background:#fff; border-radius:6px; font-size:12px; font-weight:600; color:#475569; cursor:pointer; font-family:inherit; transition:all 0.2s; }
+.period-btn:hover { border-color:#243bb2; color:#243bb2; }
+.period-btn.active { background:#243bb2; color:#fff; border-color:#243bb2; }
+.sort-icon { font-size:10px; margin-left:2px; color:#bbb; }
+.dt th { cursor:pointer; user-select:none; }
 .btn-period-search { padding:7px 18px; background:#243bb2; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; font-family:inherit; }
 .btn-period-search:hover { background:#1e32a0; }
 
@@ -188,21 +193,59 @@ table.dt tr:hover { background:#f8fafc; }
 <!-- 세척 이력 탭 -->
 <div class="tab-content" id="tab-cleaning">
     <div style="padding:16px 0;">
+        <!-- 통계 카드 -->
         <div class="hist-stat-row">
             <div class="hist-stat-card"><div class="num" id="clnTotal" style="color:#243bb2;">-</div><div class="label">전체</div></div>
             <div class="hist-stat-card"><div class="num" id="clnMonth" style="color:#0ea5e9;">-</div><div class="label">이번 달</div></div>
+            <div class="hist-stat-card"><div class="num" id="clnInspect" style="color:#16a34a;">-</div><div class="label">순회검사</div></div>
+            <div class="hist-stat-card"><div class="num" id="clnChange" style="color:#f59e0b;">-</div><div class="label">금형교체</div></div>
         </div>
+        <!-- 기간 필터 -->
+        <div class="period-filter" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+            <button class="period-btn active" onclick="setClnPeriod('month','this')">당월</button>
+            <button class="period-btn" onclick="setClnPeriod('month','prev')">전월</button>
+            <button class="period-btn" onclick="setClnPeriod('months',3)">3개월</button>
+            <button class="period-btn" onclick="setClnPeriod('months',6)">6개월</button>
+            <button class="period-btn" onclick="setClnPeriod('all')">전체</button>
+        </div>
+        <!-- 검색 + 버튼 -->
         <div class="toolbar">
             <input type="text" class="search-input" id="clnSearch" placeholder="사번, 접수자, 세척내용 검색...">
             <button class="btn-primary" onclick="openCleanModal()">+ 세척 등록</button>
             <button class="btn-success" onclick="downloadCleanExcel()">📥 엑셀</button>
+            <button class="btn-outline" onclick="toggleClnMigration()" style="border:1px solid #94a3b8;background:#fff;color:#475569;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">📂 과거 데이터 등록</button>
         </div>
-        <table class="dt">
+        <!-- 마이그레이션 영역 -->
+        <div id="clnMigrationArea" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:12px;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">📂 과거 세척 데이터 엑셀 일괄 등록</div>
+            <p style="font-size:12px;color:#64748b;margin-bottom:10px;">엑셀 컬럼 순서: 접수날짜, 접수사번, 접수자, 세척기준, 세척내용, 완료날짜, 완료자, 비고 (첫 행은 헤더)</p>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <label style="padding:7px 14px;background:#243bb2;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">
+                    📂 파일 선택
+                    <input type="file" id="clnMigFile" accept=".xlsx,.xls,.csv" onchange="parseClnMigration(this)" style="display:none;">
+                </label>
+                <span id="clnMigFileName" style="font-size:12px;color:#64748b;"></span>
+                <button id="clnMigSubmitBtn" style="display:none;padding:7px 14px;background:#16a34a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;" onclick="submitClnMigration()">일괄 등록</button>
+                <span id="clnMigInfo" style="font-size:12px;color:#64748b;"></span>
+            </div>
+        </div>
+        <!-- 테이블 -->
+        <div style="overflow-x:auto;">
+        <table class="dt" id="clnTable">
             <thead><tr>
-                <th>접수일</th><th>사번</th><th>접수자</th><th>세척기준</th><th>세척내용</th><th>완료일</th><th>완료자</th><th>비고</th>
+                <th onclick="sortClnTable(0)">접수일 <span class="sort-icon">▲▼</span></th>
+                <th onclick="sortClnTable(1)">사번 <span class="sort-icon">▲▼</span></th>
+                <th onclick="sortClnTable(2)">접수자 <span class="sort-icon">▲▼</span></th>
+                <th onclick="sortClnTable(3)">세척기준 <span class="sort-icon">▲▼</span></th>
+                <th onclick="sortClnTable(4)">세척내용 <span class="sort-icon">▲▼</span></th>
+                <th onclick="sortClnTable(5)">금형점검 <span class="sort-icon">▲▼</span></th>
+                <th onclick="sortClnTable(6)">완료일 <span class="sort-icon">▲▼</span></th>
+                <th onclick="sortClnTable(7)">완료자 <span class="sort-icon">▲▼</span></th>
+                <th>비고</th>
             </tr></thead>
-            <tbody id="clnBody"><tr><td colspan="8" class="empty-msg">로딩 중...</td></tr></tbody>
+            <tbody id="clnBody"><tr><td colspan="9" class="empty-msg">로딩 중...</td></tr></tbody>
         </table>
+        </div>
     </div>
 </div>
 
@@ -268,11 +311,16 @@ table.dt tr:hover { background:#f8fafc; }
         <div class="form-row">
             <div class="form-group"><label>접수자</label><input type="text" id="cRequester" placeholder="접수자명"></div>
             <div class="form-group"><label>세척기준</label>
-                <select id="cReason"><option value="공정순회검사">공정순회검사</option><option value="금형 교체">금형 교체</option><option value="정기세척">정기세척</option><option value="기타">기타</option></select>
+                <select id="cReason"><option value="공정순회검사">공정순회검사</option><option value="금형교체">금형교체</option><option value="정기세척">정기세척</option><option value="기타">기타</option></select>
             </div>
         </div>
-        <div class="form-group"><label>세척내용</label>
-            <select id="cMethod"><option value="금형 세척제 사용 세척">금형 세척제 사용 세척</option><option value="샌드 브라스트 세척">샌드 브라스트 세척</option><option value="샌드브라스트 세척">샌드브라스트 세척</option><option value="기타">기타</option></select>
+        <div class="form-row">
+            <div class="form-group"><label>세척내용</label>
+                <select id="cMethod"><option value="금형 세척제 사용 세척">금형 세척제 사용 세척</option><option value="샌드 브라스트 세척">샌드 브라스트 세척</option><option value="기타">기타</option></select>
+            </div>
+            <div class="form-group"><label>금형점검 (찍힘/파손)</label>
+                <select id="cInspection"><option value="">해당없음</option><option value="정상">정상</option><option value="찍힘">찍힘</option><option value="파손">파손</option><option value="마모">마모</option><option value="기타">기타</option></select>
+            </div>
         </div>
         <div class="form-row">
             <div class="form-group"><label>완료일</label><input type="date" id="cCompleteDate"></div>
@@ -700,32 +748,109 @@ async function completeDamage(id) {
 }
 
 // =============================================
-// 세척 이력
+// 세척 이력 (개편)
 // =============================================
+var clnPeriod = 'month_this';
+var clnSortCol = 0;
+var clnSortDir = 'desc';
+var clnMigData = [];
+
+function setClnPeriod(type, val) {
+    clnPeriod = type + '_' + (val||'');
+    // 버튼 active
+    var btns = document.querySelectorAll('.period-btn');
+    for (var i=0; i<btns.length; i++) btns[i].classList.remove('active');
+    if (event && event.target) event.target.classList.add('active');
+    renderClean();
+}
+
+function getClnDateRange() {
+    var now = new Date();
+    var y = now.getFullYear(), m = now.getMonth();
+    if (clnPeriod === 'month_this') {
+        return { from: y+'-'+String(m+1).padStart(2,'0')+'-01', to: '9999-12-31' };
+    } else if (clnPeriod === 'month_prev') {
+        var pm = m === 0 ? 11 : m-1;
+        var py = m === 0 ? y-1 : y;
+        var lastDay = new Date(py, pm+1, 0).getDate();
+        return { from: py+'-'+String(pm+1).padStart(2,'0')+'-01', to: py+'-'+String(pm+1).padStart(2,'0')+'-'+lastDay };
+    } else if (clnPeriod === 'months_3') {
+        var d = new Date(y, m-3, 1);
+        return { from: d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01', to: '9999-12-31' };
+    } else if (clnPeriod === 'months_6') {
+        var d = new Date(y, m-6, 1);
+        return { from: d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01', to: '9999-12-31' };
+    }
+    return { from: '0000-01-01', to: '9999-12-31' };
+}
+
 function renderClean() {
     var keyword = (document.getElementById('clnSearch').value||'').toUpperCase();
+    var range = getClnDateRange();
+
     var filtered = cleanData.filter(function(c) {
+        var dt = c.request_date || '';
+        if (dt < range.from || dt > range.to) return false;
         if (!keyword) return true;
-        var s = ((c.product_code||'')+(c.requester||'')+(c.cleaning_method||'')).toUpperCase();
+        var s = ((c.product_code||'')+(c.requester||'')+(c.cleaning_method||'')+(c.cleaning_reason||'')).toUpperCase();
         return s.indexOf(keyword)!==-1;
     });
+
+    // 정렬
+    var cols = ['request_date','product_code','requester','cleaning_reason','cleaning_method','mold_inspection','complete_date','completed_by'];
+    if (clnSortCol < cols.length) {
+        var col = cols[clnSortCol];
+        var dir = clnSortDir === 'asc' ? 1 : -1;
+        filtered.sort(function(a,b) {
+            var va = (a[col]||'').toUpperCase();
+            var vb = (b[col]||'').toUpperCase();
+            if (va < vb) return -1 * dir;
+            if (va > vb) return 1 * dir;
+            return 0;
+        });
+    }
+
+    // 통계 업데이트
     var now = new Date();
     var thisMonth = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
     var monthCount = cleanData.filter(function(c){ return (c.request_date||'').substring(0,7)===thisMonth; }).length;
+    var inspectCount = cleanData.filter(function(c){ return c.cleaning_reason==='공정순회검사'; }).length;
+    var changeCount = cleanData.filter(function(c){ return c.cleaning_reason==='금형교체'; }).length;
     document.getElementById('clnTotal').textContent = cleanData.length;
     document.getElementById('clnMonth').textContent = monthCount;
+    document.getElementById('clnInspect').textContent = inspectCount;
+    document.getElementById('clnChange').textContent = changeCount;
 
+    // 정렬 아이콘 업데이트
+    var ths = document.querySelectorAll('#clnTable thead th');
+    for (var i=0; i<ths.length; i++) {
+        var icon = ths[i].querySelector('.sort-icon');
+        if (!icon) continue;
+        if (i === clnSortCol) {
+            icon.textContent = clnSortDir === 'asc' ? '▲' : '▼';
+        } else {
+            icon.textContent = '▲▼';
+        }
+    }
+
+    // 테이블 렌더링
     var html='';
-    if (filtered.length===0) { html='<tr><td colspan="8" class="empty-msg">데이터가 없습니다</td></tr>'; }
+    if (filtered.length===0) { html='<tr><td colspan="9" class="empty-msg">데이터가 없습니다</td></tr>'; }
     else {
         for (var i=0;i<filtered.length;i++) {
             var c=filtered[i];
+            var inspText = c.mold_inspection || '-';
+            var inspStyle = '';
+            if (inspText === '찍힘' || inspText === '파손') inspStyle = ' style="color:#dc2626;font-weight:700;"';
+            else if (inspText === '마모') inspStyle = ' style="color:#f59e0b;font-weight:600;"';
+
             html+='<tr>'
                 +'<td>'+(c.request_date||'-')+'</td>'
                 +'<td><strong>'+(c.product_code||'-')+'</strong></td>'
                 +'<td>'+(c.requester||'-')+'</td>'
                 +'<td>'+(c.cleaning_reason||'-')+'</td>'
                 +'<td>'+(c.cleaning_method||'-')+'</td>'
+                +'<td'+inspStyle+'>'+inspText+'</td>'
                 +'<td>'+(c.complete_date||'-')+'</td>'
                 +'<td>'+(c.completed_by||'-')+'</td>'
                 +'<td>'+(c.note||'')+'</td>'
@@ -736,12 +861,23 @@ function renderClean() {
 }
 document.getElementById('clnSearch').addEventListener('input', renderClean);
 
+function sortClnTable(colIdx) {
+    if (clnSortCol === colIdx) {
+        clnSortDir = clnSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+        clnSortCol = colIdx;
+        clnSortDir = 'asc';
+    }
+    renderClean();
+}
+
 function openCleanModal() {
     document.getElementById('cProductCode').value='';
     document.getElementById('cDate').value=fmtLocal(new Date());
     document.getElementById('cRequester').value='';
     document.getElementById('cReason').value='공정순회검사';
     document.getElementById('cMethod').value='금형 세척제 사용 세척';
+    document.getElementById('cInspection').value='';
     document.getElementById('cCompleteDate').value=fmtLocal(new Date());
     document.getElementById('cCompletedBy').value='';
     document.getElementById('cNote').value='';
@@ -760,6 +896,7 @@ async function submitClean() {
         requester:document.getElementById('cRequester').value.trim()||null,
         cleaning_reason:document.getElementById('cReason').value,
         cleaning_method:document.getElementById('cMethod').value,
+        mold_inspection:document.getElementById('cInspection').value||null,
         complete_date:document.getElementById('cCompleteDate').value||null,
         completed_by:document.getElementById('cCompletedBy').value.trim()||null,
         note:document.getElementById('cNote').value.trim()
@@ -769,6 +906,144 @@ async function submitClean() {
         showToast('세척 이력 등록 완료','success');
         closeCleanModal(); await loadHistoryData();
     } catch(e) { showToast('저장 실패: '+e.message,'error'); }
+}
+
+// ── 과거 데이터 마이그레이션 ──
+function toggleClnMigration() {
+    var el = document.getElementById('clnMigrationArea');
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function parseClnMigration(input) {
+    var file = input.files[0];
+    if (!file) return;
+    document.getElementById('clnMigFileName').textContent = file.name;
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            var wb = XLSX.read(e.target.result, {type:'array'});
+            var ws = wb.Sheets[wb.SheetNames[0]];
+            var json = XLSX.utils.sheet_to_json(ws, {defval:'', header:1});
+
+            // 첫 행이 헤더인지 확인 후 스킵
+            var startRow = 0;
+            if (json.length > 0) {
+                var first = String(json[0][0]||'');
+                if (first === 'NO.' || first === 'NO' || first === 'no' || first.indexOf('날짜') !== -1 || first.indexOf('접수') !== -1 || isNaN(Number(first))) {
+                    startRow = 1;
+                }
+                // NO. 컬럼이 숫자인 경우 (NO, 접수날짜, ...) 두번째 행부터
+                if (json.length > 1 && !isNaN(Number(json[1][0]))) {
+                    // 헤더 행이 있는 구조
+                }
+            }
+
+            clnMigData = [];
+            for (var i=startRow; i<json.length; i++) {
+                var row = json[i];
+                if (!row || row.length < 2) continue;
+
+                // NO 컬럼이 첫 번째인 경우 스킵 (엑셀 양식에 따라)
+                var offset = 0;
+                if (row.length >= 8 && !isNaN(Number(row[0])) && String(row[0]).length <= 5) {
+                    offset = 1; // NO 컬럼 건너뛰기
+                }
+
+                var dateVal = row[offset+0];
+                var productCode = String(row[offset+1]||'').trim();
+                if (!dateVal || !productCode) continue;
+
+                // 날짜 처리
+                var dateStr = '';
+                if (typeof dateVal === 'number') {
+                    var d = XLSX.SSF.parse_date_code(dateVal);
+                    if (d) dateStr = d.y+'-'+('0'+d.m).slice(-2)+'-'+('0'+d.d).slice(-2);
+                } else {
+                    dateStr = String(dateVal).trim();
+                    if (dateStr.indexOf('.') !== -1) {
+                        var parts = dateStr.split('.');
+                        if (parts.length >= 3) {
+                            var yr = parts[0].length === 2 ? '20'+parts[0] : parts[0];
+                            dateStr = yr+'-'+('0'+parts[1]).slice(-2)+'-'+('0'+parts[2]).slice(-2);
+                        }
+                    }
+                }
+                if (dateStr.length < 8) continue;
+
+                var completeDateVal = row[offset+5];
+                var completeDateStr = '';
+                if (completeDateVal) {
+                    if (typeof completeDateVal === 'number') {
+                        var d2 = XLSX.SSF.parse_date_code(completeDateVal);
+                        if (d2) completeDateStr = d2.y+'-'+('0'+d2.m).slice(-2)+'-'+('0'+d2.d).slice(-2);
+                    } else {
+                        completeDateStr = String(completeDateVal).trim().substring(0,10);
+                    }
+                }
+
+                clnMigData.push({
+                    request_date: dateStr.substring(0,10),
+                    product_code: productCode,
+                    requester: String(row[offset+2]||'').trim()||null,
+                    cleaning_reason: String(row[offset+3]||'').trim()||null,
+                    cleaning_method: String(row[offset+4]||'').trim()||null,
+                    complete_date: completeDateStr||null,
+                    completed_by: String(row[offset+6]||'').trim()||null,
+                    note: String(row[offset+7]||'').trim()||null
+                });
+            }
+
+            document.getElementById('clnMigInfo').textContent = clnMigData.length + '건 파싱 완료';
+            document.getElementById('clnMigInfo').style.color = '#16a34a';
+            if (clnMigData.length > 0) {
+                document.getElementById('clnMigSubmitBtn').style.display = 'inline-block';
+            }
+        } catch(ex) {
+            document.getElementById('clnMigInfo').textContent = '파싱 실패: ' + ex.message;
+            document.getElementById('clnMigInfo').style.color = '#dc2626';
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+async function submitClnMigration() {
+    if (clnMigData.length === 0) return;
+    if (!confirm(clnMigData.length + '건을 일괄 등록하시겠습니까?\n(중복 체크 없이 전부 등록됩니다)')) return;
+
+    var batchSize = 50;
+    var total = clnMigData.length;
+    var success = 0, fail = 0;
+
+    for (var i=0; i<total; i+=batchSize) {
+        var batch = clnMigData.slice(i, i+batchSize);
+        // mold_id 매칭
+        for (var j=0; j<batch.length; j++) {
+            var mold = moldsData.find(function(m){ return m.product_code === batch[j].product_code; });
+            batch[j].mold_id = mold ? mold.id : null;
+        }
+        try {
+            var res = await supabase.from('mold_cleaning_logs').insert(batch);
+            if (res.error) throw res.error;
+            success += batch.length;
+        } catch(e) {
+            fail += batch.length;
+            console.error('배치 실패:', e);
+        }
+        document.getElementById('clnMigInfo').textContent = '진행 중... ' + Math.min(i+batchSize, total) + '/' + total;
+    }
+
+    var msg = success + '건 등록 완료';
+    if (fail > 0) msg += ', ' + fail + '건 실패';
+    showToast(msg, fail > 0 ? 'error' : 'success');
+
+    clnMigData = [];
+    document.getElementById('clnMigSubmitBtn').style.display = 'none';
+    document.getElementById('clnMigFileName').textContent = '';
+    document.getElementById('clnMigFile').value = '';
+    document.getElementById('clnMigInfo').textContent = msg;
+
+    await loadHistoryData();
 }
 
 // =============================================
@@ -879,7 +1154,7 @@ function downloadDamageExcel() {
 }
 function downloadCleanExcel() {
     var data = cleanData.map(function(c) {
-        return {'접수일':c.request_date,'사번':c.product_code,'접수자':c.requester||'','세척기준':c.cleaning_reason||'','세척내용':c.cleaning_method||'','완료일':c.complete_date||'','완료자':c.completed_by||'','비고':c.note||''};
+        return {'접수일':c.request_date,'사번':c.product_code,'접수자':c.requester||'','세척기준':c.cleaning_reason||'','세척내용':c.cleaning_method||'','금형점검':c.mold_inspection||'','완료일':c.complete_date||'','완료자':c.completed_by||'','비고':c.note||''};
     });
     var ws=XLSX.utils.json_to_sheet(data); var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'세척이력');
     XLSX.writeFile(wb,'금형세척이력_'+fmtLocal(new Date()).replace(/-/g,'')+'.xlsx');
