@@ -70,19 +70,27 @@
     /* 데이터 테이블 */
     .data-table-wrap { overflow-x: auto; margin-bottom: 20px; }
     .data-table {
-      width: 100%; border-collapse: collapse; font-size: 13px;
+      width: 100%; border-collapse: collapse; font-size: 13px; table-layout: auto;
     }
     .data-table th {
       background: #f5f5f5; padding: 10px 8px; text-align: left;
       font-weight: 600; color: #555; border-bottom: 2px solid #ddd;
-      white-space: nowrap; cursor: pointer;
+      white-space: nowrap; cursor: pointer; position: relative; user-select: none;
     }
     .data-table th:hover { background: #eee; }
+    .data-table th .sort-icon { font-size:10px; margin-left:3px; color:#bbb; }
+    .data-table th .sort-icon.asc { color:#243bb2; }
+    .data-table th .sort-icon.desc { color:#243bb2; }
     .data-table td {
       padding: 8px; border-bottom: 1px solid #eee; vertical-align: middle;
     }
     .data-table tr:hover { background: #f9f9f9; }
     .data-table .qty-cell { text-align: right; font-weight: 600; }
+    /* 컬럼 너비 유틸 */
+    .col-w80 { width:80px; }
+    .col-w100 { width:100px; }
+    .col-w120 { width:120px; }
+    .col-w150 { width:150px; }
 
     /* 상태 배지 */
     .status-badge {
@@ -272,7 +280,7 @@
         productMap[pc].slotCount += 1;
         var rackName = s.inventory_racks ? s.inventory_racks.rack_name : '';
         productMap[pc].locations.push(rackName + '-' + s.slot_code + '(' + s.quantity + ')');
-        if (s.current_lot_no) productMap[pc].lots.push(s.current_lot_no);
+        if (s.lot_no) productMap[pc].lots.push(s.lot_no);
       }
 
       // 안전재고 매핑
@@ -294,7 +302,12 @@
 
       h += '<div class="page-info">총 ' + products.length + '개 제품</div>';
       h += '<div class="data-table-wrap"><table class="data-table" id="productTable"><thead><tr>';
-      h += '<th>사번</th><th style="text-align:right">총 재고</th><th>슬롯 수</th><th>안전재고</th><th>적재 위치</th><th>LOT</th>';
+      h += '<th class="col-w120" data-sort="0" onclick="sortDataTable(\'productTable\',0)">사번 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w100" data-sort="1" onclick="sortDataTable(\'productTable\',1)" style="text-align:right">총 재고 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w80" data-sort="2" onclick="sortDataTable(\'productTable\',2)">슬롯 수 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w100" data-sort="3" onclick="sortDataTable(\'productTable\',3)">안전재고 <span class="sort-icon">▲▼</span></th>';
+      h += '<th data-sort="4" onclick="sortDataTable(\'productTable\',4)">적재 위치 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w120" data-sort="5" onclick="sortDataTable(\'productTable\',5)">LOT <span class="sort-icon">▲▼</span></th>';
       h += '</tr></thead><tbody>';
 
       for (var i = 0; i < products.length; i++) {
@@ -357,7 +370,12 @@
 
       h += '<div class="page-info">총 ' + allSlots.length + '개 슬롯</div>';
       h += '<div class="data-table-wrap"><table class="data-table" id="slotTable"><thead><tr>';
-      h += '<th>동</th><th>슬롯</th><th>상태</th><th>사번</th><th>LOT</th><th style="text-align:right">수량</th>';
+      h += '<th class="col-w80" data-sort="0" onclick="sortDataTable(\'slotTable\',0)">동 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w80" data-sort="1" onclick="sortDataTable(\'slotTable\',1)">슬롯 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w80" data-sort="2" onclick="sortDataTable(\'slotTable\',2)">상태 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w120" data-sort="3" onclick="sortDataTable(\'slotTable\',3)">사번 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w150" data-sort="4" onclick="sortDataTable(\'slotTable\',4)">LOT <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w100" data-sort="5" onclick="sortDataTable(\'slotTable\',5)" style="text-align:right">수량 <span class="sort-icon">▲▼</span></th>';
       h += '</tr></thead><tbody>';
 
       for (var i = 0; i < allSlots.length; i++) {
@@ -372,7 +390,7 @@
         h += '<td><strong>' + (s.slot_code || '') + '</strong></td>';
         h += '<td>' + statusBadge + '</td>';
         h += '<td>' + (s.product_code || '-') + '</td>';
-        h += '<td>' + (s.current_lot_no || '-') + '</td>';
+        h += '<td>' + (s.lot_no || '-') + '</td>';
         h += '<td class="qty-cell">' + (s.quantity || 0).toLocaleString() + '</td>';
         h += '</tr>';
       }
@@ -419,7 +437,13 @@
 
       h += '<div class="page-info">총 ' + allLots.length + '건</div>';
       h += '<div class="data-table-wrap"><table class="data-table" id="lotTable"><thead><tr>';
-      h += '<th>LOT번호</th><th>사번</th><th>상태</th><th style="text-align:right">수량</th><th>슬롯</th><th>소스</th><th>등록일</th>';
+      h += '<th class="col-w150" data-sort="0" onclick="sortDataTable(\'lotTable\',0)">LOT번호 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w120" data-sort="1" onclick="sortDataTable(\'lotTable\',1)">사번 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w80" data-sort="2" onclick="sortDataTable(\'lotTable\',2)">상태 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w100" data-sort="3" onclick="sortDataTable(\'lotTable\',3)" style="text-align:right">수량 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w100" data-sort="4" onclick="sortDataTable(\'lotTable\',4)">슬롯 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w100" data-sort="5" onclick="sortDataTable(\'lotTable\',5)">소스 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w120" data-sort="6" onclick="sortDataTable(\'lotTable\',6)">등록일 <span class="sort-icon">▲▼</span></th>';
       h += '</tr></thead><tbody>';
 
       for (var i = 0; i < allLots.length; i++) {
@@ -493,8 +517,15 @@
 
       h += '<div class="page-info" id="histPageInfo">총 ' + allMovements.length + '건</div>';
       h += '<div class="data-table-wrap"><table class="data-table" id="histTable"><thead><tr>';
-      h += '<th>일시</th><th>유형</th><th>사번</th><th>LOT</th>';
-      h += '<th style="text-align:right">수량</th><th>출발</th><th>도착</th><th>사유</th><th>처리자</th>';
+      h += '<th class="col-w150" data-sort="0" onclick="sortDataTable(\'histTable\',0)">일시 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w80" data-sort="1" onclick="sortDataTable(\'histTable\',1)">유형 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w120" data-sort="2" onclick="sortDataTable(\'histTable\',2)">사번 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w120" data-sort="3" onclick="sortDataTable(\'histTable\',3)">LOT <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w100" data-sort="4" onclick="sortDataTable(\'histTable\',4)" style="text-align:right">수량 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w100" data-sort="5" onclick="sortDataTable(\'histTable\',5)">출발 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w100" data-sort="6" onclick="sortDataTable(\'histTable\',6)">도착 <span class="sort-icon">▲▼</span></th>';
+      h += '<th data-sort="7" onclick="sortDataTable(\'histTable\',7)">사유 <span class="sort-icon">▲▼</span></th>';
+      h += '<th class="col-w80" data-sort="8" onclick="sortDataTable(\'histTable\',8)">처리자 <span class="sort-icon">▲▼</span></th>';
       h += '</tr></thead><tbody>';
 
       for (var i = 0; i < allMovements.length; i++) {
@@ -682,6 +713,53 @@
       else if (id === 'lotSearch') filterLotTable();
       else if (id === 'histSearch') filterHistoryTable();
     });
+
+    // ═══════════════════════════════════════════
+    // 공통 정렬 함수
+    // ═══════════════════════════════════════════
+    var sortState = {};
+
+    function sortDataTable(tableId, colIdx) {
+      var table = document.getElementById(tableId);
+      if (!table) return;
+
+      var key = tableId + '_' + colIdx;
+      var dir = (sortState[key] === 'asc') ? 'desc' : 'asc';
+      sortState[key] = dir;
+
+      // 아이콘 업데이트
+      var ths = table.querySelectorAll('thead th');
+      for (var i = 0; i < ths.length; i++) {
+        var icon = ths[i].querySelector('.sort-icon');
+        if (!icon) continue;
+        if (parseInt(ths[i].getAttribute('data-sort')) === colIdx) {
+          icon.textContent = dir === 'asc' ? '▲' : '▼';
+          icon.className = 'sort-icon ' + dir;
+        } else {
+          icon.textContent = '▲▼';
+          icon.className = 'sort-icon';
+        }
+      }
+
+      // 행 정렬
+      var tbody = table.querySelector('tbody');
+      var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+      rows.sort(function(a, b) {
+        var cellA = a.cells[colIdx];
+        var cellB = b.cells[colIdx];
+        if (!cellA || !cellB) return 0;
+        var va = (cellA.textContent || '').trim();
+        var vb = (cellB.textContent || '').trim();
+        // 숫자 판별 (콤마 제거)
+        var na = parseFloat(va.replace(/,/g, ''));
+        var nb = parseFloat(vb.replace(/,/g, ''));
+        if (!isNaN(na) && !isNaN(nb)) {
+          return dir === 'asc' ? na - nb : nb - na;
+        }
+        return dir === 'asc' ? va.localeCompare(vb, 'ko') : vb.localeCompare(va, 'ko');
+      });
+      for (var i = 0; i < rows.length; i++) { tbody.appendChild(rows[i]); }
+    }
   </script>
   <script src="sidebar.js"></script>
 </body>

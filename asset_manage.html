@@ -230,8 +230,7 @@ table.dt tr:hover { background:#f8fafc; }
 
             <div class="form-group">
                 <label>회계코드</label>
-                <input type="text" id="regAccCode" placeholder="회계장부 자산번호">
-                <div class="form-help">경영관리부서 회계장부와 매칭할 코드</div>
+                <input type="text" id="regAccCode" placeholder="회계장부 자산번호 (경영관리 매칭용)">
             </div>
             <div class="form-group">
                 <label>모델명/규격</label>
@@ -276,6 +275,59 @@ table.dt tr:hover { background:#f8fafc; }
             <div class="form-actions">
                 <button class="btn-sm" style="background:#94a3b8;color:#fff;" onclick="clearRegForm()">초기화</button>
                 <button class="btn-sm btn-primary" onclick="submitAsset()">등록</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 엑셀 일괄 등록 -->
+    <div class="form-area" style="margin-top:16px;">
+        <div class="toggle-area">
+            <button class="toggle-btn" onclick="toggleBulk()">📥 엑셀 일괄 등록 ▼</button>
+        </div>
+        <div class="toggle-content" id="bulkArea">
+            <p style="font-size:13px;color:#64748b;margin-bottom:12px;">양식을 다운로드 후 작성하여 업로드하면 자산코드가 자동 생성되며 일괄 등록됩니다.</p>
+
+            <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+                <button class="btn-sm btn-primary" onclick="downloadTemplate()">📄 양식 다운로드</button>
+                <label class="btn-sm" style="background:#16a34a;color:#fff;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+                    📂 파일 선택
+                    <input type="file" id="bulkFile" accept=".xlsx,.xls,.csv" onchange="parseBulkFile(this)" style="display:none;">
+                </label>
+                <span id="bulkFileName" style="font-size:12px;color:#64748b;"></span>
+            </div>
+
+            <!-- 미리보기 테이블 -->
+            <div id="bulkPreview" style="display:none;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <div style="font-size:14px;font-weight:600;">미리보기 (<span id="bulkCount">0</span>건)</div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn-sm" style="background:#94a3b8;color:#fff;" onclick="clearBulk()">취소</button>
+                        <button class="btn-sm btn-primary" onclick="submitBulk()">일괄 등록</button>
+                    </div>
+                </div>
+                <div style="overflow-x:auto;max-height:400px;overflow-y:auto;">
+                <table class="dt" id="bulkTable">
+                    <thead>
+                        <tr>
+                            <th>No</th>
+                            <th>대분류</th>
+                            <th>중분류</th>
+                            <th>자산명</th>
+                            <th>회계코드</th>
+                            <th>모델명</th>
+                            <th>제조사</th>
+                            <th>시리얼</th>
+                            <th>취득일</th>
+                            <th>취득가액</th>
+                            <th>관리부서</th>
+                            <th>위치</th>
+                            <th>사용자</th>
+                            <th>상태</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bulkBody"></tbody>
+                </table>
+                </div>
             </div>
         </div>
     </div>
@@ -930,6 +982,236 @@ function downloadAssetExcel() {
     XLSX.utils.book_append_sheet(wb, ws, '자산목록');
     var today = new Date().toISOString().slice(0,10).replace(/-/g,'');
     XLSX.writeFile(wb, '자산목록_' + today + '.xlsx');
+}
+
+// =============================================
+// 엑셀 일괄 등록
+// =============================================
+var bulkData = [];
+
+function toggleBulk() {
+    var el = document.getElementById('bulkArea');
+    el.classList.toggle('open');
+}
+
+function downloadTemplate() {
+    if (!window.XLSX) { showToast('엑셀 라이브러리가 없습니다', 'error'); return; }
+
+    // 분류 코드 참조 시트 데이터
+    var catRef = [];
+    for (var i=0; i<categories.length; i++) {
+        catRef.push({
+            '대분류코드': categories[i].major_code,
+            '대분류명': categories[i].major_name,
+            '중분류코드': categories[i].minor_code,
+            '중분류명': categories[i].minor_name
+        });
+    }
+
+    // 양식 시트 (빈 행 + 예시 1행)
+    var tplData = [
+        {
+            '대분류코드': 'EQ',
+            '중분류코드': 'MF',
+            '자산명': '1공장 사출기 3호 (예시)',
+            '회계코드': 'ACC-001',
+            '모델명': '350t 인젝션',
+            '제조사': '한국기계',
+            '시리얼번호': 'SN-12345',
+            '취득일': '2026-01-15',
+            '취득가액': 50000000,
+            '관리부서': '생산부',
+            '설치위치': '1공장 A라인',
+            '사용자': '홍길동',
+            '비고': '신규 도입'
+        }
+    ];
+
+    var wb = XLSX.utils.book_new();
+    var ws1 = XLSX.utils.json_to_sheet(tplData);
+    // 컬럼 너비 설정
+    ws1['!cols'] = [
+        {wch:12},{wch:12},{wch:25},{wch:15},{wch:20},{wch:15},{wch:15},{wch:12},{wch:12},{wch:12},{wch:12},{wch:15},{wch:12}
+    ];
+    XLSX.utils.book_append_sheet(wb, ws1, '자산등록양식');
+
+    var ws2 = XLSX.utils.json_to_sheet(catRef);
+    ws2['!cols'] = [{wch:12},{wch:12},{wch:12},{wch:15}];
+    XLSX.utils.book_append_sheet(wb, ws2, '분류코드참조');
+
+    XLSX.writeFile(wb, '자산등록_양식.xlsx');
+    showToast('양식 파일이 다운로드됩니다', 'success');
+}
+
+function parseBulkFile(input) {
+    var file = input.files[0];
+    if (!file) return;
+    document.getElementById('bulkFileName').textContent = file.name;
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            var wb = XLSX.read(e.target.result, {type:'array'});
+            var ws = wb.Sheets[wb.SheetNames[0]];
+            var json = XLSX.utils.sheet_to_json(ws, {defval:''});
+
+            if (json.length === 0) { showToast('데이터가 없습니다', 'error'); return; }
+
+            // 데이터 검증 + 미리보기
+            bulkData = [];
+            var errors = [];
+            for (var i=0; i<json.length; i++) {
+                var row = json[i];
+                var major = (row['대분류코드'] || '').toString().trim().toUpperCase();
+                var minor = (row['중분류코드'] || '').toString().trim().toUpperCase();
+                var name = (row['자산명'] || '').toString().trim();
+
+                if (!major || !minor || !name) {
+                    errors.push((i+2) + '행: 대분류코드/중분류코드/자산명 필수');
+                    continue;
+                }
+
+                // 분류 코드 유효성 검사
+                var validCat = false;
+                for (var j=0; j<categories.length; j++) {
+                    if (categories[j].major_code === major && categories[j].minor_code === minor) { validCat = true; break; }
+                }
+                if (!validCat) {
+                    errors.push((i+2) + '행: 분류코드 ' + major + '-' + minor + ' 없음');
+                    continue;
+                }
+
+                // 취득일 처리
+                var acqDate = (row['취득일'] || '').toString().trim();
+                if (acqDate && typeof row['취득일'] === 'number') {
+                    // 엑셀 날짜 숫자 변환
+                    var d = XLSX.SSF.parse_date_code(row['취득일']);
+                    if (d) acqDate = d.y + '-' + ('0'+d.m).slice(-2) + '-' + ('0'+d.d).slice(-2);
+                }
+
+                bulkData.push({
+                    major_code: major,
+                    minor_code: minor,
+                    asset_name: name,
+                    accounting_code: (row['회계코드'] || '').toString().trim() || null,
+                    model_name: (row['모델명'] || '').toString().trim() || null,
+                    manufacturer: (row['제조사'] || '').toString().trim() || null,
+                    serial_no: (row['시리얼번호'] || '').toString().trim() || null,
+                    acquisition_date: acqDate || null,
+                    acquisition_cost: parseInt(row['취득가액']) || null,
+                    department: (row['관리부서'] || '').toString().trim() || null,
+                    location: (row['설치위치'] || '').toString().trim() || null,
+                    user_name: (row['사용자'] || '').toString().trim() || null,
+                    note: (row['비고'] || '').toString().trim() || null,
+                    status: 'active'
+                });
+            }
+
+            if (errors.length > 0) {
+                showToast(errors.slice(0,3).join(', ') + (errors.length > 3 ? ' 외 ' + (errors.length-3) + '건' : ''), 'error');
+            }
+
+            renderBulkPreview();
+        } catch(ex) {
+            showToast('파일 파싱 실패: ' + ex.message, 'error');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function renderBulkPreview() {
+    if (bulkData.length === 0) {
+        document.getElementById('bulkPreview').style.display = 'none';
+        return;
+    }
+    document.getElementById('bulkPreview').style.display = 'block';
+    document.getElementById('bulkCount').textContent = bulkData.length;
+
+    var html = '';
+    for (var i=0; i<bulkData.length; i++) {
+        var d = bulkData[i];
+        var catName = getCategoryName(d.major_code, d.minor_code);
+        html += '<tr>';
+        html += '<td>' + (i+1) + '</td>';
+        html += '<td>' + d.major_code + '</td>';
+        html += '<td>' + d.minor_code + '</td>';
+        html += '<td><strong>' + d.asset_name + '</strong></td>';
+        html += '<td>' + (d.accounting_code || '-') + '</td>';
+        html += '<td>' + (d.model_name || '-') + '</td>';
+        html += '<td>' + (d.manufacturer || '-') + '</td>';
+        html += '<td>' + (d.serial_no || '-') + '</td>';
+        html += '<td>' + (d.acquisition_date || '-') + '</td>';
+        html += '<td>' + (d.acquisition_cost ? d.acquisition_cost.toLocaleString() : '-') + '</td>';
+        html += '<td>' + (d.department || '-') + '</td>';
+        html += '<td>' + (d.location || '-') + '</td>';
+        html += '<td>' + (d.user_name || '-') + '</td>';
+        html += '<td>사용중</td>';
+        html += '</tr>';
+    }
+    document.getElementById('bulkBody').innerHTML = html;
+}
+
+async function submitBulk() {
+    if (bulkData.length === 0) { showToast('등록할 데이터가 없습니다', 'error'); return; }
+    if (!confirm(bulkData.length + '건을 일괄 등록하시겠습니까?')) return;
+
+    var year = new Date().getFullYear();
+    var successCount = 0;
+    var failCount = 0;
+
+    for (var i=0; i<bulkData.length; i++) {
+        var d = bulkData[i];
+        try {
+            // 시퀀스 가져오기/생성
+            var seqRes = await sb.from('asset_sequences')
+                .select('*')
+                .eq('major_code', d.major_code)
+                .eq('minor_code', d.minor_code)
+                .eq('year', year)
+                .maybeSingle();
+
+            var nextSeq = 1;
+            if (seqRes.data) {
+                nextSeq = seqRes.data.last_seq + 1;
+                await sb.from('asset_sequences')
+                    .update({ last_seq: nextSeq })
+                    .eq('id', seqRes.data.id);
+            } else {
+                await sb.from('asset_sequences')
+                    .insert({ major_code:d.major_code, minor_code:d.minor_code, year:year, last_seq:1 });
+            }
+
+            var seqStr = ('000' + nextSeq).slice(-3);
+            var assetCode = d.major_code + '-' + d.minor_code + '-' + year + '-' + seqStr;
+            var qrUrl = BASE_URL + 'asset_manage.html?code=' + encodeURIComponent(assetCode);
+
+            d.asset_code = assetCode;
+            d.qr_url = qrUrl;
+
+            var res = await sb.from('assets').insert(d);
+            if (res.error) throw res.error;
+            successCount++;
+        } catch(ex) {
+            failCount++;
+            console.error('등록 실패 #' + (i+1) + ':', ex);
+        }
+    }
+
+    var msg = successCount + '건 등록 완료';
+    if (failCount > 0) msg += ', ' + failCount + '건 실패';
+    showToast(msg, failCount > 0 ? 'error' : 'success');
+
+    clearBulk();
+    await loadAssets();
+    switchTab('list');
+}
+
+function clearBulk() {
+    bulkData = [];
+    document.getElementById('bulkPreview').style.display = 'none';
+    document.getElementById('bulkBody').innerHTML = '';
+    document.getElementById('bulkFileName').textContent = '';
+    document.getElementById('bulkFile').value = '';
 }
 
 // =============================================
