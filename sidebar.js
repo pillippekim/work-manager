@@ -24,6 +24,7 @@ function initSidebar() {
     var isDataPage = ['data_viewer.html','safety_viewer.html','docs_manager.html'].indexOf(page) !== -1;
     var isSystemPage = ['master_data.html','users.html'].indexOf(page) !== -1;
     var isInventoryPage = ['inventory_layout.html','inventory_rack.html','inventory_io.html','inventory_viewer.html','inventory_zone.html'].indexOf(page) !== -1;
+    var isAssetPage = ['asset_manage.html'].indexOf(page) !== -1;
 
     // 금형관리 active
     var dashActive = (page === 'mold_dashboard.html') ? ' nav-active' : '';
@@ -45,9 +46,12 @@ function initSidebar() {
     // 재고관리 active
     var invLayoutActive = (page === 'inventory_layout.html') ? ' nav-active' : '';
     var invRackActive = (page === 'inventory_rack.html') ? ' nav-active' : '';
-    var invZoneActive = (page === 'inventory_zone.html') ? ' nav-active' : '';
     var invOutboundActive = (page === 'inventory_io.html') ? ' nav-active' : '';
     var invViewerActive = (page === 'inventory_viewer.html') ? ' nav-active' : '';
+    var invZoneActive = (page === 'inventory_zone.html') ? ' nav-active' : '';
+
+    // 경영지원 active
+    var assetActive = (page === 'asset_manage.html') ? ' nav-active' : '';
 
     // 자동 펼침
     var prodOpen = isMoldPage ? ' open' : '';
@@ -58,6 +62,8 @@ function initSidebar() {
     var systemOpen = isSystemPage ? ' open' : '';
     var logisticsOpen = isInventoryPage ? ' open' : '';
     var inventoryOpen = isInventoryPage ? ' open' : '';
+    var bizOpen = isAssetPage ? ' open' : '';
+    var assetOpen = isAssetPage ? ' open' : '';
 
     /* ── 상단 헤더 바 ── */
     var headerEl = document.getElementById('top-header');
@@ -166,7 +172,7 @@ function initSidebar() {
                         '<div class="sub-body">' +
                             '<a class="nav-link' + invLayoutActive + '" href="inventory_layout.html"><span class="n-icon">🗺️</span>적재대 현황</a>' +
                             '<a class="nav-link' + invRackActive + '" href="inventory_rack.html"><span class="n-icon">🗄️</span>랙 상세 현황</a>' +
-                            '<a class="nav-link' + invZoneActive + '" href="inventory_rack.html?type=zone"><span class="n-icon">🚚</span>대차 현황</a>' +
+                            '<a class="nav-link' + invZoneActive + '" href="inventory_zone.html"><span class="n-icon">🛒</span>대차 현황</a>' +
                             '<a class="nav-link' + invOutboundActive + '" href="inventory_io.html"><span class="n-icon">📤</span>입출고 관리</a>' +
                             '<a class="nav-link' + invViewerActive + '" href="inventory_viewer.html"><span class="n-icon">📊</span>재고 조회</a>' +
                         '</div>' +
@@ -174,7 +180,23 @@ function initSidebar() {
                 '</div>' +
             '</div>' +
             '<div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">🔬</span><span class="c-label">R&D</span><span class="c-badge off">향후</span></button></div>' +
-            '<div class="cat-item disabled"><button class="cat-btn"><span class="c-icon">💼</span><span class="c-label">경영지원</span><span class="c-badge off">향후</span></button></div>' +
+            '<div class="cat-item' + bizOpen + '" id="c-biz">' +
+                '<button class="cat-btn" onclick="toggleCat(\'c-biz\')">' +
+                    '<span class="c-icon">💼</span><span class="c-label">경영지원</span>' +
+                    '<span class="c-badge on">운영</span><span class="c-arrow">▼</span>' +
+                '</button>' +
+                '<div class="cat-body">' +
+                    '<div class="sub-item' + assetOpen + '" id="s-asset">' +
+                        '<button class="sub-btn" onclick="toggleCat(\'s-asset\')">' +
+                            '<span class="s-icon">📦</span><span class="s-label">자산관리</span>' +
+                            '<span class="s-arrow">▼</span>' +
+                        '</button>' +
+                        '<div class="sub-body">' +
+                            '<a class="nav-link' + assetActive + '" href="asset_manage.html"><span class="n-icon">📋</span>자산 관리</a>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
         '</div>' +
 
         '<div class="menu-divider"></div>' +
@@ -261,9 +283,9 @@ function applyAccessRestrictions() {
             allowedPages = [
                 'inventory_layout.html',
                 'inventory_rack.html',
-                'inventory_zone.html',
                 'inventory_io.html',
-                'inventory_viewer.html'
+                'inventory_viewer.html',
+                'inventory_zone.html'
             ];
         } else {
             allowedPages = ['mold_layout.html', 'mold_dashboard.html'];
