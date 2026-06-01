@@ -797,7 +797,7 @@ function openDeleteModal(id) {
     if (!m) return;
     deleteTargetId = id;
     document.getElementById('deleteMsg').textContent =
-        '금형 "' + m.mold_code + '" (' + m.product_code + ')을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.';
+        '금형 "' + m.mold_code + '" (' + m.product_code + ')을 삭제하시겠습니까?\n관련 이력(세척/손상/타발수/상태변경/수리)도 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.';
     document.getElementById('deleteModal').classList.add('show');
 }
 
@@ -808,9 +808,31 @@ function closeDeleteModal() {
 
 async function confirmDelete() {
     if (!deleteTargetId) return;
+    var m = allMolds.find(function(x) { return x.id === deleteTargetId; });
+    if (!m) return;
+
     try {
+        // 관련 이력 먼저 삭제 (FK 제약 해소)
+        var tables = [
+            { table: 'mold_cleaning_logs', col: 'mold_id', val: m.id },
+            { table: 'mold_cleaning_logs', col: 'product_code', val: m.product_code },
+            { table: 'mold_damage_logs', col: 'mold_id', val: m.id },
+            { table: 'mold_damage_logs', col: 'product_code', val: m.product_code },
+            { table: 'mold_shot_logs', col: 'mold_id', val: m.id },
+            { table: 'mold_status_logs', col: 'mold_id', val: m.id },
+            { table: 'mold_maintenance', col: 'mold_id', val: m.id }
+        ];
+        for (var i = 0; i < tables.length; i++) {
+            var t = tables[i];
+            if (!t.val) continue;
+            await fetch(SUPABASE_URL + '/rest/v1/' + t.table + '?' + t.col + '=eq.' + t.val, {
+                method: 'DELETE', headers: supaHeaders()
+            });
+        }
+
+        // 금형 삭제
         await supaDelete('molds', deleteTargetId);
-        showToast('금형 삭제 완료', 'success');
+        showToast('금형 및 관련 이력 삭제 완료', 'success');
         closeDeleteModal();
         await loadData();
     } catch(e) {
