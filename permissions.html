@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>권한 관리 - HKHT</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="common.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth_guard.js"></script>
+<style>
+.container { max-width:none; }
+.perm-layout { display:grid; grid-template-columns:340px 1fr; gap:16px; }
+@media(max-width:900px){ .perm-layout { grid-template-columns:1fr; } }
+
+/* 직원 목록 */
+.user-panel { background:#fff; border-radius:10px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.08); max-height:calc(100vh - 220px); overflow-y:auto; }
+.user-search { width:100%; padding:9px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; outline:none; margin-bottom:10px; box-sizing:border-box; font-family:inherit; }
+.user-search:focus { border-color:#243bb2; box-shadow:0 0 0 3px rgba(36,59,178,0.15); }
+.user-item { padding:10px 12px; border-radius:8px; cursor:pointer; border:2px solid transparent; margin-bottom:4px; transition:all 0.15s; }
+.user-item:hover { background:#f8fafc; }
+.user-item.selected { background:#f0f3ff; border-color:#243bb2; }
+.user-item .u-name { font-size:14px; font-weight:600; }
+.user-item .u-meta { font-size:11px; color:#64748b; margin-top:2px; }
+.role-badge { display:inline-block; padding:1px 7px; border-radius:10px; font-size:10px; font-weight:600; }
+.role-super { background:#fce7f3; color:#9d174d; }
+.role-admin { background:#dbeafe; color:#1e40af; }
+.role-worker { background:#dcfce7; color:#166534; }
+
+/* 권한 설정 패널 */
+.perm-panel { background:#fff; border-radius:10px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+.perm-empty { text-align:center; padding:60px 20px; color:#94a3b8; }
+.perm-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:8px; }
+.perm-header h2 { font-size:18px; font-weight:700; }
+.perm-subtitle { font-size:12px; color:#64748b; margin-bottom:16px; }
+.super-notice { background:#fce7f3; color:#9d174d; padding:12px 16px; border-radius:8px; font-size:13px; font-weight:600; }
+
+.cat-block { border:1px solid #e2e8f0; border-radius:10px; margin-bottom:12px; overflow:hidden; }
+.cat-block.sensitive { border-color:#f59e0b; }
+.cat-head { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:#f8fafc; }
+.cat-head.sensitive { background:#fffbeb; }
+.cat-name { font-size:14px; font-weight:700; display:flex; align-items:center; gap:6px; }
+.cat-pages { padding:8px 16px; }
+.page-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #f1f5f9; }
+.page-row:last-child { border-bottom:none; }
+.page-name { font-size:13px; color:#475569; }
+
+/* 토글 스위치 */
+.toggle { position:relative; display:inline-block; width:44px; height:24px; }
+.toggle input { opacity:0; width:0; height:0; }
+.toggle .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#cbd5e1; border-radius:24px; transition:0.2s; }
+.toggle .slider:before { position:absolute; content:""; height:18px; width:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:0.2s; }
+.toggle input:checked + .slider { background:#243bb2; }
+.toggle input:checked + .slider:before { transform:translateX(20px); }
+.toggle.cat-toggle .slider { background:#94a3b8; }
+.toggle.cat-toggle input:checked + .slider { background:#16a34a; }
+
+.state-label { font-size:11px; font-weight:600; margin-right:8px; }
+.state-on { color:#16a34a; }
+.state-off { color:#94a3b8; }
+.state-default { color:#cbd5e1; font-style:italic; }
+
+.perm-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; padding-top:16px; border-top:2px solid #e2e8f0; }
+.btn-save { padding:10px 24px; background:#243bb2; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; }
+.btn-save:hover { background:#1e32a0; }
+.btn-reset { padding:10px 18px; background:#94a3b8; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; }
+.legend { font-size:11px; color:#64748b; margin-bottom:12px; padding:10px 14px; background:#f8fafc; border-radius:8px; }
+</style>
+</head>
+<body>
+
+<div id="top-header" class="top-header"></div>
+<nav id="sidebar-nav" class="sidebar"></nav>
+
+<div class="main">
+<div class="page-header">
+    <div class="header-row">
+        <div>
+            <h1>🔐 권한 관리</h1>
+            <div class="sub">사번별 페이지 접근 권한 설정 — 대분류 및 개별 페이지 단위</div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+<div class="perm-layout">
+
+    <!-- 직원 목록 -->
+    <div class="user-panel">
+        <input type="text" class="user-search" id="userSearch" placeholder="🔍 사번 / 이름 / 부서 검색" oninput="renderUserList()">
+        <div id="userList"></div>
+    </div>
+
+    <!-- 권한 설정 -->
+    <div class="perm-panel">
+        <div id="permEmpty" class="perm-empty">
+            👈 좌측에서 권한을 설정할 직원을 선택하세요
+        </div>
+        <div id="permContent" style="display:none;">
+            <div class="perm-header">
+                <h2 id="permUserName">-</h2>
+                <span id="permUserBadge"></span>
+            </div>
+            <div class="perm-subtitle" id="permUserMeta">-</div>
+
+            <div id="superNotice" class="super-notice" style="display:none;">
+                ⭐ 슈퍼관리자는 모든 페이지에 접근 가능합니다. 별도 설정이 필요 없습니다.
+            </div>
+
+            <div id="permBody">
+                <div class="legend">
+                    <strong>설정 안내:</strong> 대분류 토글로 한 번에 켜고 끌 수 있고, 개별 페이지로 세부 조정이 가능합니다.
+                    개별 페이지 설정이 대분류보다 우선합니다. 설정하지 않으면 기본 권한이 적용됩니다.
+                </div>
+                <div id="catBlocks"></div>
+                <div class="perm-actions">
+                    <button class="btn-reset" onclick="resetPerms()">기본값으로 초기화</button>
+                    <button class="btn-save" onclick="savePerms()">권한 저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+</div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+var allUsers = [];
+var selectedUser = null;
+var currentPerms = { categories:{}, pages:{} };
+var myInfo = null;
+
+var MS = window.MENU_STRUCTURE;
+
+async function init() {
+    myInfo = await checkAuth();
+    if (!myInfo) return;
+    // 슈퍼관리자/관리자만 접근 (auth_guard에서도 막지만 이중 체크)
+    if (myInfo.user_type !== 'super' && myInfo.user_type !== 'admin') {
+        document.querySelector('.container').innerHTML = '<div style="padding:40px;text-align:center;color:#94a3b8;">권한 관리는 관리자만 접근 가능합니다.</div>';
+        return;
+    }
+    await loadUsers();
+}
+
+async function loadUsers() {
+    try {
+        var res = await sb.from('users').select('*').order('emp_code');
+        if (res.error) throw res.error;
+        allUsers = res.data || [];
+        renderUserList();
+    } catch(e) {
+        document.getElementById('userList').innerHTML = '<div style="padding:20px;color:#94a3b8;text-align:center;">로드 실패</div>';
+    }
+}
+
+function renderUserList() {
+    var q = (document.getElementById('userSearch').value || '').toLowerCase();
+    var filtered = allUsers.filter(function(u) {
+        if (!q) return true;
+        return (u.emp_code||'').toLowerCase().indexOf(q) !== -1
+            || (u.name||'').toLowerCase().indexOf(q) !== -1
+            || (u.department||'').toLowerCase().indexOf(q) !== -1
+            || (u.process||'').toLowerCase().indexOf(q) !== -1;
+    });
+
+    var html = '';
+    for (var i=0; i<filtered.length; i++) {
+        var u = filtered[i];
+        var roleLabel = u.user_type==='super'?'슈퍼관리자':u.user_type==='admin'?'관리자':'작업자';
+        var roleClass = u.user_type==='super'?'role-super':u.user_type==='admin'?'role-admin':'role-worker';
+        var deptOrProc = u.user_type==='worker' ? (u.process||'-') : (u.department||'-');
+        var sel = (selectedUser && selectedUser.emp_code === u.emp_code) ? ' selected' : '';
+        html += '<div class="user-item'+sel+'" onclick="selectUser(\''+u.emp_code+'\')">'
+            + '<div class="u-name">'+(u.name||'-')+' <span class="role-badge '+roleClass+'">'+roleLabel+'</span></div>'
+            + '<div class="u-meta">'+u.emp_code+' · '+deptOrProc+'</div>'
+            + '</div>';
+    }
+    document.getElementById('userList').innerHTML = html || '<div style="padding:20px;color:#94a3b8;text-align:center;">결과 없음</div>';
+}
+
+async function selectUser(empCode) {
+    selectedUser = allUsers.find(function(u){ return u.emp_code === empCode; });
+    if (!selectedUser) return;
+    renderUserList();
+
+    document.getElementById('permEmpty').style.display = 'none';
+    document.getElementById('permContent').style.display = 'block';
+
+    var roleLabel = selectedUser.user_type==='super'?'슈퍼관리자':selectedUser.user_type==='admin'?'관리자':'작업자';
+    var roleClass = selectedUser.user_type==='super'?'role-super':selectedUser.user_type==='admin'?'role-admin':'role-worker';
+    document.getElementById('permUserName').textContent = selectedUser.name || '-';
+    document.getElementById('permUserBadge').innerHTML = '<span class="role-badge '+roleClass+'">'+roleLabel+'</span>';
+    document.getElementById('permUserMeta').textContent = '사번 '+selectedUser.emp_code+' · '+(selectedUser.department||'-')+(selectedUser.process?(' / '+selectedUser.process):'');
+
+    // 슈퍼관리자는 설정 불필요
+    if (selectedUser.user_type === 'super') {
+        document.getElementById('superNotice').style.display = 'block';
+        document.getElementById('permBody').style.display = 'none';
+        return;
+    }
+    document.getElementById('superNotice').style.display = 'none';
+    document.getElementById('permBody').style.display = 'block';
+
+    // 기존 권한 로드
+    currentPerms = { categories:{}, pages:{} };
+    try {
+        var res = await sb.from('page_permissions').select('perms').eq('emp_code', empCode).maybeSingle();
+        if (res.data && res.data.perms) {
+            currentPerms.categories = res.data.perms.categories || {};
+            currentPerms.pages = res.data.perms.pages || {};
+        }
+    } catch(e) {}
+
+    renderCatBlocks();
+}
+
+function renderCatBlocks() {
+    var html = '';
+    for (var key in MS) {
+        var cat = MS[key];
+        var catState = currentPerms.categories[key]; // true/false/undefined
+        var checked = catState === true ? 'checked' : '';
+        var sensitiveClass = cat.sensitive ? ' sensitive' : '';
+
+        html += '<div class="cat-block'+sensitiveClass+'">';
+        html += '<div class="cat-head'+sensitiveClass+'">';
+        html += '<div class="cat-name">'+(cat.sensitive?'🔒 ':'')+cat.name+'</div>';
+        html += '<label class="toggle cat-toggle"><input type="checkbox" '+checked+' onchange="toggleCat(\''+key+'\',this.checked)"><span class="slider"></span></label>';
+        html += '</div>';
+        html += '<div class="cat-pages">';
+        for (var p=0; p<cat.pages.length; p++) {
+            var page = cat.pages[p];
+            var pState = currentPerms.pages[page]; // true/false/undefined
+            var pChecked = '';
+            var stateLabel = '';
+            if (pState === true) { pChecked = 'checked'; stateLabel = '<span class="state-label state-on">허용</span>'; }
+            else if (pState === false) { stateLabel = '<span class="state-label state-off">차단</span>'; }
+            else { stateLabel = '<span class="state-label state-default">기본</span>'; }
+            html += '<div class="page-row">';
+            html += '<span class="page-name">'+pageLabel(page)+'</span>';
+            html += '<div style="display:flex;align-items:center;">'+stateLabel;
+            html += '<label class="toggle"><input type="checkbox" '+pChecked+' onchange="togglePage(\''+page+'\',this.checked)"><span class="slider"></span></label>';
+            html += '</div></div>';
+        }
+        html += '</div></div>';
+    }
+    document.getElementById('catBlocks').innerHTML = html;
+}
+
+function pageLabel(page) {
+    var labels = {
+        'mold_dashboard.html':'대시보드 / 이력', 'mold_layout.html':'적치대 현황', 'mold_detail.html':'금형 상세관리', 'mold_admin.html':'금형 관리(구)',
+        'inspection_round_viewer.html':'공정검사 조회',
+        'inventory_layout.html':'적재대 현황', 'inventory_rack.html':'랙 상세 현황', 'inventory_zone.html':'대차 현황', 'inventory_io.html':'입출고 관리', 'inventory_viewer.html':'재고 조회',
+        'asset_manage.html':'자산 관리', 'data_viewer.html':'데이터 조회', 'safety_viewer.html':'설비 점검 조회', 'docs_manager.html':'문서 관리',
+        'master_data.html':'기준정보 관리', 'users.html':'사용자 관리', 'permissions.html':'권한 관리'
+    };
+    return labels[page] || page;
+}
+
+function toggleCat(key, checked) {
+    currentPerms.categories[key] = checked;
+    // 대분류 토글 시 해당 분류의 개별 페이지 설정 초기화 (대분류 따름)
+    var pages = MS[key].pages;
+    for (var i=0; i<pages.length; i++) { delete currentPerms.pages[pages[i]]; }
+    renderCatBlocks();
+}
+
+function togglePage(page, checked) {
+    currentPerms.pages[page] = checked;
+    renderCatBlocks();
+}
+
+async function savePerms() {
+    if (!selectedUser) return;
+    // 빈 값 정리
+    var payload = {
+        emp_code: selectedUser.emp_code,
+        perms: { categories: currentPerms.categories, pages: currentPerms.pages },
+        updated_at: new Date().toISOString(),
+        updated_by: myInfo.emp_code
+    };
+    try {
+        // upsert
+        var res = await sb.from('page_permissions').upsert(payload, { onConflict:'emp_code' });
+        if (res.error) throw res.error;
+        showToast(selectedUser.name + '님의 권한이 저장되었습니다', 'success');
+    } catch(e) {
+        showToast('저장 실패: ' + e.message, 'error');
+    }
+}
+
+async function resetPerms() {
+    if (!selectedUser) return;
+    if (!confirm(selectedUser.name + '님의 권한을 기본값으로 초기화하시겠습니까?\n(설정된 권한이 모두 삭제되고 기본 권한이 적용됩니다)')) return;
+    try {
+        var res = await sb.from('page_permissions').delete().eq('emp_code', selectedUser.emp_code);
+        if (res.error) throw res.error;
+        currentPerms = { categories:{}, pages:{} };
+        renderCatBlocks();
+        showToast('기본값으로 초기화되었습니다', 'success');
+    } catch(e) {
+        showToast('초기화 실패: ' + e.message, 'error');
+    }
+}
+
+function showToast(msg, type) {
+    var el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast toast-' + type + ' show';
+    setTimeout(function(){ el.classList.remove('show'); }, 3000);
+}
+
+init();
+</script>
+<script src="sidebar.js"></script>
+</body>
+</html>

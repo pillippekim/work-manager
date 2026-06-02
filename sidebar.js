@@ -42,6 +42,7 @@ function initSidebar() {
     // 시스템 active
     var masterActive = (page === 'master_data.html') ? ' nav-active' : '';
     var usersActive = (page === 'users.html') ? ' nav-active' : '';
+    var permActive = (page === 'permissions.html') ? ' nav-active' : '';
 
     // 재고관리 active
     var invLayoutActive = (page === 'inventory_layout.html') ? ' nav-active' : '';
@@ -241,6 +242,7 @@ function initSidebar() {
                 '<div class="cat-body">' +
                     '<a class="nav-link' + masterActive + '" href="master_data.html"><span class="n-icon">🗂️</span>기준정보 관리</a>' +
                     '<a class="nav-link' + usersActive + '" href="users.html"><span class="n-icon">👥</span>사용자 관리</a>' +
+                    '<a class="nav-link' + permActive + '" href="permissions.html"><span class="n-icon">🔐</span>권한 관리</a>' +
                     '<a class="nav-link" href="' + PM + 'audit.html"><span class="n-icon">📋</span>변경 이력</a>' +
                 '</div>' +
             '</div>' +
@@ -254,7 +256,7 @@ function toggleCat(id) {
     document.getElementById(id).classList.toggle('open');
 }
 
-// 모니터/worker/물류기사 계정: 허용 페이지 외 링크 비활성화
+// 권한 기반 메뉴 표시 제어
 function applyAccessRestrictions() {
     try {
         var cached = sessionStorage.getItem('userInfo');
@@ -262,60 +264,79 @@ function applyAccessRestrictions() {
         var u = JSON.parse(cached);
         if (!u) return;
 
+        // 슈퍼관리자: 제한 없음
+        if (u.user_type === 'super') return;
+
+        // 권한 레코드 로드
+        var perms = null;
+        try { perms = JSON.parse(sessionStorage.getItem('userPerms') || 'null'); } catch(e) {}
+
+        var links = document.querySelectorAll('#sidebar-nav a.nav-link, #sidebar-nav a.cat-btn');
+
+        // ── 권한 레코드가 있으면: page_permissions 기반 전면 적용 ──
+        if (perms && (perms.categories || perms.pages) && typeof window.canAccessPage === 'function') {
+            for (var i = 0; i < links.length; i++) {
+                var href = links[i].getAttribute('href') || '';
+                if (href.indexOf('project-moon') !== -1 || href === '#' || href.indexOf('index.html') !== -1) continue;
+                var pageName = href.split('/').pop().split('?')[0].split('#')[0];
+                if (!pageName) continue;
+                if (!window.canAccessPage(u, perms, pageName)) {
+                    disableLink(links[i]);
+                }
+            }
+            return;
+        }
+
+        // ── 권한 레코드가 없으면: 기존 하드코딩 동작 유지 ──
         var isMonitor = (u.process === '모니터');
         var isWorker = (u.user_type === 'worker');
-
-        // 물류기사 판별: 사번 기준 (추가 시 여기에 사번 추가)
         var logisticsIds = ['25120901', '24010201'];
-        var empId = String(u.employee_id || u.id || '');
+        var empId = String(u.emp_code || u.employee_id || u.id || '');
         var isLogistics = false;
         for (var k = 0; k < logisticsIds.length; k++) {
             if (empId === logisticsIds[k]) { isLogistics = true; break; }
         }
 
-        if (!isMonitor && !isWorker && !isLogistics) return;
+        // 경영지원(민감) 페이지는 모든 비권한 사용자에게 기본 차단 (경영지원팀/admin 제외)
+        var mgmtAllowed = (u.user_type === 'admin' && u.department === '경영지원팀');
 
-        // 모니터: 적치대+대시보드만
-        // worker: 적치대+대시보드+공정검사(작성/조회)+작업일지
-        // 물류기사: 재고관리 4개 페이지만
+        if (!isMonitor && !isWorker && !isLogistics) {
+            // 일반 사용자: 경영지원만 기본 보호
+            if (!mgmtAllowed) {
+                for (var m = 0; m < links.length; m++) {
+                    var h2 = links[m].getAttribute('href') || '';
+                    var pn2 = h2.split('/').pop().split('?')[0].split('#')[0];
+                    if (pn2 === 'asset_manage.html') disableLink(links[m]);
+                }
+            }
+            return;
+        }
+
         var allowedPages = [];
         if (isLogistics) {
-            allowedPages = [
-                'inventory_layout.html',
-                'inventory_rack.html',
-                'inventory_io.html',
-                'inventory_viewer.html',
-                'inventory_zone.html'
-            ];
+            allowedPages = ['inventory_layout.html','inventory_rack.html','inventory_io.html','inventory_viewer.html','inventory_zone.html'];
         } else {
             allowedPages = ['mold_layout.html', 'mold_dashboard.html'];
-            if (isWorker) {
-                allowedPages.push('inspection_round.html');
-                allowedPages.push('inspection_round_viewer.html');
-            }
+            if (isWorker) { allowedPages.push('inspection_round.html'); allowedPages.push('inspection_round_viewer.html'); }
         }
 
-        var links = document.querySelectorAll('#sidebar-nav a.nav-link, #sidebar-nav a.cat-btn');
-        for (var i = 0; i < links.length; i++) {
-            var href = links[i].getAttribute('href') || '';
-            var pageName = href.split('/').pop().split('?')[0].split('#')[0];
+        for (var i2 = 0; i2 < links.length; i2++) {
+            var href2 = links[i2].getAttribute('href') || '';
+            var pageName2 = href2.split('/').pop().split('?')[0].split('#')[0];
             var isAllowed = false;
-
-            // 작업일지 바로가기(PM index.html)는 worker에게 허용
-            if (isWorker && href.indexOf('project-moon/index.html') !== -1) {
-                isAllowed = true;
-            }
-
+            if (isWorker && href2.indexOf('project-moon/index.html') !== -1) isAllowed = true;
             for (var j = 0; j < allowedPages.length; j++) {
-                if (pageName === allowedPages[j]) { isAllowed = true; break; }
+                if (pageName2 === allowedPages[j]) { isAllowed = true; break; }
             }
-            if (!isAllowed) {
-                links[i].style.opacity = '0.35';
-                links[i].style.pointerEvents = 'none';
-                links[i].style.cursor = 'default';
-            }
+            if (!isAllowed) disableLink(links[i2]);
         }
     } catch(e) {}
+}
+
+function disableLink(el) {
+    el.style.opacity = '0.35';
+    el.style.pointerEvents = 'none';
+    el.style.cursor = 'default';
 }
 
 document.addEventListener('DOMContentLoaded', function() {
