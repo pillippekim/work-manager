@@ -812,26 +812,37 @@ async function confirmDelete() {
     if (!m) return;
 
     try {
-        // 관련 이력 먼저 삭제 (FK 제약 해소)
-        var tables = [
-            { table: 'mold_cleaning_logs', col: 'mold_id', val: m.id },
-            { table: 'mold_cleaning_logs', col: 'product_code', val: m.product_code },
-            { table: 'mold_damage_logs', col: 'mold_id', val: m.id },
-            { table: 'mold_damage_logs', col: 'product_code', val: m.product_code },
-            { table: 'mold_shot_logs', col: 'mold_id', val: m.id },
-            { table: 'mold_status_logs', col: 'mold_id', val: m.id },
-            { table: 'mold_maintenance', col: 'mold_id', val: m.id }
-        ];
-        for (var i = 0; i < tables.length; i++) {
-            var t = tables[i];
-            if (!t.val) continue;
-            await fetch(SUPABASE_URL + '/rest/v1/' + t.table + '?' + t.col + '=eq.' + t.val, {
+        // 1) 관련 이력 먼저 삭제 (FK 제약은 모두 mold_id 기준)
+        var childTables = ['mold_cleaning_logs', 'mold_damage_logs', 'mold_shot_logs', 'mold_status_logs', 'mold_maintenance'];
+        for (var i = 0; i < childTables.length; i++) {
+            var delRes = await fetch(SUPABASE_URL + '/rest/v1/' + childTables[i] + '?mold_id=eq.' + m.id, {
                 method: 'DELETE', headers: supaHeaders()
             });
+            if (!delRes.ok) {
+                var errTxt = await delRes.text();
+                showToast(childTables[i] + ' 이력 삭제 실패: ' + errTxt, 'error');
+                return;
+            }
         }
 
-        // 금형 삭제
-        await supaDelete('molds', deleteTargetId);
+        // 2) 금형 삭제 + 실제 삭제 검증
+        var moldRes = await fetch(SUPABASE_URL + '/rest/v1/molds?id=eq.' + m.id, {
+            method: 'DELETE', headers: supaHeaders()
+        });
+        if (!moldRes.ok) {
+            var mErr = await moldRes.text();
+            showToast('금형 삭제 실패: ' + mErr, 'error');
+            return;
+        }
+        // 삭제된 행이 실제로 있는지 확인 (return=representation)
+        var deleted = [];
+        try { deleted = await moldRes.json(); } catch(e) { deleted = []; }
+        if (!deleted || deleted.length === 0) {
+            showToast('삭제되지 않았습니다. 다른 곳에서 이 금형을 참조 중일 수 있습니다.', 'error');
+            await loadData();
+            return;
+        }
+
         showToast('금형 및 관련 이력 삭제 완료', 'success');
         closeDeleteModal();
         await loadData();
