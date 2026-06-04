@@ -130,6 +130,7 @@ th.sortable.desc::after { content:'▼'; color:#243bb2; }
     <button class="process-tab" data-process="쇼트" onclick="switchProcess('쇼트')">💥 쇼트</button>
     <button class="process-tab" data-process="성형" onclick="switchProcess('성형')">🏭 성형</button>
     <button class="process-tab" data-process="조립" onclick="switchProcess('조립')">🔩 조립</button>
+    <button class="process-tab" data-process="사상" onclick="switchProcess('사상')">🪚 사상</button>
   </div>
 
   <!-- 필터 -->
@@ -594,7 +595,7 @@ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentProcess = 'all';
 let unifiedView = false;
-let cachedData = { 포장: [], 검사: [], 'CMB': [], 재단: [], 재단점검: [], 도포: [], '2차가류': [], '2차가류점검': [], 쇼트: [] };
+let cachedData = { 포장: [], 검사: [], 'CMB': [], 재단: [], 재단점검: [], 도포: [], '2차가류': [], '2차가류점검': [], 쇼트: [], 사상: [] };
 let PRODUCTS = {};
 let myInfo = null;
 let showDeleted = false;
@@ -1010,6 +1011,16 @@ async function loadData() {
     cachedData.조립 = data || [];
   }
 
+  // 사상
+  if (currentProcess === 'all' || currentProcess === '사상') {
+    let q = db.from('sasang_reports').select('*').gte('work_date', start).lte('work_date', end);
+    if (!showDeleted) q = q.is('deleted_at', null);
+    if (fSabun)  q = q.ilike('sabun', `%${fSabun}%`);
+    if (fWorker) q = q.ilike('worker_name', `%${fWorker}%`);
+    const { data } = await q.order('work_date', { ascending: false });
+    cachedData.사상 = data || [];
+  }
+
   render();
 }
 
@@ -1079,6 +1090,8 @@ function render() {
     renderMoldingTable(cachedData.성형);
   } else if (currentProcess === '조립') {
     renderAssemblyTable(cachedData.조립);
+  } else if (currentProcess === '사상') {
+    renderSasangTable(cachedData.사상);
   }
 }
 
@@ -1093,9 +1106,10 @@ function renderStats() {
   const shot = cachedData.쇼트 || [];
   const mold = cachedData.성형 || [];
   const asm = cachedData.조립 || [];
+  const sas = cachedData.사상 || [];
 
   if (currentProcess === 'all') {
-    const totalCount = pkg.length + ins.length + cmb.length + cut.length + coat.length + pc.length + shot.length + mold.length + asm.length;
+    const totalCount = pkg.length + ins.length + cmb.length + cut.length + coat.length + pc.length + shot.length + mold.length + asm.length + sas.length;
     const totalQty = pkg.reduce((s,r)=>s+(r.quantity||0),0);
     const totalInspect = ins.reduce((s,r)=>s+(r.inspect_qty||0),0);
     const totalCmbWeight = cmb.filter(r => !r.is_remix).reduce((s,r)=>s+(parseFloat(r.weight)||0),0);
@@ -1310,6 +1324,16 @@ function renderStats() {
       <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-label">총 불량수량</div><div class="stat-num" style="color:#dc2626">${totalDefect.toLocaleString()} <span class="stat-unit">EA</span></div></div>
       <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">작업자 수</div><div class="stat-num orange">${workers} <span class="stat-unit">명</span></div></div>
     `;
+  } else if (currentProcess === '사상') {
+    const totalQty = sas.reduce((s,r)=>s+(r.production_qty||0),0);
+    const totalDefect = sas.reduce((s,r)=>s+(r.defect_qty||0),0);
+    const workers = new Set(sas.map(r=>r.worker_name).filter(Boolean)).size;
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">사상 건수</div><div class="stat-num blue">${sas.length} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🪚</div><div class="stat-label">총 사상수량</div><div class="stat-num green">${totalQty.toLocaleString()} <span class="stat-unit">EA</span></div></div>
+      <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-label">총 불량수량</div><div class="stat-num" style="color:#dc2626">${totalDefect.toLocaleString()} <span class="stat-unit">EA</span></div></div>
+      <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">작업자 수</div><div class="stat-num orange">${workers} <span class="stat-unit">명</span></div></div>
+    `;
   }
 }
 
@@ -1323,6 +1347,7 @@ function renderAllSections() {
   const shot = cachedData.쇼트 || [];
   const mold = cachedData.성형 || [];
   const asm = cachedData.조립 || [];
+  const sas = cachedData.사상 || [];
   const html = `
     <div class="process-section">
       <div class="section-header">
@@ -1440,6 +1465,20 @@ function renderAllSections() {
               return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.sabun||'-'} · ${r.worker_name||'-'}</span><span style="color:#243bb2;font-weight:500">${(r.production_qty||0).toLocaleString()} EA</span></div>`;
             }).join('')
           + (asm.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('조립')">전체 ${asm.length}건 보기 →</button></div>` : '')}
+      </div>
+    </div>
+    <div class="process-section">
+      <div class="section-header">
+        <span class="section-title">🪚 사상 작업일지</span>
+        <span class="section-count">${sas.length}건</span>
+      </div>
+      <div class="section-card">
+        ${sas.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
+          : sas.slice(0, 5).map(r => {
+              const tag = r.work_method === '자동사상' ? '⚙️자동' : '✋수사상';
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${tag} · ${r.sabun||'-'} · ${r.worker_name||'-'}</span><span style="color:#243bb2;font-weight:500">${(r.production_qty||0).toLocaleString()} EA</span></div>`;
+            }).join('')
+          + (sas.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('사상')">전체 ${sas.length}건 보기 →</button></div>` : '')}
       </div>
     </div>
   `;
@@ -2467,6 +2506,43 @@ async function deleteAssembly(id) {
   alert('삭제 완료!'); loadData();
 }
 
+// ── 사상 작업일지 ──────────────────────────────
+function renderSasangTable(data) {
+  if (!data.length) { document.getElementById('resultArea').innerHTML = '<div class="card"><div style="padding:2rem;text-align:center;color:#aaa;font-size:13px">데이터가 없어요.</div></div>'; return; }
+  data = applySortIfNeeded(data);
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card" style="padding:0"><div class="table-wrap"><table><thead><tr>
+      <th>NO</th>${makeSortTh('작업일','work_date')}${makeSortTh('근무','shift_type')}${makeSortTh('설비','equipment_no')}${makeSortTh('사번','sabun')}${makeSortTh('제품명','product_name')}
+      ${makeSortTh('방식','work_method')}${makeSortTh('성형LOT','lot_no')}${makeSortTh('사상수량','production_qty','style="text-align:right"')}${makeSortTh('불량','defect_qty','style="text-align:right"')}
+      ${makeSortTh('작업자','worker_name')}<th>비고</th>${makeSortTh('제출일시','created_at')}<th>작업</th>
+    </tr></thead><tbody>
+    ${data.map((r,i) => {
+      const del = r.deleted_at;
+      const st = del ? 'background:#f9f9f9;opacity:0.5;text-decoration:line-through' : '';
+      const methodColor = r.work_method === '수사상' ? 'background:#fef3c7;color:#92400e' : 'background:#dbeafe;color:#1e40af';
+      return `<tr style="${st}">
+        <td>${i+1}</td><td>${r.work_date||''}</td><td>${r.shift_type||''}</td>
+        <td style="font-size:11px">${r.equipment_no||''}</td>
+        <td>${r.sabun||''}</td><td style="font-size:11px">${r.product_name||''}</td>
+        <td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;${methodColor}">${r.work_method||''}</span></td>
+        <td style="font-size:11px;font-family:monospace;color:#ca8a04">${r.lot_no||'-'}</td>
+        <td style="text-align:right;font-weight:600">${(r.production_qty||0).toLocaleString()}</td>
+        <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${r.defect_qty||0}</td>
+        <td style="min-width:80px">${r.worker_name||''}</td><td style="font-size:11px">${r.note||''}</td>
+        <td style="font-size:11px;color:#999">${fmtDatetime(r.created_at)}</td>
+        <td>${del ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : (() => { const canEdit = canEditDelete(r); const reason = canEdit ? '' : getCannotEditReason(r); return `<div class="row-actions"><button class="btn-row btn-row-del" ${canEdit ? `onclick="deleteSasang('${r.id}')">삭제` : `disabled title="${reason}">삭제`}</button></div>`; })()}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table></div></div>`;
+}
+
+async function deleteSasang(id) {
+  if (!confirm('이 기록을 삭제할까요?')) return;
+  await db.from('sasang_reports').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  try { await db.from('audit_logs').insert({ table_name:'sasang_reports', record_id:id, action:'DELETE', performed_by:currentUser?.name||'-', performed_at:new Date().toISOString() }); } catch(e){}
+  alert('삭제 완료!'); loadData();
+}
+
 // ── 엑셀 다운로드 ──────────────────────────────
 function downloadExcel() {
   const wb = XLSX.utils.book_new();
@@ -2795,6 +2871,25 @@ function downloadExcel() {
     }));
     const ws = XLSX.utils.json_to_sheet(asmRows);
     XLSX.utils.book_append_sheet(wb, ws, '조립 작업일지');
+    added++;
+  }
+
+  if ((currentProcess === 'all' || currentProcess === '사상') && (cachedData.사상||[]).length > 0) {
+    const sasRows = cachedData.사상.filter(r => !r.deleted_at).map(r => ({
+      '작업일': r.work_date,
+      '근무': r.shift_type || '',
+      '설비': r.equipment_no || '',
+      '사번': r.sabun || '',
+      '제품명': r.product_name || '',
+      '작업방식': r.work_method || '',
+      '성형LOT': r.lot_no || '',
+      '사상수량': r.production_qty || 0,
+      '불량수량': r.defect_qty || 0,
+      '작업자': r.worker_name || '',
+      '비고': r.note || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(sasRows);
+    XLSX.utils.book_append_sheet(wb, ws, '사상 작업일지');
     added++;
   }
 
