@@ -166,6 +166,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 .n-btn-edit{background:#fef3c7;color:#92400e;}.n-btn-edit:hover{background:#fde68a;}
 .n-btn-del{background:#fee2e2;color:#991b1b;}.n-btn-del:hover{background:#fecaca;}
 .n-btn-detail{background:#e0e7ff;color:#3730a3;}.n-btn-detail:hover{background:#c7d2fe;}
+.n-target{font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;margin-left:6px;flex-shrink:0;}
+.n-target-office{background:#dbeafe;color:#1e40af;}
+.n-target-field{background:#dcfce7;color:#166534;}
 .n-pinned{color:#f59e0b;font-size:10px;flex-shrink:0;}
 
 /* 공지 모달 */
@@ -411,6 +414,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
                 <select id="nPriority"><option value="normal">보통</option><option value="high">높음</option></select>
             </div>
         </div>
+        <div class="fm-group"><label>전파 대상</label>
+            <select id="nTarget"><option value="all">전체 (관리직+현장직)</option><option value="office">관리직만</option><option value="field">현장직만</option></select>
+        </div>
         <div class="fm-group" style="display:flex;align-items:center;gap:8px;">
             <input type="checkbox" id="nPinned" style="width:auto;"><label for="nPinned" style="margin:0;cursor:pointer;">상단 고정 (📌)</label>
         </div>
@@ -574,6 +580,9 @@ function noticeItemHtml(n, isAdmin) {
     var diffDays = Math.floor((now - created) / (1000 * 60 * 60 * 24));
     var newBadge = diffDays <= 3 ? '<span class="nb">NEW</span>' : '';
     var pinBadge = n.is_pinned ? '<span class="n-pinned">📌</span>' : '';
+    var targetBadge = '';
+    if (n.target === 'office') targetBadge = '<span class="n-target n-target-office">관리직</span>';
+    else if (n.target === 'field') targetBadge = '<span class="n-target n-target-field">현장직</span>';
     var dateStr = String(created.getMonth() + 1).padStart(2, '0') + '.' + String(created.getDate()).padStart(2, '0');
     var actionsHtml = '<button class="n-btn-detail" onclick="viewNotice(' + n.id + ')">자세히</button>';
     if (isAdmin) {
@@ -584,6 +593,7 @@ function noticeItemHtml(n, isAdmin) {
         + '<div class="nd ' + dotClass + '"></div>'
         + pinBadge
         + '<div class="nt" onclick="viewNotice(' + n.id + ')" style="cursor:pointer;">' + (n.title || '') + '</div>'
+        + targetBadge
         + newBadge
         + '<div class="ndate">' + dateStr + '</div>'
         + '<div class="n-actions">' + actionsHtml + '</div>'
@@ -592,7 +602,7 @@ function noticeItemHtml(n, isAdmin) {
 
 async function loadNotices() {
     try {
-        var r = await fetch(SB + '/rest/v1/notices?order=is_pinned.desc,created_at.desc&limit=50', { headers: H });
+        var r = await fetch(SB + '/rest/v1/notices?target=in.(all,office)&order=is_pinned.desc,created_at.desc&limit=50', { headers: H });
         var notices = await r.json();
         if (!Array.isArray(notices) || notices.length === 0) {
             document.getElementById('noticeList').innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px;">등록된 공지사항이 없습니다</div>';
@@ -653,6 +663,7 @@ function openNoticeModal() {
     document.getElementById('nContent').value = '';
     document.getElementById('nCategory').value = 'general';
     document.getElementById('nPriority').value = 'normal';
+    document.getElementById('nTarget').value = 'all';
     document.getElementById('nPinned').checked = false;
     document.getElementById('noticeModal').classList.add('show');
 }
@@ -670,6 +681,7 @@ async function editNotice(id) {
         document.getElementById('nContent').value = n.content || '';
         document.getElementById('nCategory').value = n.category || 'general';
         document.getElementById('nPriority').value = n.priority || 'normal';
+        document.getElementById('nTarget').value = n.target || 'all';
         document.getElementById('nPinned').checked = !!n.is_pinned;
         document.getElementById('noticeModal').classList.add('show');
     } catch(e) { alert('공지 정보를 불러올 수 없습니다.'); }
@@ -683,6 +695,7 @@ async function submitNotice() {
         content: document.getElementById('nContent').value.trim() || null,
         category: document.getElementById('nCategory').value,
         priority: document.getElementById('nPriority').value,
+        target: document.getElementById('nTarget').value,
         is_pinned: document.getElementById('nPinned').checked,
         created_by: _currentUser ? _currentUser.name : null,
         updated_at: new Date().toISOString()
