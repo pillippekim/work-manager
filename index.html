@@ -95,25 +95,25 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 .right-content{padding:24px 28px;}
 
 /* 즐겨찾기 */
-.fav-section{margin-bottom:24px;}
-.sec-label{font-size:15px;font-weight:700;color:#1e293b;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.fav-section{margin-bottom:18px;}
+.sec-label{font-size:15px;font-weight:700;color:#1e293b;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
 .fav-edit-btn{margin-left:auto;font-size:11px;color:#94a3b8;cursor:pointer;padding:4px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;font-family:inherit;font-weight:500;transition:all 0.15s;}
 .fav-edit-btn:hover{background:#f1f5f9;color:#243bb2;border-color:#c7ceff;}
-.fav-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;}
-.fav-card{background:#fff;border-radius:14px;padding:20px 14px;text-align:center;text-decoration:none;color:#334155;border:1px solid #e8ecf3;transition:all 0.18s;cursor:pointer;position:relative;}
+.fav-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;}
+.fav-card{background:#fff;border-radius:12px;padding:12px 8px;text-align:center;text-decoration:none;color:#334155;border:1px solid #e8ecf3;transition:all 0.18s;cursor:pointer;position:relative;}
 .fav-card:hover{transform:translateY(-4px);box-shadow:0 10px 28px rgba(0,0,0,0.08);border-color:#c7ceff;color:#243bb2;}
-.fav-card .fi{font-size:30px;margin-bottom:10px;}
-.fav-card .fn{font-size:13px;font-weight:600;}
+.fav-card .fi{font-size:22px;margin-bottom:5px;}
+.fav-card .fn{font-size:12px;font-weight:600;}
 .fav-card .fav-del{display:none;position:absolute;top:6px;right:8px;width:22px;height:22px;border-radius:50%;background:#ef4444;color:#fff;border:none;cursor:pointer;font-size:13px;line-height:22px;text-align:center;font-weight:700;}
 .fav-card .fav-del:hover{background:#dc2626;}
 .fav-grid.editing .fav-card{animation:shake 0.3s ease-in-out infinite alternate;}
 .fav-grid.editing .fav-card .fav-del{display:block;}
 .fav-grid.editing .fav-card:hover{transform:none;box-shadow:none;}
 @keyframes shake{0%{transform:rotate(-0.5deg);}100%{transform:rotate(0.5deg);}}
-.fav-add-card{background:#f8fafc;border:2px dashed #cbd5e1;border-radius:14px;padding:20px 14px;text-align:center;cursor:pointer;transition:all 0.15s;display:none;color:#94a3b8;}
+.fav-add-card{background:#f8fafc;border:2px dashed #cbd5e1;border-radius:12px;padding:12px 8px;text-align:center;cursor:pointer;transition:all 0.15s;display:none;color:#94a3b8;}
 .fav-add-card:hover{border-color:#243bb2;color:#243bb2;background:#f0f4ff;}
-.fav-add-card .fi{font-size:28px;margin-bottom:8px;}
-.fav-add-card .fn{font-size:12px;font-weight:600;}
+.fav-add-card .fi{font-size:20px;margin-bottom:4px;}
+.fav-add-card .fn{font-size:11px;font-weight:600;}
 .fav-grid.editing .fav-add-card{display:block;}
 
 /* 모달 */
@@ -165,6 +165,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 .n-actions button{border:none;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:500;}
 .n-btn-edit{background:#fef3c7;color:#92400e;}.n-btn-edit:hover{background:#fde68a;}
 .n-btn-del{background:#fee2e2;color:#991b1b;}.n-btn-del:hover{background:#fecaca;}
+.n-btn-detail{background:#e0e7ff;color:#3730a3;}.n-btn-detail:hover{background:#c7d2fe;}
 .n-pinned{color:#f59e0b;font-size:10px;flex-shrink:0;}
 
 /* 공지 모달 */
@@ -233,6 +234,15 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 <!-- ═══ 좌측 메뉴 (헤더 아래) ═══ -->
 <div class="left-menu">
     <div class="menu-scroll">
+        <!-- 0. 공지사항 (최상단) -->
+        <div class="menu-group">
+            <div class="cat-item">
+                <a class="cat-btn" href="#noticeSection" onclick="scrollToNotice(event)" style="text-decoration:none;color:inherit;">
+                    <span class="c-icon">📢</span><span class="c-label">공지사항</span><span class="c-badge on">NEW</span>
+                </a>
+            </div>
+        </div>
+        <div class="menu-divider"></div>
         <!-- 1. 업무관리 -->
         <div class="menu-group">
             <div class="menu-group-title">업무관리</div>
@@ -351,6 +361,18 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
             <div class="sec-label">⭐ 즐겨찾기 <button class="fav-edit-btn" id="favEditBtn" onclick="toggleFavEdit()">편집</button></div>
             <div class="fav-grid" id="favGrid"></div>
         </div>
+        <div class="notice-section" id="noticeSection">
+            <div class="notice-w">
+                <div class="notice-wh">
+                    <div class="notice-wt">📢 공지사항</div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <button class="notice-add-btn" id="noticeAddBtn" style="display:none;" onclick="openNoticeModal()">+ 공지 작성</button>
+                        <a href="#" id="noticeMoreBtn" onclick="openAllNotices(event)" style="display:none;font-size:12px;color:#243bb2;font-weight:600;text-decoration:none;">전체 보기 →</a>
+                    </div>
+                </div>
+                <div class="notice-wb" id="noticeList"><div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">불러오는 중...</div></div>
+            </div>
+        </div>
         <div class="alarm-section">
             <div class="sec-label">🔔 주요 현황</div>
             <div class="alarm-grid">
@@ -362,15 +384,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
                     <div class="alarm-wh"><div class="alarm-wt">📝 오늘 작업일지</div><a class="alarm-wmore" href="https://pillippekim.github.io/project-moon/index.html">자세히 →</a></div>
                     <div class="alarm-wb" id="reportAlarm"><div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">불러오는 중...</div></div>
                 </div>
-            </div>
-        </div>
-        <div class="notice-section">
-            <div class="notice-w">
-                <div class="notice-wh">
-                    <div class="notice-wt">📢 공지사항</div>
-                    <button class="notice-add-btn" id="noticeAddBtn" style="display:none;" onclick="openNoticeModal()">+ 공지 작성</button>
-                </div>
-                <div class="notice-wb" id="noticeList"><div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">불러오는 중...</div></div>
             </div>
         </div>
     </div>
@@ -403,6 +416,23 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
         </div>
         <input type="hidden" id="nEditId" value="">
         <button class="fm-submit" onclick="submitNotice()">저장</button>
+    </div>
+</div>
+
+<!-- 공지 상세 보기 모달 -->
+<div class="notice-modal-overlay" id="noticeDetailModal">
+    <div class="notice-modal">
+        <h3><span id="ndTitle">공지 제목</span><button class="fm-close" onclick="closeNoticeDetail()">&#10005;</button></h3>
+        <div id="ndDate" style="font-size:12px;color:#94a3b8;margin-bottom:12px;">-</div>
+        <div id="ndContent" style="font-size:14px;color:#334155;line-height:1.7;white-space:pre-wrap;min-height:60px;">-</div>
+    </div>
+</div>
+
+<!-- 전체 공지 보기 모달 -->
+<div class="notice-modal-overlay" id="allNoticeModal">
+    <div class="notice-modal" style="max-width:620px;">
+        <h3><span>📢 전체 공지사항</span><button class="fm-close" onclick="closeAllNotices()">&#10005;</button></h3>
+        <div class="notice-wb" id="allNoticeList" style="max-height:60vh;overflow-y:auto;"></div>
     </div>
 </div>
 
@@ -525,6 +555,7 @@ loadMoldAlarm();loadReportAlarm();loadNotices();
 
 /* ===== 공지사항 DB 연동 ===== */
 var _currentUser = null;
+var _allNotices = [];
 // 로그인 사용자 정보 가져오기 (캐시)
 try { _currentUser = JSON.parse(sessionStorage.getItem('userInfo')); } catch(e) {}
 
@@ -534,58 +565,86 @@ if (_currentUser && (_currentUser.user_type === 'super' || _currentUser.user_typ
     if (addBtn) addBtn.style.display = '';
 }
 
+function noticeItemHtml(n, isAdmin) {
+    var now = new Date();
+    var dotClass = 'gray';
+    if (n.priority === 'high') dotClass = 'red';
+    else if (n.category === 'update' || n.category === 'system') dotClass = 'blue';
+    var created = new Date(n.created_at);
+    var diffDays = Math.floor((now - created) / (1000 * 60 * 60 * 24));
+    var newBadge = diffDays <= 3 ? '<span class="nb">NEW</span>' : '';
+    var pinBadge = n.is_pinned ? '<span class="n-pinned">📌</span>' : '';
+    var dateStr = String(created.getMonth() + 1).padStart(2, '0') + '.' + String(created.getDate()).padStart(2, '0');
+    var actionsHtml = '<button class="n-btn-detail" onclick="viewNotice(' + n.id + ')">자세히</button>';
+    if (isAdmin) {
+        actionsHtml += '<button class="n-btn-edit" onclick="editNotice(' + n.id + ')">수정</button>'
+            + '<button class="n-btn-del" onclick="deleteNotice(' + n.id + ')">삭제</button>';
+    }
+    return '<div class="n-item">'
+        + '<div class="nd ' + dotClass + '"></div>'
+        + pinBadge
+        + '<div class="nt" onclick="viewNotice(' + n.id + ')" style="cursor:pointer;">' + (n.title || '') + '</div>'
+        + newBadge
+        + '<div class="ndate">' + dateStr + '</div>'
+        + '<div class="n-actions">' + actionsHtml + '</div>'
+        + '</div>';
+}
+
 async function loadNotices() {
     try {
-        var r = await fetch(SB + '/rest/v1/notices?order=is_pinned.desc,created_at.desc&limit=20', { headers: H });
+        var r = await fetch(SB + '/rest/v1/notices?order=is_pinned.desc,created_at.desc&limit=50', { headers: H });
         var notices = await r.json();
         if (!Array.isArray(notices) || notices.length === 0) {
             document.getElementById('noticeList').innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px;">등록된 공지사항이 없습니다</div>';
             return;
         }
-        var now = new Date();
+        _allNotices = notices;
         var isAdmin = _currentUser && (_currentUser.user_type === 'super' || _currentUser.user_type === 'admin');
+
+        // 대시보드에는 최대 5개만 표시
+        var shown = notices.slice(0, 5);
         var html = '';
-        for (var i = 0; i < notices.length; i++) {
-            var n = notices[i];
-            var dotClass = 'gray';
-            if (n.priority === 'high') dotClass = 'red';
-            else if (n.category === 'update') dotClass = 'blue';
-            else if (n.category === 'system') dotClass = 'blue';
-
-            // NEW 뱃지: 3일 이내
-            var created = new Date(n.created_at);
-            var diffDays = Math.floor((now - created) / (1000 * 60 * 60 * 24));
-            var newBadge = diffDays <= 3 ? '<span class="nb">NEW</span>' : '';
-
-            // 고정 표시
-            var pinBadge = n.is_pinned ? '<span class="n-pinned">📌</span>' : '';
-
-            // 날짜 표시
-            var dateStr = String(created.getMonth() + 1).padStart(2, '0') + '.' + String(created.getDate()).padStart(2, '0');
-
-            // 관리 버튼 (admin만)
-            var actionsHtml = '';
-            if (isAdmin) {
-                actionsHtml = '<div class="n-actions">'
-                    + '<button class="n-btn-edit" onclick="editNotice(' + n.id + ')">수정</button>'
-                    + '<button class="n-btn-del" onclick="deleteNotice(' + n.id + ')">삭제</button>'
-                    + '</div>';
-            }
-
-            html += '<div class="n-item">'
-                + '<div class="nd ' + dotClass + '"></div>'
-                + pinBadge
-                + '<div class="nt">' + (n.title || '') + '</div>'
-                + newBadge
-                + '<div class="ndate">' + dateStr + '</div>'
-                + actionsHtml
-                + '</div>';
-        }
+        for (var i = 0; i < shown.length; i++) { html += noticeItemHtml(shown[i], isAdmin); }
         document.getElementById('noticeList').innerHTML = html;
+
+        // 5개 초과 시 "전체 보기" 버튼 표시
+        var moreBtn = document.getElementById('noticeMoreBtn');
+        if (moreBtn) moreBtn.style.display = notices.length > 5 ? '' : 'none';
     } catch(e) {
         document.getElementById('noticeList').innerHTML = '<div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">공지사항을 불러올 수 없습니다</div>';
     }
 }
+
+// 사이드바 공지사항 클릭 → 공지 영역으로 스크롤
+function scrollToNotice(e) {
+    e.preventDefault();
+    var el = document.getElementById('noticeSection');
+    if (el) el.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+// 공지 상세 보기
+function viewNotice(id) {
+    var n = _allNotices.find(function(x){ return x.id === id; });
+    if (!n) return;
+    var created = new Date(n.created_at);
+    var dateStr = created.getFullYear() + '.' + String(created.getMonth()+1).padStart(2,'0') + '.' + String(created.getDate()).padStart(2,'0');
+    document.getElementById('ndTitle').textContent = n.title || '';
+    document.getElementById('ndDate').textContent = dateStr;
+    document.getElementById('ndContent').textContent = n.content || '(내용 없음)';
+    document.getElementById('noticeDetailModal').classList.add('show');
+}
+function closeNoticeDetail() { document.getElementById('noticeDetailModal').classList.remove('show'); }
+
+// 전체 공지 보기
+function openAllNotices(e) {
+    if (e) e.preventDefault();
+    var isAdmin = _currentUser && (_currentUser.user_type === 'super' || _currentUser.user_type === 'admin');
+    var html = '';
+    for (var i = 0; i < _allNotices.length; i++) { html += noticeItemHtml(_allNotices[i], isAdmin); }
+    document.getElementById('allNoticeList').innerHTML = html || '<div style="text-align:center;padding:20px;color:#94a3b8;">공지사항이 없습니다</div>';
+    document.getElementById('allNoticeModal').classList.add('show');
+}
+function closeAllNotices() { document.getElementById('allNoticeModal').classList.remove('show'); }
 
 function openNoticeModal() {
     document.getElementById('noticeModalTitle').textContent = '공지 작성';
