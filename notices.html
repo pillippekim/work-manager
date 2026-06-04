@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>공지사항 - HKHT</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="common.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth_guard.js"></script>
+<style>
+/* ── notices 고유 스타일 ── */
+.container { max-width: 100% !important; margin: 0 !important; padding: 16px 20px !important; }
+.btn-save { font-size: 13px; padding: 8px 18px; border-radius: 8px; background: #243bb2; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
+.btn-save:hover { background: #1e32a0; }
+.btn-cancel-form { font-size: 13px; padding: 8px 14px; border-radius: 8px; background: transparent; color: #888; border: 1px solid #ddd; cursor: pointer; font-family: inherit; }
+
+/* 글쓰기 폼 */
+.form-textarea { width: 100%; min-height: 140px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 13px; resize: vertical; box-sizing: border-box; line-height: 1.6; }
+.form-textarea:focus { outline: none; border-color: #243bb2; }
+.pin-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #555; cursor: pointer; user-select: none; }
+.pin-check input { width: 16px; height: 16px; cursor: pointer; }
+
+/* 분류 뱃지 */
+.cat-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 10px; }
+.notice-title-link { color: #1f2937; font-weight: 500; cursor: pointer; }
+.notice-title-link:hover { color: #243bb2; text-decoration: underline; }
+.pin-mark { color: #d97706; margin-right: 4px; }
+
+/* ── 정렬 가능한 표 제목 ── */
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; transition: background .12s; }
+th.sortable:hover { background: #eef1fb; }
+th.sortable .sort-ind { font-size: 10px; margin-left: 4px; color: #c2c7d0; }
+th.sortable.sorted { color: #243bb2; }
+th.sortable.sorted .sort-ind { color: #243bb2; font-size: 11px; }
+
+/* ── 작업 아이콘 버튼 (수정/삭제) ── */
+.act-cell { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+.icon-btn {
+  width: 30px; height: 30px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid #e5e7eb; border-radius: 8px; background: #fff;
+  font-size: 14px; line-height: 1; cursor: pointer;
+  transition: transform .12s, box-shadow .12s, background .12s, border-color .12s;
+}
+.icon-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,.10); }
+.icon-btn.edit:hover { background: #fff7ed; border-color: #fdba74; }
+.icon-btn.del:hover  { background: #fef2f2; border-color: #fca5a5; }
+.icon-btn:active { transform: translateY(0); }
+
+/* 보기 모달 본문 */
+.view-meta { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 12px; color: #888; margin: 6px 0 14px; }
+.view-content { font-size: 14px; line-height: 1.8; color: #333; white-space: normal; max-height: 50vh; overflow-y: auto; padding-top: 4px; border-top: 1px solid #eee; }
+.view-attach { margin-top: 16px; }
+.view-attach a { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #243bb2; text-decoration: none; border: 1px solid #d6dcf5; background: #f5f7ff; padding: 7px 12px; border-radius: 8px; }
+.view-attach a:hover { background: #eef1fb; }
+.modal-box.wide { max-width: 640px; width: 92%; }
+</style>
+</head>
+<body>
+
+<!-- 권한 체크 로딩 화면 -->
+<div id="authCheckOverlay" style="position:fixed;inset:0;background:#f1f3f9;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="width:36px;height:36px;border:3px solid #e5e5e5;border-top-color:#243bb2;border-radius:50%;animation:authSpin 0.8s linear infinite"></div>
+  <div style="font-size:13px;color:#888;font-family:inherit">권한 확인 중...</div>
+  <style>@keyframes authSpin { to { transform: rotate(360deg); } }</style>
+</div>
+
+<!-- WM 레이아웃 -->
+<div id="top-header" class="top-header"></div>
+<nav id="sidebar-nav" class="sidebar"></nav>
+
+<div class="main">
+
+  <!-- 페이지 헤더 -->
+  <div class="page-header">
+    <div class="header-row">
+      <div>
+        <h1>📢 공지사항</h1>
+        <div class="sub">과거 공지 아카이브 · 작성 / 수정 / 삭제</div>
+      </div>
+    </div>
+  </div>
+
+<div class="container">
+
+  <div class="section active" id="section_notice">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">📢 공지 목록</div>
+          <div class="card-sub">최신 공지가 위로 정렬돼요. 📌 표시는 상단 고정 공지입니다.</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn-add" id="writeBtn" onclick="toggleForm()">+ 공지 작성</button>
+        </div>
+      </div>
+
+      <!-- 검색 / 분류 필터 -->
+      <div class="search-bar">
+        <input class="search-input" id="searchNotice" placeholder="🔍 제목, 내용, 작성자 검색" oninput="filterNotices()" />
+        <select class="form-select" id="filterCategory" onchange="filterNotices()" style="width:140px;">
+          <option value="">전체 분류</option>
+          <option value="일반">일반</option>
+          <option value="안전">안전</option>
+          <option value="품질">품질</option>
+          <option value="설비">설비</option>
+          <option value="생산">생산</option>
+          <option value="인사">인사</option>
+          <option value="기타">기타</option>
+        </select>
+      </div>
+
+      <!-- 작성 / 수정 폼 -->
+      <div class="form-row" id="form_notice">
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div class="form-group">
+            <span class="form-label">분류 *</span>
+            <select class="form-select" id="n_category">
+              <option value="일반">일반</option>
+              <option value="안전">안전</option>
+              <option value="품질">품질</option>
+              <option value="설비">설비</option>
+              <option value="생산">생산</option>
+              <option value="인사">인사</option>
+              <option value="기타">기타</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <span class="form-label">작성자</span>
+            <input class="form-input" id="n_author" placeholder="예: 홍길동" />
+          </div>
+          <div class="form-group" style="justify-content:flex-end;">
+            <label class="pin-check"><input type="checkbox" id="n_pinned" /> 📌 상단 고정</label>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:10px">
+          <span class="form-label">제목 *</span>
+          <input class="form-input" id="n_title" placeholder="공지 제목을 입력하세요" />
+        </div>
+        <div class="form-group" style="margin-top:10px">
+          <span class="form-label">내용</span>
+          <textarea class="form-textarea" id="n_content" placeholder="공지 내용을 입력하세요. 줄바꿈도 그대로 저장돼요."></textarea>
+        </div>
+        <div class="form-group" style="margin-top:10px">
+          <span class="form-label">첨부 링크 (선택)</span>
+          <input class="form-input" id="n_attach" placeholder="예: https://drive.google.com/... (파일 공유 링크)" />
+        </div>
+        <div class="form-actions" style="margin-top:12px">
+          <button class="btn-cancel-form" id="noticeCancelBtn" onclick="cancelEdit()" style="display:none">수정 취소</button>
+          <button class="btn-cancel-form" onclick="toggleForm()">닫기</button>
+          <button class="btn-save" id="noticeSaveBtn" onclick="saveNotice()">등록</button>
+        </div>
+      </div>
+
+      <!-- 목록 -->
+      <div class="table-scroll-wrap">
+        <table>
+          <thead><tr>
+            <th class="sortable" data-table="notice" data-key="category" onclick="sortBy('category')" style="width:90px">분류<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="notice" data-key="title" onclick="sortBy('title')">제목<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="notice" data-key="author" onclick="sortBy('author')" style="width:120px">작성자<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="notice" data-key="created_at" onclick="sortBy('created_at')" style="width:120px">작성일<span class="sort-ind"></span></th>
+            <th id="actHead" style="width:90px"></th>
+          </tr></thead>
+          <tbody id="noticeTable"></tbody>
+        </table>
+      </div>
+      <div class="show-more-row" id="noticeMoreRow" style="display:none">
+        <button class="btn-show-more" id="noticeMoreBtn" onclick="toggleShowAll()"></button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- container -->
+</div><!-- main -->
+
+<!-- 공지 보기 모달 -->
+<div class="modal-overlay" id="viewModal">
+  <div class="modal-box wide">
+    <div class="modal-title" id="vm_title">제목</div>
+    <div class="view-meta" id="vm_meta"></div>
+    <div class="view-content" id="vm_content"></div>
+    <div class="view-attach" id="vm_attach"></div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal('viewModal')">닫기</button>
+      <button class="btn-modal-save" id="vm_editBtn" onclick="editFromView()">✏️ 수정</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── 권한 체크 ──
+var currentUser = null;
+var canEdit = false;
+(async function() {
+  var user = await checkAuth();
+  if (!user) return;
+  currentUser = user;
+  document.getElementById('authCheckOverlay').style.display = 'none';
+  // 공지는 누구나 볼 수 있고, 작성/수정/삭제는 관리자(작업자 외)만
+  canEdit = (user.user_type !== 'worker');
+  if (!canEdit) {
+    document.getElementById('writeBtn').style.display = 'none';
+    document.getElementById('actHead').style.display = 'none';
+  }
+  loadNotices();
+})();
+
+// ── Supabase (master_data와 동일) ──
+var SU = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+var SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+var db = window.supabase.createClient(SU, SK);
+
+var allNotices = [];
+var showAllNotice = false;
+var editingId = null;
+var viewingId = null;
+var PAGE_SIZE = 20;
+
+function esc(s) {
+  return (s == null ? '' : String(s))
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function fmtDate(str) { return str ? str.slice(0, 10) : '-'; }
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2500);
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function catStyle(cat) {
+  switch (cat) {
+    case '안전': return 'background:#fef2f2;color:#dc2626';
+    case '품질': return 'background:#eff6ff;color:#1e40af';
+    case '설비': return 'background:#f0fdf4;color:#15803d';
+    case '생산': return 'background:#fff7ed;color:#c2410c';
+    case '인사': return 'background:#faf5ff;color:#7e22ce';
+    case '기타': return 'background:#f3f4f6;color:#555';
+    default:    return 'background:#eef1fb;color:#243bb2'; // 일반
+  }
+}
+
+// ── 불러오기 ──
+async function loadNotices() {
+  var result = await db.from('notices')
+    .select('*')
+    .order('is_pinned', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (result.error) {
+    document.getElementById('noticeTable').innerHTML =
+      '<tr class="empty-row"><td colspan="5">로드 실패: ' + esc(result.error.message) +
+      '<br><span style="font-size:12px;color:#999">notices 테이블이 아직 없을 수 있어요. 함께 드린 SQL을 Supabase에서 먼저 실행해주세요.</span></td></tr>';
+    return;
+  }
+  allNotices = result.data || [];
+  renderNotices(allNotices);
+}
+
+function filterNotices() {
+  var q = document.getElementById('searchNotice').value.trim().toLowerCase();
+  var cat = document.getElementById('filterCategory').value;
+  var filtered = allNotices;
+  if (cat) filtered = filtered.filter(function(r) { return r.category === cat; });
+  if (q) {
+    filtered = filtered.filter(function(r) {
+      return (r.title || '').toLowerCase().indexOf(q) !== -1 ||
+        (r.content || '').toLowerCase().indexOf(q) !== -1 ||
+        (r.author || '').toLowerCase().indexOf(q) !== -1;
+    });
+  }
+  renderNotices(filtered, true);
+}
+
+function renderNotices(data, isSearch) {
+  data = applySort(data);
+  var tbody = document.getElementById('noticeTable');
+  var moreRow = document.getElementById('noticeMoreRow');
+  var moreBtn = document.getElementById('noticeMoreBtn');
+
+  if (!data.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">등록된 공지가 없어요.</td></tr>';
+    moreRow.style.display = 'none';
+    return;
+  }
+
+  var showAll = isSearch || showAllNotice;
+  var displayed = showAll ? data : data.slice(0, PAGE_SIZE);
+  var html = '';
+  for (var i = 0; i < displayed.length; i++) {
+    var r = displayed[i];
+    var pin = r.is_pinned ? '<span class="pin-mark">📌</span>' : '';
+    var attach = r.attachment_url ? ' <span title="첨부 있음" style="font-size:12px">📎</span>' : '';
+    var actCell = canEdit
+      ? '<td><div class="act-cell">' +
+          '<button class="icon-btn edit" title="수정" onclick="editNotice(\'' + r.id + '\')">✏️</button>' +
+          '<button class="icon-btn del" title="삭제" onclick="deleteNotice(\'' + r.id + '\')">🗑️</button>' +
+        '</div></td>'
+      : '<td></td>';
+    html += '<tr>' +
+      '<td><span class="cat-badge" style="' + catStyle(r.category) + '">' + esc(r.category || '일반') + '</span></td>' +
+      '<td>' + pin + '<span class="notice-title-link" onclick="openView(\'' + r.id + '\')">' + esc(r.title || '(제목 없음)') + '</span>' + attach + '</td>' +
+      '<td style="font-size:12px;color:#555">' + esc(r.author || '-') + '</td>' +
+      '<td style="color:#aaa;font-size:12px">' + fmtDate(r.created_at) + '</td>' +
+      actCell + '</tr>';
+  }
+  tbody.innerHTML = html;
+
+  if (!isSearch && data.length > PAGE_SIZE) {
+    moreRow.style.display = 'block';
+    moreBtn.textContent = showAllNotice ? '▲ 접기' : '▼ 더보기 (' + (data.length - PAGE_SIZE) + '건 더)';
+  } else {
+    moreRow.style.display = 'none';
+  }
+}
+
+function toggleShowAll() { showAllNotice = !showAllNotice; renderNotices(allNotices); }
+
+// ── 작성 / 수정 ──
+function toggleForm() {
+  var el = document.getElementById('form_notice');
+  el.classList.toggle('open');
+  if (!el.classList.contains('open')) cancelEdit();
+}
+
+async function saveNotice() {
+  var title = document.getElementById('n_title').value.trim();
+  var category = document.getElementById('n_category').value;
+  var author = document.getElementById('n_author').value.trim();
+  var content = document.getElementById('n_content').value;
+  var attach = document.getElementById('n_attach').value.trim();
+  var pinned = document.getElementById('n_pinned').checked;
+  if (!title) { showToast('제목을 입력해주세요.'); return; }
+
+  var payload = {
+    title: title, category: category, author: author || null,
+    content: content || null, attachment_url: attach || null,
+    is_pinned: pinned, updated_at: new Date().toISOString()
+  };
+
+  var result;
+  if (editingId) {
+    result = await db.from('notices').update(payload).eq('id', editingId);
+  } else {
+    result = await db.from('notices').insert(payload);
+  }
+  if (result.error) { showToast('저장 실패: ' + result.error.message); return; }
+
+  showToast(editingId ? '✓ 공지가 수정됐어요' : '✓ 공지가 등록됐어요');
+  cancelEdit();
+  document.getElementById('form_notice').classList.remove('open');
+  loadNotices();
+}
+
+function editNotice(id) {
+  var r = null;
+  for (var i = 0; i < allNotices.length; i++) { if (allNotices[i].id === id) { r = allNotices[i]; break; } }
+  if (!r) return;
+  editingId = id;
+  document.getElementById('form_notice').classList.add('open');
+  document.getElementById('n_title').value = r.title || '';
+  document.getElementById('n_category').value = r.category || '일반';
+  document.getElementById('n_author').value = r.author || '';
+  document.getElementById('n_content').value = r.content || '';
+  document.getElementById('n_attach').value = r.attachment_url || '';
+  document.getElementById('n_pinned').checked = !!r.is_pinned;
+  document.getElementById('noticeSaveBtn').textContent = '수정 저장';
+  document.getElementById('noticeSaveBtn').style.background = '#d97706';
+  document.getElementById('noticeCancelBtn').style.display = 'inline-block';
+  window.scrollTo({ top: document.getElementById('form_notice').offsetTop - 100, behavior: 'smooth' });
+}
+
+function cancelEdit() {
+  editingId = null;
+  document.getElementById('n_title').value = '';
+  document.getElementById('n_author').value = '';
+  document.getElementById('n_content').value = '';
+  document.getElementById('n_attach').value = '';
+  document.getElementById('n_pinned').checked = false;
+  document.getElementById('n_category').value = '일반';
+  document.getElementById('noticeSaveBtn').textContent = '등록';
+  document.getElementById('noticeSaveBtn').style.background = '';
+  document.getElementById('noticeCancelBtn').style.display = 'none';
+}
+
+async function deleteNotice(id) {
+  if (!confirm('이 공지를 삭제할까요? 되돌릴 수 없어요.')) return;
+  var result = await db.from('notices').delete().eq('id', id);
+  if (result.error) { showToast('삭제 실패: ' + result.error.message); return; }
+  showToast('✓ 삭제됐어요');
+  loadNotices();
+}
+
+// ── 보기 모달 ──
+function openView(id) {
+  var r = null;
+  for (var i = 0; i < allNotices.length; i++) { if (allNotices[i].id === id) { r = allNotices[i]; break; } }
+  if (!r) return;
+  viewingId = id;
+  document.getElementById('vm_title').innerHTML = (r.is_pinned ? '<span class="pin-mark">📌</span>' : '') + esc(r.title || '(제목 없음)');
+  document.getElementById('vm_meta').innerHTML =
+    '<span class="cat-badge" style="' + catStyle(r.category) + '">' + esc(r.category || '일반') + '</span>' +
+    '<span>작성자: ' + esc(r.author || '-') + '</span>' +
+    '<span>작성일: ' + fmtDate(r.created_at) + '</span>';
+  document.getElementById('vm_content').innerHTML = r.content ? esc(r.content).replace(/\n/g, '<br>') : '<span style="color:#aaa">(내용 없음)</span>';
+  var attachEl = document.getElementById('vm_attach');
+  if (r.attachment_url) {
+    attachEl.innerHTML = '<a href="' + esc(r.attachment_url) + '" target="_blank" rel="noopener">📎 첨부 파일 / 링크 열기</a>';
+  } else {
+    attachEl.innerHTML = '';
+  }
+  document.getElementById('vm_editBtn').style.display = canEdit ? 'inline-block' : 'none';
+  document.getElementById('viewModal').classList.add('open');
+}
+
+function editFromView() {
+  closeModal('viewModal');
+  if (viewingId) editNotice(viewingId);
+}
+
+// ── 표 정렬 (▲ 오름차순 / ▼ 내림차순) ──
+var sortState = { key: null, dir: 1 };
+
+function applySort(data) {
+  if (!sortState.key || !data || !data.length) return data;
+  var key = sortState.key, dir = sortState.dir;
+  var sorted = data.slice();
+  sorted.sort(function(a, b) {
+    var va = a[key], vb = b[key];
+    va = (va === null || va === undefined) ? '' : va;
+    vb = (vb === null || vb === undefined) ? '' : vb;
+    if (typeof va === 'boolean') va = va ? 1 : 0;
+    if (typeof vb === 'boolean') vb = vb ? 1 : 0;
+    return String(va).localeCompare(String(vb), 'ko', { numeric: true, sensitivity: 'base' }) * dir;
+  });
+  return sorted;
+}
+
+function sortBy(key) {
+  if (sortState.key === key) { sortState.dir = -sortState.dir; }
+  else { sortState.key = key; sortState.dir = 1; }
+  updateSortIndicators();
+  document.getElementById('searchNotice').value.trim() || document.getElementById('filterCategory').value
+    ? filterNotices() : renderNotices(allNotices);
+}
+
+function updateSortIndicators() {
+  var ths = document.querySelectorAll('th.sortable[data-table="notice"]');
+  for (var i = 0; i < ths.length; i++) {
+    var ind = ths[i].querySelector('.sort-ind');
+    if (ths[i].getAttribute('data-key') === sortState.key) {
+      ind.textContent = sortState.dir === 1 ? '▲' : '▼';
+      ths[i].classList.add('sorted');
+    } else {
+      ind.textContent = '↕';
+      ths[i].classList.remove('sorted');
+    }
+  }
+}
+updateSortIndicators();
+</script>
+<script src="sidebar.js"></script>
+</body>
+</html>
