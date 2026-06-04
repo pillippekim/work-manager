@@ -95,7 +95,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 .right-content{padding:24px 28px;}
 
 /* 즐겨찾기 */
-.fav-section{margin-bottom:18px;}
+.fav-section,.notice-section{margin-bottom:22px;}
 .sec-label{font-size:15px;font-weight:700;color:#1e293b;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
 .fav-edit-btn{margin-left:auto;font-size:11px;color:#94a3b8;cursor:pointer;padding:4px 10px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;font-family:inherit;font-weight:500;transition:all 0.15s;}
 .fav-edit-btn:hover{background:#f1f5f9;color:#243bb2;border-color:#c7ceff;}
@@ -132,7 +132,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
 .fav-modal-item .fmi-added{font-size:10px;color:#94a3b8;}
 
 /* 주요 현황 */
-.alarm-section{margin-bottom:24px;}
+.alarm-section{margin-bottom:22px;}
 .alarm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
 .alarm-widget{background:#fff;border-radius:14px;border:1px solid #e8ecf3;overflow:hidden;}
 .alarm-wh{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #f1f5f9;}
@@ -240,7 +240,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
         <!-- 0. 공지사항 (최상단) -->
         <div class="menu-group">
             <div class="cat-item">
-                <a class="cat-btn" href="#noticeSection" onclick="scrollToNotice(event)" style="text-decoration:none;color:inherit;">
+                <a class="cat-btn" href="notices.html" style="text-decoration:none;color:inherit;">
                     <span class="c-icon">📢</span><span class="c-label">공지사항</span><span class="c-badge on">NEW</span>
                 </a>
             </div>
@@ -370,7 +370,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
                     <div class="notice-wt">📢 공지사항</div>
                     <div style="display:flex;gap:8px;align-items:center;">
                         <button class="notice-add-btn" id="noticeAddBtn" style="display:none;" onclick="openNoticeModal()">+ 공지 작성</button>
-                        <a href="#" id="noticeMoreBtn" onclick="openAllNotices(event)" style="display:none;font-size:12px;color:#243bb2;font-weight:600;text-decoration:none;">전체 보기 →</a>
+                        <a href="notices.html" id="noticeMoreBtn" style="display:none;font-size:12px;color:#243bb2;font-weight:600;text-decoration:none;">전체 보기 →</a>
                     </div>
                 </div>
                 <div class="notice-wb" id="noticeList"><div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">불러오는 중...</div></div>
@@ -556,7 +556,7 @@ document.getElementById('favModal').addEventListener('click',function(e){if(e.ta
 var SB='https://vpaixxlhzkwtgcllimvn.supabase.co',SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
 var H={'apikey':SK,'Authorization':'Bearer '+SK};
 async function loadMoldAlarm(){try{var r=await fetch(SB+'/rest/v1/molds?select=status,is_active,total_shots,maintenance_threshold&is_active=eq.true',{headers:H});var m=await r.json();var st=0,iu=0,rp=0,al=0;for(var i=0;i<m.length;i++){if(m[i].status==='stored')st++;else if(m[i].status==='in_use')iu++;else if(m[i].status==='repairing')rp++;if(m[i].maintenance_threshold&&m[i].total_shots>=m[i].maintenance_threshold)al++;}var h='';h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#22c55e"></span>보관중</span><span class="a-val" style="color:#22c55e">'+st+'</span></div>';h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#ef4444"></span>사용중</span><span class="a-val" style="color:#ef4444">'+iu+'</span></div>';h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#f59e0b"></span>수리중</span><span class="a-val" style="color:#f59e0b">'+rp+'</span></div>';if(al>0)h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#dc2626"></span>⚠️ 유지보수</span><span class="a-val" style="color:#dc2626">'+al+'</span></div>';document.getElementById('moldAlarm').innerHTML=h;}catch(e){document.getElementById('moldAlarm').innerHTML='<div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">데이터를 불러올 수 없습니다</div>';}}
-async function loadReportAlarm(){var today=(function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();var tables=[{n:'성형',t:'molding_reports'},{n:'검사',t:'inspection_reports'},{n:'조립',t:'assembly_reports'},{n:'절단',t:'cutting_reports'},{n:'CMB',t:'cmb_reports'},{n:'코팅',t:'coating_reports'},{n:'후경화',t:'postcure_reports'},{n:'사출',t:'shot_reports'},{n:'포장',t:'packaging_reports'}];var h='',tot=0;try{for(var i=0;i<tables.length;i++){try{var r=await fetch(SB+'/rest/v1/'+tables[i].t+'?select=id&work_date=eq.'+today,{headers:H});var d=await r.json();var c=Array.isArray(d)?d.length:0;tot+=c;if(c>0)h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#3b82f6"></span>'+tables[i].n+'</span><span class="a-val" style="color:#243bb2">'+c+'<span class="a-unit">건</span></span></div>';}catch(e2){}}if(!h)h='<div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">오늘 제출된 작업일지가 없습니다</div>';else h='<div class="a-row" style="border-bottom:2px solid #e8ecf3;padding-bottom:8px;margin-bottom:4px;"><span class="a-label" style="font-weight:700;color:#1e293b;">오늘 총 제출</span><span class="a-val" style="color:#243bb2">'+tot+'<span class="a-unit">건</span></span></div>'+h;document.getElementById('reportAlarm').innerHTML=h;}catch(e){document.getElementById('reportAlarm').innerHTML='<div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">데이터를 불러올 수 없습니다</div>';}}
+async function loadReportAlarm(){var today=(function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();var tables=[{n:'성형',t:'molding_reports'},{n:'검사',t:'inspection_reports'},{n:'조립',t:'assembly_reports'},{n:'절단',t:'cutting_reports'},{n:'CMB',t:'cmb_reports'},{n:'코팅',t:'coating_reports'},{n:'후경화',t:'postcure_reports'},{n:'사출',t:'shot_reports'},{n:'포장',t:'packaging_reports'}];var h='',tot=0;try{for(var i=0;i<tables.length;i++){try{var r=await fetch(SB+'/rest/v1/'+tables[i].t+'?select=id&work_date=eq.'+today+'&deleted_at=is.null',{headers:H});var d=await r.json();var c=Array.isArray(d)?d.length:0;tot+=c;if(c>0)h+='<div class="a-row"><span class="a-label"><span class="a-dot" style="background:#3b82f6"></span>'+tables[i].n+'</span><span class="a-val" style="color:#243bb2">'+c+'<span class="a-unit">건</span></span></div>';}catch(e2){}}if(!h)h='<div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">오늘 제출된 작업일지가 없습니다</div>';else h='<div class="a-row" style="border-bottom:2px solid #e8ecf3;padding-bottom:8px;margin-bottom:4px;"><span class="a-label" style="font-weight:700;color:#1e293b;">오늘 총 제출</span><span class="a-val" style="color:#243bb2">'+tot+'<span class="a-unit">건</span></span></div>'+h;document.getElementById('reportAlarm').innerHTML=h;}catch(e){document.getElementById('reportAlarm').innerHTML='<div style="text-align:center;padding:14px;color:#94a3b8;font-size:12px;">데이터를 불러올 수 없습니다</div>';}}
 loadMoldAlarm();loadReportAlarm();loadNotices();
 
 /* ===== 공지사항 DB 연동 ===== */
