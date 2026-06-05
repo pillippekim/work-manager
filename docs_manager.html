@@ -14,7 +14,7 @@
 .app { max-width: 980px; margin: 0 auto; }
 
 /* 업로드 토글 */
-.upload-toggle { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.upload-toggle { display: flex; justify-content: flex-start; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 1rem; }
 .upload-toggle-title { font-size: 14px; color: #888; }
 .btn-toggle-upload { font-size: 13px; padding: 8px 18px; border-radius: 8px; background: #243bb2; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
 .upload-area { display: none; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
@@ -75,6 +75,21 @@
 .old-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #f9f9f9; color: #aaa; }
 .btn-view { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: #eff6ff; color: #243bb2; border: none; cursor: pointer; font-family: inherit; }
 .btn-edit { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: #f0fdf4; color: #16a34a; border: none; cursor: pointer; font-family: inherit; }
+.inactive-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #fef2f2; color: #b91c1c; font-weight: 600; }
+.btn-deact { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: #fff7ed; color: #c2410c; border: none; cursor: pointer; font-family: inherit; }
+.btn-react { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: #ecfdf5; color: #047857; border: none; cursor: pointer; font-family: inherit; }
+.btn-hist  { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: #f5f3ff; color: #6d28d9; border: none; cursor: pointer; font-family: inherit; }
+.action-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+th.doc-sortable { cursor: pointer; user-select: none; white-space: nowrap; transition: background .12s; }
+th.doc-sortable:hover { background: #eef1fb; }
+th.doc-sortable .sind { font-size: 10px; margin-left: 3px; color: #c2c7d0; }
+th.doc-sortable.sorted { color: #243bb2; }
+th.doc-sortable.sorted .sind { color: #243bb2; font-size: 11px; }
+tr.inactive-row td { background: #fcfcfc !important; opacity: 0.72; }
+.hist-item { display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; align-items: center; padding: 9px 4px; border-bottom: 1px solid #f1f1f1; font-size: 13px; }
+.hist-action { font-weight: 600; }
+.hist-act-비활성화 { color: #c2410c; } .hist-act-재활성화 { color: #047857; }
+.hist-act-신규등록, .hist-act-리비전등록 { color: #243bb2; } .hist-act-삭제 { color: #b91c1c; } .hist-act-수정 { color: #6d28d9; }
 
 /* 모달 파일 업로드 */
 .modal-file-zone { border: 1.5px dashed #cbd5e1; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; background: #f8fafc; margin-bottom: 1rem; font-size: 13px; color: #888; }
@@ -115,9 +130,6 @@
         <h1>📄 문서 관리</h1>
         <div class="sub">검사기준서, 작업표준서 PDF 업로드 및 이력 관리</div>
       </div>
-      <div class="header-actions">
-        <button class="btn-toggle-upload" onclick="toggleUpload()">+ 문서 업로드</button>
-      </div>
     </div>
   </div>
 
@@ -125,8 +137,8 @@
 
   <!-- 업로드 토글 -->
   <div class="upload-toggle">
-    <span class="upload-toggle-title">📌 파일명 규칙: <strong>[문서유형]_[사번].pdf</strong> &nbsp;예) 검사기준서_502284.pdf</span>
     <button class="btn-toggle-upload" onclick="toggleUpload()">+ 문서 업로드</button>
+    <span class="upload-toggle-title">📌 파일명 규칙: <strong>[문서유형]_[사번].pdf</strong> &nbsp;예) 검사기준서_502284.pdf</span>
   </div>
 
   <!-- 업로드 영역 -->
@@ -195,7 +207,7 @@
   <!-- 검색 -->
   <div class="search-bar">
     <input class="search-input" id="filterSabun" placeholder="🔍 사번 검색" oninput="renderTable()" />
-    <button class="filter-toggle" id="toggleOld" onclick="toggleOldDocs()">구버전 포함</button>
+    <button class="filter-toggle" id="toggleOld" onclick="toggleOldDocs()">구버전·비활성 포함</button>
   </div>
 
   <!-- 목록 -->
@@ -204,13 +216,13 @@
       <table>
         <thead>
           <tr>
-            <th>사번</th>
-            <th>문서유형</th>
-            <th>문서명</th>
-            <th>버전</th>
-            <th>상태</th>
-            <th>담당자</th>
-            <th>등록일</th>
+            <th class="doc-sortable" data-key="sabun"       onclick="sortDocs('sabun')">사번<span class="sind">↕</span></th>
+            <th class="doc-sortable" data-key="doc_type"    onclick="sortDocs('doc_type')">문서유형<span class="sind">↕</span></th>
+            <th class="doc-sortable" data-key="doc_name"    onclick="sortDocs('doc_name')">문서명<span class="sind">↕</span></th>
+            <th class="doc-sortable" data-key="version"     onclick="sortDocs('version')">버전<span class="sind">↕</span></th>
+            <th class="doc-sortable" data-key="status"      onclick="sortDocs('status')">상태<span class="sind">↕</span></th>
+            <th class="doc-sortable" data-key="uploaded_by" onclick="sortDocs('uploaded_by')">담당자<span class="sind">↕</span></th>
+            <th class="doc-sortable" data-key="created_at"  onclick="sortDocs('created_at')">등록일<span class="sind">↕</span></th>
             <th></th>
           </tr>
         </thead>
@@ -266,6 +278,17 @@
     <div class="modal-btns">
       <button class="btn-modal-cancel" onclick="closeEditModal()">취소</button>
       <button class="btn-modal-save" onclick="saveEdit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 변경 이력 모달 -->
+<div class="modal-overlay" id="histModal">
+  <div class="modal-box" style="max-width:560px;width:92%;">
+    <div class="modal-title" id="hist_title">📜 변경 이력</div>
+    <div id="hist_body" style="max-height:55vh;overflow-y:auto;margin-top:8px;"></div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeHistModal()">닫기</button>
     </div>
   </div>
 </div>
@@ -405,6 +428,21 @@ function removeFile(i) {
 
 async function uploadAll() {
   if (!parsedFiles.length) return;
+
+  // 업로드 전 중복 확인: 같은 사번+문서유형의 '활성' 문서가 이미 있으면 한 번 확인
+  const conflicts = [];
+  for (const p of parsedFiles) {
+    if (!p.sabun) continue;
+    const { data } = await db.from('documents').select('id')
+      .eq('sabun', p.sabun).eq('doc_type', p.docType).eq('is_active', true).limit(1);
+    if (data && data.length) conflicts.push(p.sabun + ' / ' + p.docType);
+  }
+  if (conflicts.length) {
+    const msg = '동일한 사번 문서가 이미 등록돼 있어요:\n\n· ' + conflicts.join('\n· ')
+      + '\n\n계속 업로드하면 위 기존 문서는 비활성(구버전)으로 보관되고, 새 버전으로 등록됩니다.\n업로드하시겠습니까?';
+    if (!confirm(msg)) { showToast('업로드를 취소했어요.'); return; }
+  }
+
   const btn = document.getElementById('uploadAllBtn');
   btn.disabled = true; btn.textContent = '업로드 중...';
   document.getElementById('progressBar').style.display = 'block';
@@ -413,20 +451,25 @@ async function uploadAll() {
   for (const p of parsedFiles) {
     if (!p.sabun) { showToast('사번을 입력해주세요.'); continue; }
 
+    // 기존 문서 조회 (이력/비활성화 처리용)
+    const { data: existingDocs } = await db.from('documents').select('*')
+      .eq('sabun', p.sabun).eq('doc_type', p.docType);
+    const hadActive = !!(existingDocs && existingDocs.some(d => d.is_active !== false));
+
     let version;
     if (p.mode === 'overwrite') {
-      // 덮어쓰기: 기존 버전 유지
-      const { data } = await db.from('documents').select('version')
-        .eq('sabun', p.sabun).eq('doc_type', p.docType).eq('is_current', true).limit(1);
-      version = data && data.length ? data[0].version : 'v1.0';
-      // 기존 파일 구버전 처리
-      await db.from('documents').update({ is_current: false })
-        .eq('sabun', p.sabun).eq('doc_type', p.docType);
+      const cur = existingDocs && existingDocs.find(d => d.is_current);
+      version = cur ? cur.version : 'v1.0';
     } else {
-      // 신규 버전: 버전 자동 증가
       version = await getNextVersion(p.sabun, p.docType);
-      await db.from('documents').update({ is_current: false })
-        .eq('sabun', p.sabun).eq('doc_type', p.docType);
+    }
+    // 기존 문서: 삭제하지 않고 구버전 + 비활성화로 보관
+    await db.from('documents').update({ is_current: false, is_active: false })
+      .eq('sabun', p.sabun).eq('doc_type', p.docType);
+    if (existingDocs) {
+      for (const ex of existingDocs) {
+        if (ex.is_active !== false) await logDocHistory(ex, '비활성화', `리비전 ${version} 등록으로 자동 비활성화`);
+      }
     }
 
     const safeFileName = p.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -441,8 +484,10 @@ async function uploadAll() {
     await db.from('documents').insert({
       sabun: p.sabun, doc_type: p.docType, doc_name: p.docName,
       version, file_url: urlData.publicUrl, file_path: filePath,
-      is_current: true, uploaded_by: p.uploader || '관리자'
+      is_current: true, is_active: true, uploaded_by: p.uploader || '관리자'
     });
+    await logDocHistory({ sabun: p.sabun, doc_type: p.docType, doc_name: p.docName, version },
+      hadActive ? '리비전 등록' : '신규 등록', hadActive ? '리비전 업로드' : '최초 업로드');
 
     done++;
     document.getElementById('progressFill').style.width = Math.round((done/parsedFiles.length)*100) + '%';
@@ -481,32 +526,42 @@ function renderTable() {
   const sabun = document.getElementById('filterSabun').value.trim().toLowerCase();
   let filtered = allDocs;
   if (activeTab) filtered = filtered.filter(d => d.doc_type === activeTab);
-  if (!showOld)  filtered = filtered.filter(d => d.is_current);
+  if (!showOld)  filtered = filtered.filter(d => d.is_current && d.is_active !== false);
   if (sabun)     filtered = filtered.filter(d => d.sabun.toLowerCase().includes(sabun));
+  filtered = applyDocSort(filtered);
 
   const tbody = document.getElementById('docTable');
   if (!filtered.length) {
     tbody.innerHTML = `<tr class="empty-row"><td colspan="8">${activeTab?activeTab+' 문서가 없어요.':'등록된 문서가 없어요.'}</td></tr>`;
     return;
   }
-  tbody.innerHTML = filtered.map(r => `
-    <tr>
+  tbody.innerHTML = filtered.map(r => {
+    const inactive = (r.is_active === false);
+    const statusHtml = inactive ? '<span class="inactive-badge">비활성</span>'
+      : (r.is_current ? '<span class="current-badge">적용중</span>' : '<span class="old-badge">구버전</span>');
+    const toggleBtn = inactive
+      ? `<button class="btn-react" onclick="setDocActive('${r.id}',true)">재활성화</button>`
+      : `<button class="btn-deact" onclick="setDocActive('${r.id}',false)">비활성화</button>`;
+    return `
+    <tr class="${inactive?'inactive-row':''}">
       <td style="font-weight:500">${r.sabun}</td>
       <td><span class="doc-type-badge type-${r.doc_type}">${r.doc_type}</span></td>
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.doc_name}">${r.doc_name}</td>
       <td><span class="version-badge">${r.version}</span></td>
-      <td>${r.is_current?'<span class="current-badge">적용중</span>':'<span class="old-badge">구버전</span>'}</td>
+      <td>${statusHtml}</td>
       <td style="color:#888;font-size:12px">${r.uploaded_by||'-'}</td>
       <td style="color:#aaa;font-size:12px">${fmtDate(r.created_at)}</td>
       <td>
         <div class="action-btns">
           <button class="btn-view" onclick="window.open('${r.file_url}','_blank')">보기</button>
           <button class="btn-edit" onclick="openEditModal(${JSON.stringify(r).replace(/"/g,'&quot;')})">수정</button>
-          <button class="btn-del" onclick="deleteDoc(${r.id},'${r.file_path}')">삭제</button>
+          <button class="btn-hist" onclick="showDocHistory('${r.sabun}','${r.doc_type}')">이력</button>
+          ${toggleBtn}
+          <button class="btn-del" onclick="deleteDoc('${r.id}','${r.file_path}')">삭제</button>
         </div>
       </td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
 }
 
 async function loadDocs() {
@@ -582,11 +637,96 @@ async function saveEdit() {
 }
 
 async function deleteDoc(id, filePath) {
-  if (!confirm('삭제하시겠습니까?\n삭제된 파일은 복구할 수 없습니다.')) return;
-  await db.storage.from('documents').remove([filePath]);
+  if (!confirm('완전히 삭제할까요?\n삭제하면 파일과 기록이 사라져 복구할 수 없어요.\n(이력 보관이 필요하면 "비활성화"를 권장합니다.)')) return;
+  const d = allDocs.find(x => String(x.id) === String(id));
+  if (d) await logDocHistory(d, '삭제', '문서 완전 삭제');
+  if (filePath) await db.storage.from('documents').remove([filePath]);
   await db.from('documents').delete().eq('id', id);
   showToast('삭제됐어요.');
   loadDocs();
+}
+
+// ── 변경 이력 기록 ──
+async function logDocHistory(d, action, note) {
+  try {
+    await db.from('document_history').insert({
+      sabun: d.sabun, doc_type: d.doc_type, doc_name: d.doc_name || null,
+      version: d.version || null, action: action, note: note || null,
+      performed_by: MY_NAME || '관리자', performed_at: new Date().toISOString()
+    });
+  } catch (e) { /* 이력 기록 실패가 본 작업을 막지 않도록 */ }
+}
+
+// ── 비활성화 / 재활성화 ──
+async function setDocActive(id, makeActive) {
+  const d = allDocs.find(x => String(x.id) === String(id));
+  if (!d) return;
+  const msg = makeActive
+    ? '이 문서를 다시 활성화할까요?'
+    : '이 문서를 비활성화할까요?\n삭제되지 않고 보관되며, 나중에 다시 활성화할 수 있어요.';
+  if (!confirm(msg)) return;
+  const patch = makeActive ? { is_active: true } : { is_active: false, is_current: false };
+  const { error } = await db.from('documents').update(patch).eq('id', id);
+  if (error) { showToast('처리 실패: ' + error.message); return; }
+  await logDocHistory(d, makeActive ? '재활성화' : '비활성화', makeActive ? '수동 재활성화' : '수동 비활성화');
+  showToast(makeActive ? '재활성화됐어요 ✓' : '비활성화됐어요 (보관됨) ✓');
+  loadDocs();
+}
+
+// ── 변경 이력 보기 ──
+async function showDocHistory(sabun, docType) {
+  const body = document.getElementById('hist_body');
+  document.getElementById('hist_title').textContent = '📜 변경 이력 — ' + sabun + ' / ' + docType;
+  body.innerHTML = '<div style="text-align:center;color:#aaa;padding:18px;font-size:13px">불러오는 중...</div>';
+  document.getElementById('histModal').classList.add('open');
+  const { data, error } = await db.from('document_history').select('*')
+    .eq('sabun', sabun).eq('doc_type', docType)
+    .order('performed_at', { ascending: false });
+  if (error) { body.innerHTML = '<div style="text-align:center;color:#aaa;padding:18px;font-size:13px">이력을 불러올 수 없어요. (이력 테이블이 아직 없을 수 있어요)</div>'; return; }
+  if (!data || !data.length) { body.innerHTML = '<div style="text-align:center;color:#aaa;padding:18px;font-size:13px">기록된 이력이 없어요.</div>'; return; }
+  body.innerHTML = data.map(h => {
+    const dt = h.performed_at ? h.performed_at.slice(0,16).replace('T',' ') : '';
+    const cls = 'hist-act-' + (h.action || '').replace(/\s/g,'');
+    return '<div class="hist-item">'
+      + '<span class="version-badge">' + (h.version || '-') + '</span>'
+      + '<div><span class="hist-action ' + cls + '">' + (h.action || '') + '</span>'
+      + (h.note ? ' <span style="color:#999;font-size:12px">· ' + h.note + '</span>' : '')
+      + '<div style="color:#bbb;font-size:11px;margin-top:2px">' + (h.performed_by || '-') + '</div></div>'
+      + '<span style="color:#aaa;font-size:11px;white-space:nowrap">' + dt + '</span>'
+      + '</div>';
+  }).join('');
+}
+function closeHistModal() { document.getElementById('histModal').classList.remove('open'); }
+
+// ── 정렬 ──
+var docSort = { key: null, dir: 1 };
+function statusRank(r) { return (r.is_active === false) ? 2 : (r.is_current ? 0 : 1); }
+function applyDocSort(list) {
+  if (!docSort.key) return list;
+  const k = docSort.key, dir = docSort.dir;
+  const arr = list.slice();
+  arr.sort((a, b) => {
+    if (k === 'status') return (statusRank(a) - statusRank(b)) * dir;
+    let va = a[k], vb = b[k];
+    va = (va === null || va === undefined) ? '' : va;
+    vb = (vb === null || vb === undefined) ? '' : vb;
+    return String(va).localeCompare(String(vb), 'ko', { numeric: true, sensitivity: 'base' }) * dir;
+  });
+  return arr;
+}
+function sortDocs(key) {
+  if (docSort.key === key) docSort.dir = -docSort.dir;
+  else { docSort.key = key; docSort.dir = 1; }
+  updateDocSortInd();
+  renderTable();
+}
+function updateDocSortInd() {
+  document.querySelectorAll('th.doc-sortable').forEach(th => {
+    const ind = th.querySelector('.sind');
+    if (!ind) return;
+    if (th.getAttribute('data-key') === docSort.key) { ind.textContent = docSort.dir === 1 ? '▲' : '▼'; th.classList.add('sorted'); }
+    else { ind.textContent = '↕'; th.classList.remove('sorted'); }
+  });
 }
 
 loadMyName();
