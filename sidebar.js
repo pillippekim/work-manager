@@ -111,6 +111,15 @@ function initSidebar() {
     nav.innerHTML =
         '<div class="menu-scroll">' +
 
+        /* ═══ 0. 공지사항 (최상단) ═══ */
+        '<div class="menu-group">' +
+            '<div class="cat-item">' +
+                '<a class="cat-btn" href="notices.html" style="text-decoration:none;color:inherit;' + (page === 'notices.html' ? 'background:#eef1fb;border-radius:8px;' : '') + '">' +
+                    '<span class="c-icon">📢</span><span class="c-label">공지사항</span><span class="c-badge on">NEW</span>' +
+                '</a>' +
+            '</div>' +
+        '</div>' +
+
         /* ═══ 1. 업무관리 ═══ */
         '<div class="menu-group">' +
             '<div class="menu-group-title">업무관리</div>' +

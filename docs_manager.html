@@ -11,7 +11,7 @@
 <script src="auth_guard.js"></script>
 <style>
 /* ── docs_manager 고유 스타일 ── */
-.app { max-width: 980px; margin: 0 auto; }
+.app { max-width: 980px; margin: 0 auto; padding: 24px 16px 0; }
 
 /* 업로드 토글 */
 .upload-toggle { display: flex; justify-content: flex-start; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 1rem; }
@@ -665,7 +665,16 @@ async function setDocActive(id, makeActive) {
     ? '이 문서를 다시 활성화할까요?'
     : '이 문서를 비활성화할까요?\n삭제되지 않고 보관되며, 나중에 다시 활성화할 수 있어요.';
   if (!confirm(msg)) return;
-  const patch = makeActive ? { is_active: true } : { is_active: false, is_current: false };
+  let patch;
+  if (makeActive) {
+    // 재활성화: 같은 사번+문서유형에 '적용중'이 하나도 없으면 이 문서를 다시 적용중으로 복귀
+    const hasCurrent = allDocs.some(x =>
+      x.sabun === d.sabun && x.doc_type === d.doc_type &&
+      x.is_active !== false && x.is_current && String(x.id) !== String(id));
+    patch = hasCurrent ? { is_active: true } : { is_active: true, is_current: true };
+  } else {
+    patch = { is_active: false, is_current: false };
+  }
   const { error } = await db.from('documents').update(patch).eq('id', id);
   if (error) { showToast('처리 실패: ' + error.message); return; }
   await logDocHistory(d, makeActive ? '재활성화' : '비활성화', makeActive ? '수동 재활성화' : '수동 비활성화');
