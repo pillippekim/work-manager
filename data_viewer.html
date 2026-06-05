@@ -874,6 +874,23 @@ function toggleUnifiedView() {
   render();
 }
 
+var prevDayCount = 0;
+var lastPeriodType = '';
+
+function highlightPeriod(type) {
+  document.querySelectorAll('.btn-period').forEach(function(b) {
+    var oc = b.getAttribute('onclick') || '';
+    var active = oc.indexOf("'" + type + "'") !== -1;
+    b.style.background = active ? '#eef0ff' : 'white';
+    b.style.color = active ? '#243bb2' : '#555';
+    b.style.borderColor = active ? '#243bb2' : '#e0e4ed';
+    // 전일 버튼은 며칠 전인지 라벨로 표시
+    if (oc.indexOf("'yesterday'") !== -1) {
+      b.textContent = (type === 'yesterday' && prevDayCount > 1) ? ('전일 (' + prevDayCount + '일 전)') : '전일';
+    }
+  });
+}
+
 function setPeriod(type) {
   const now = new Date();
   let start, end;
@@ -884,7 +901,9 @@ function setPeriod(type) {
   if (type === 'today') {
     start = end = fmtLocal(now);
   } else if (type === 'yesterday') {
-    const y = new Date(now); y.setDate(y.getDate() - 1);
+    // 전일을 연속으로 누르면 하루씩 더 과거로 (전일 → 전전일 → 전전전일 …)
+    prevDayCount = (lastPeriodType === 'yesterday') ? prevDayCount + 1 : 1;
+    const y = new Date(now); y.setDate(y.getDate() - prevDayCount);
     start = end = fmtLocal(y);
   } else if (type === 'thisMonth') {
     start = fmtLocal(new Date(now.getFullYear(), now.getMonth(), 1));
@@ -893,11 +912,11 @@ function setPeriod(type) {
     start = fmtLocal(new Date(now.getFullYear(), now.getMonth() - 1, 1));
     end = fmtLocal(new Date(now.getFullYear(), now.getMonth(), 0));
   }
+  if (type !== 'yesterday') prevDayCount = 0;
+  lastPeriodType = type;
   document.getElementById('startDate').value = start;
   document.getElementById('endDate').value = end;
-  // 버튼 스타일
-  document.querySelectorAll('.btn-period').forEach(b => { b.style.background = 'white'; b.style.color = '#555'; b.style.borderColor = '#e0e4ed'; });
-  event.target.style.background = '#eef0ff'; event.target.style.color = '#243bb2'; event.target.style.borderColor = '#243bb2';
+  highlightPeriod(type);
   loadData();
 }
 
@@ -2908,8 +2927,15 @@ window.onload = async () => {
   if (!user) return;
   document.getElementById('authCheckOverlay').style.display = 'none';
   
-  document.getElementById('startDate').value = firstDayOfMonth();
-  document.getElementById('endDate').value = todayStr();
+  // 기본 조회 기간: 전일(어제)
+  prevDayCount = 1; lastPeriodType = 'yesterday';
+  (function() {
+    var y = new Date(); y.setDate(y.getDate() - 1);
+    var ys = y.getFullYear() + '-' + String(y.getMonth()+1).padStart(2,'0') + '-' + String(y.getDate()).padStart(2,'0');
+    document.getElementById('startDate').value = ys;
+    document.getElementById('endDate').value = ys;
+  })();
+  highlightPeriod('yesterday');
   await loadMyInfo();
   await loadProducts();
   loadData();
