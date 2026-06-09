@@ -82,6 +82,8 @@
 .detail-table .td-code:hover { text-decoration:underline; }
 .detail-empty { text-align:center; padding:40px 16px; color:#94a3b8; font-size:13px; }
 .grid-container { margin:8px 16px 16px; padding:0; overflow:auto; max-height:calc(100vh - 240px); border:1px solid #e2e8f0; border-radius:10px; background:#fff; }
+.grid-topscroll { margin:6px 16px 0; overflow-x:auto; overflow-y:hidden; height:16px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; }
+.grid-topscroll > div { height:1px; }
 .grid-table { border-collapse:separate; border-spacing:4px; padding:4px 8px 8px; }
 .grid-table th { font-size:13px; font-weight:600; color:#64748b; padding:6px 8px; text-align:center; min-width:70px; position:sticky; top:0; z-index:10; background:#eef1f8; box-shadow:0 2px 0 #fff; }
 .grid-table .floor-label { font-size:13px; font-weight:600; color:#64748b; text-align:right; padding-right:8px; min-width:48px; position:sticky; left:0; z-index:8; background:#eef1f8; box-shadow:2px 0 0 #fff; }
@@ -292,6 +294,7 @@
 
 <!-- 좌측: 적치대 그리드 -->
 <div class="split-left">
+<div class="grid-topscroll" id="gridTopScroll" style="display:none"><div id="gridTopScrollInner"></div></div>
 <div class="grid-container" id="gridContainer">
     <div class="loading"><div class="spinner"></div><br>데이터 불러오는 중...</div>
 </div>
@@ -599,6 +602,32 @@ function renderGrid() {
     html += '</table>';
 
     document.getElementById('gridContainer').innerHTML = html;
+    setupTopScroll();
+    setTimeout(syncTopScroll, 0);
+}
+
+// 상단 가로 스크롤바 ↔ 그리드 가로 스크롤 연동
+var _topScrollBound = false;
+function setupTopScroll() {
+    if (_topScrollBound) return;
+    var gc = document.getElementById('gridContainer');
+    var ts = document.getElementById('gridTopScroll');
+    if (!gc || !ts) return;
+    var syncing = false;
+    ts.addEventListener('scroll', function(){ if(syncing) return; syncing=true; gc.scrollLeft = ts.scrollLeft; syncing=false; });
+    gc.addEventListener('scroll', function(){ if(syncing) return; syncing=true; ts.scrollLeft = gc.scrollLeft; syncing=false; });
+    window.addEventListener('resize', syncTopScroll);
+    _topScrollBound = true;
+}
+function syncTopScroll() {
+    var gc = document.getElementById('gridContainer');
+    var ts = document.getElementById('gridTopScroll');
+    var inner = document.getElementById('gridTopScrollInner');
+    if (!gc || !ts || !inner) return;
+    inner.style.width = gc.scrollWidth + 'px';
+    // 가로로 넘칠 때만 상단 스크롤바 표시
+    ts.style.display = (gc.scrollWidth > gc.clientWidth + 2) ? 'block' : 'none';
+    ts.scrollLeft = gc.scrollLeft;
 }
 
 // 주소 생성 함수
