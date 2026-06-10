@@ -472,24 +472,64 @@ body{font-family:'Noto Sans KR',sans-serif;background:#f0f2f7;min-height:100vh;}
         if (user.process === '모니터') {
             allowedUrls = ['mold_dashboard.html', 'mold_layout.html'];
         }
+
+        // 권한 관리(page_permissions)에서 부여된 개별 권한을 최신으로 다시 읽어 반영
+        // (로그인 이후 부여된 권한도 재로그인 없이 즉시 적용)
+        var perms = null;
+        if (user.process !== '모니터') {
+            try {
+                var sbP = window.supabase.createClient(
+                    'https://vpaixxlhzkwtgcllimvn.supabase.co',
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig'
+                );
+                var pr = await sbP.from('page_permissions').select('perms').eq('emp_code', user.emp_code).maybeSingle();
+                perms = (pr.data && pr.data.perms) ? pr.data.perms : null;
+                sessionStorage.setItem('userPerms', JSON.stringify(perms)); // 페이지 가드도 최신 권한 사용
+            } catch(e) {
+                try { perms = JSON.parse(sessionStorage.getItem('userPerms') || 'null'); } catch(_) {}
+            }
+        }
+
+        // 명시적으로 허용(true)/차단(false)된 설정만 판별 (기본값 폴백 없음)
+        function pgState(page) {
+            if (!perms) return undefined;
+            if (perms.pages && perms.pages[page] !== undefined) return perms.pages[page];
+            var cat = (typeof getPageCategory === 'function') ? getPageCategory(page) : null;
+            if (cat && perms.categories && perms.categories[cat] !== undefined) return perms.categories[cat];
+            return undefined;
+        }
+
         var links = document.querySelectorAll('.left-menu a.nav-link, .left-menu a.cat-btn');
         for (var i = 0; i < links.length; i++) {
             var href = links[i].getAttribute('href') || '';
-            var isAllowed = false;
-            for (var j = 0; j < allowedUrls.length; j++) {
-                if (href.indexOf(allowedUrls[j]) !== -1) { isAllowed = true; break; }
+            if (!href || href === '#') continue;
+            var pageFile = href.split('/').pop();
+            var st = pgState(pageFile);
+            var isAllowed;
+            if (st === true) isAllowed = true;            // 권한 관리에서 명시 허용
+            else if (st === false) isAllowed = false;     // 권한 관리에서 명시 차단
+            else {                                        // 설정 없으면 기본 허용목록
+                isAllowed = false;
+                for (var j = 0; j < allowedUrls.length; j++) {
+                    if (href.indexOf(allowedUrls[j]) !== -1) { isAllowed = true; break; }
+                }
             }
-            if (!isAllowed && href && href !== '#') {
+            if (!isAllowed) {
                 links[i].style.opacity = '0.35';
                 links[i].style.pointerEvents = 'none';
                 links[i].style.cursor = 'default';
             }
         }
-        // 데이터관리 + 시스템관리 카테고리 전체 비활성화
-        var disableCats = ['c-data', 'c-system'];
-        for (var k = 0; k < disableCats.length; k++) {
-            var catEl = document.getElementById(disableCats[k]);
-            if (catEl) { catEl.style.opacity = '0.35'; catEl.style.pointerEvents = 'none'; }
+
+        // 데이터관리/시스템관리: 기본 비활성화. 단, 분류 내 페이지가 '명시 허용'되면 활성 유지
+        var catMap = { 'c-data':'data', 'c-system':'system' };
+        for (var key in catMap) {
+            var catEl = document.getElementById(key);
+            if (!catEl) continue;
+            var pages = (window.MENU_STRUCTURE && window.MENU_STRUCTURE[catMap[key]]) ? window.MENU_STRUCTURE[catMap[key]].pages : [];
+            var anyGranted = false;
+            for (var pi = 0; pi < pages.length; pi++) { if (pgState(pages[pi]) === true) { anyGranted = true; break; } }
+            if (!anyGranted) { catEl.style.opacity = '0.35'; catEl.style.pointerEvents = 'none'; }
         }
     }
 })();
