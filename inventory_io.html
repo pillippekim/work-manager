@@ -803,8 +803,10 @@
           for (var i = 0; i < parsedRows.length; i++) {
             var row = parsedRows[i];
             var candidates = [];
+            var pcRow = String(row.product_code == null ? '' : row.product_code).trim().toUpperCase().replace(/\s+/g, '');
             for (var s = 0; s < slots.length; s++) {
-              if (slots[s].product_code === row.product_code && slots[s].quantity > 0) candidates.push(slots[s]);
+              var pcSlot = String(slots[s].product_code == null ? '' : slots[s].product_code).trim().toUpperCase().replace(/\s+/g, '');
+              if (pcSlot === pcRow && pcRow !== '' && slots[s].quantity > 0) candidates.push(slots[s]);
             }
             candidates.sort(function(a, b) {
               var la = a.lot_no || '999999', lb = b.lot_no || '999999';
@@ -919,8 +921,13 @@
             }));
           }
         }
-        Promise.all(promises).then(function() {
+        Promise.all(promises).then(function(results) {
           hideLoading();
+          var errs = (results || []).filter(function(r) { return r && r.error; });
+          if (errs.length) {
+            showToast('출고 처리 중 ' + errs.length + '건 저장 실패: ' + ((errs[0].error && errs[0].error.message) || '권한/네트워크 오류'));
+            return;
+          }
           var h = '<div class="complete-area"><div class="complete-icon">&#10004;</div>';
           h += '<div class="complete-title">출고 처리 완료!</div>';
           h += '<div class="complete-sub">출하 ID: #' + shipId + '</div></div>';
