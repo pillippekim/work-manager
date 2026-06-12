@@ -564,9 +564,8 @@
         h += '<select id="moveRack" onchange="loadMoveSlots()">';
         h += '<option value="">-- 동 선택 --</option>';
         for (var r = 0; r < allRacks.length; r++) {
-          if (allRacks[r].id !== currentRack.id) {
-            h += '<option value="' + allRacks[r].id + '">' + allRacks[r].rack_name + '</option>';
-          }
+          var sameDong = (allRacks[r].id === currentRack.id);
+          h += '<option value="' + allRacks[r].id + '">' + allRacks[r].rack_name + (sameDong ? ' (현재 동)' : '') + '</option>';
         }
         h += '</select></div>';
         h += '<div class="modal-form-group"><label>이동할 슬롯</label>';

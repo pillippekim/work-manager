@@ -491,31 +491,29 @@
     // TAB 4: 입출고 이력
     // ═══════════════════════════════════════════
     function renderHistory() {
-      document.getElementById('tabContent').innerHTML = '<div class="empty-msg">이력을 조회합니다...</div>';
-      showLoading('이력 불러오는 중...');
-
-      supabase.from('inventory_movements').select('*').order('moved_at', { ascending: false }).limit(500)
-        .then(function(res) {
-          hideLoading();
-          allMovements = res.data || [];
-          renderHistoryTable();
-        });
-    }
-
-    function renderHistoryTable() {
       var h = '';
       h += '<div class="filter-bar">';
       h += '<input type="date" id="histDateFrom" style="width:150px">';
       h += '<span style="color:#888;font-size:13px">~</span>';
       h += '<input type="date" id="histDateTo" style="width:150px">';
       h += '<select id="histTypeFilter"><option value="">전체 유형</option><option value="inbound">입고</option><option value="outbound">출고</option><option value="adjustment">조정</option><option value="transfer">이동</option></select>';
-      h += '<input type="text" id="histSearch" placeholder="사번 검색" style="width:180px">';
+      h += '<input type="text" id="histSearch" placeholder="사번 검색" onkeydown="if(event.key===\'Enter\')filterHistoryTable()" style="width:180px">';
       h += '<button class="btn-filter" onclick="filterHistoryTable()">🔍 조회</button>';
       h += '<button class="btn-excel" onclick="exportHistory()">📥 엑셀</button>';
       h += '<button class="btn-reset" onclick="resetHistFilter()">초기화</button>';
       h += '</div>';
+      h += '<div id="histTableArea"><div class="empty-msg">이력을 조회합니다...</div></div>';
+      document.getElementById('tabContent').innerHTML = h;
+      filterHistoryTable();
+    }
 
-      h += '<div class="page-info" id="histPageInfo">총 ' + allMovements.length + '건</div>';
+    function renderHistoryRows() {
+      if (!allMovements.length) {
+        document.getElementById('histTableArea').innerHTML = '<div class="empty-msg">조회된 이력이 없습니다</div>';
+        return;
+      }
+      var h = '';
+      h += '<div class="page-info" id="histPageInfo">조회 결과: ' + allMovements.length + '건</div>';
       h += '<div class="data-table-wrap"><table class="data-table" id="histTable"><thead><tr>';
       h += '<th class="col-w150" data-sort="0" onclick="sortDataTable(\'histTable\',0)">일시 <span class="sort-icon">▲▼</span></th>';
       h += '<th class="col-w80" data-sort="1" onclick="sortDataTable(\'histTable\',1)">유형 <span class="sort-icon">▲▼</span></th>';
@@ -547,30 +545,27 @@
         h += '</tr>';
       }
       h += '</tbody></table></div>';
-      document.getElementById('tabContent').innerHTML = h;
+      document.getElementById('histTableArea').innerHTML = h;
     }
 
     function filterHistoryTable() {
       var dateFrom = document.getElementById('histDateFrom').value;
       var dateTo = document.getElementById('histDateTo').value;
       var typeFilter = document.getElementById('histTypeFilter').value;
-      var keyword = document.getElementById('histSearch').value.trim().toUpperCase();
+      var keyword = (document.getElementById('histSearch').value || '').trim();
+      document.getElementById('histTableArea').innerHTML = '<div class="empty-msg">조회 중...</div>';
 
-      var rows = document.querySelectorAll('#histTable tbody tr');
-      var shown = 0;
-      for (var i = 0; i < rows.length; i++) {
-        var type = rows[i].getAttribute('data-type');
-        var date = rows[i].getAttribute('data-date').slice(0, 10);
-        var code = (rows[i].getAttribute('data-code') || '').toUpperCase();
-        var show = true;
-        if (typeFilter && type !== typeFilter) show = false;
-        if (dateFrom && date < dateFrom) show = false;
-        if (dateTo && date > dateTo) show = false;
-        if (keyword && code.indexOf(keyword) === -1) show = false;
-        rows[i].style.display = show ? '' : 'none';
-        if (show) shown++;
-      }
-      document.getElementById('histPageInfo').textContent = '조회 결과: ' + shown + '건';
+      var q = supabase.from('inventory_movements').select('*').order('moved_at', { ascending: false });
+      if (dateFrom) q = q.gte('moved_at', dateFrom + 'T00:00:00');
+      if (dateTo) q = q.lte('moved_at', dateTo + 'T23:59:59');
+      if (typeFilter) q = q.eq('movement_type', typeFilter);
+      if (keyword) q = q.ilike('product_code', '%' + keyword + '%');
+      q = q.limit(2000);
+
+      q.then(function(res) {
+        allMovements = res.data || [];
+        renderHistoryRows();
+      });
     }
 
     function resetHistFilter() {
@@ -578,9 +573,7 @@
       document.getElementById('histDateTo').value = '';
       document.getElementById('histTypeFilter').value = '';
       document.getElementById('histSearch').value = '';
-      var rows = document.querySelectorAll('#histTable tbody tr');
-      for (var i = 0; i < rows.length; i++) rows[i].style.display = '';
-      document.getElementById('histPageInfo').textContent = '총 ' + allMovements.length + '건';
+      filterHistoryTable();
     }
 
     function exportHistory() {

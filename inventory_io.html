@@ -1250,61 +1250,75 @@
     // TAB 3: 처리이력 (기존 TAB 4에서 번호만 변경)
     // ══════════════════════════════════════
     function renderHistory() {
-      var h = '<div class="empty-msg">이력을 조회합니다...</div>';
+      var h = '';
+      h += '<div class="filter-bar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;">';
+      h += '<input type="date" id="histStart" style="padding:7px 9px;border:1px solid #d8dee9;border-radius:6px;font-size:13px;">';
+      h += '<span style="color:#888;">~</span>';
+      h += '<input type="date" id="histEnd" style="padding:7px 9px;border:1px solid #d8dee9;border-radius:6px;font-size:13px;">';
+      h += '<select id="histType" style="padding:7px 9px;border:1px solid #d8dee9;border-radius:6px;font-size:13px;">';
+      h += '<option value="">전체 유형</option><option value="inbound">입고</option>';
+      h += '<option value="outbound">출고</option><option value="adjustment">조정</option></select>';
+      h += '<input type="text" id="histSabun" placeholder="사번 검색" onkeydown="if(event.key===\'Enter\')loadHistory()" style="padding:7px 9px;border:1px solid #d8dee9;border-radius:6px;font-size:13px;width:140px;">';
+      h += '<button class="action-btn primary" style="padding:7px 16px;" onclick="loadHistory()">&#128269; 조회</button>';
+      h += '<button class="action-btn secondary" style="padding:7px 16px;" onclick="resetHistory()">초기화</button>';
+      h += '</div>';
+      h += '<div id="histTableArea"><div class="empty-msg">이력을 조회합니다...</div></div>';
       document.getElementById('tabContent').innerHTML = h;
-
-      supabase.from('inventory_movements').select('*').order('moved_at', { ascending: false }).limit(50)
-        .then(function(res) {
-          var movements = res.data || [];
-          if (movements.length === 0) {
-            document.getElementById('tabContent').innerHTML = '<div class="empty-msg">처리 이력이 없습니다</div>';
-            return;
-          }
-
-          var h2 = '';
-          h2 += '<div class="filter-bar">';
-          h2 += '<select id="histFilter" onchange="filterHistory()">';
-          h2 += '<option value="">전체</option><option value="inbound">입고</option>';
-          h2 += '<option value="outbound">출고</option><option value="adjustment">조정</option>';
-          h2 += '</select></div>';
-
-          h2 += '<div class="section-box">';
-          h2 += '<div class="data-table-wrap"><table class="data-table" id="histTable"><thead><tr>';
-          h2 += '<th>일시</th><th>유형</th><th>사번</th><th>LOT</th>';
-          h2 += '<th style="text-align:right">수량</th><th>위치</th><th>사유</th>';
-          h2 += '</tr></thead><tbody>';
-
-          for (var i = 0; i < movements.length; i++) {
-            var m = movements[i];
-            var typeText = m.movement_type === 'inbound' ? '입고' : (m.movement_type === 'outbound' ? '출고' : '조정');
-            var typeBadge = m.movement_type === 'inbound' ? 'stocked' : (m.movement_type === 'outbound' ? 'shipped' : 'waiting');
-            var loc = m.movement_type === 'inbound' ? (m.to_location || '-') : (m.from_location || '-');
-            h2 += '<tr data-type="' + m.movement_type + '">';
-            h2 += '<td>' + (m.moved_at ? m.moved_at.slice(0, 16).replace('T', ' ') : '-') + '</td>';
-            h2 += '<td><span class="status-badge ' + typeBadge + '">' + typeText + '</span></td>';
-            h2 += '<td><strong>' + (m.product_code || '-') + '</strong></td>';
-            h2 += '<td>' + (m.lot_no || '-') + '</td>';
-            h2 += '<td class="qty-cell">' + (m.quantity || 0).toLocaleString() + '</td>';
-            h2 += '<td>' + loc + '</td>';
-            h2 += '<td style="font-size:12px;color:#888;">' + (m.reason || '-') + '</td>';
-            h2 += '</tr>';
-          }
-          h2 += '</tbody></table></div>';
-          h2 += '</div>';
-          document.getElementById('tabContent').innerHTML = h2;
-        });
+      loadHistory();
     }
 
-    function filterHistory() {
-      var filter = document.getElementById('histFilter').value;
-      var rows = document.querySelectorAll('#histTable tbody tr');
-      for (var i = 0; i < rows.length; i++) {
-        if (!filter || rows[i].getAttribute('data-type') === filter) {
-          rows[i].style.display = '';
-        } else {
-          rows[i].style.display = 'none';
+    function loadHistory() {
+      var start = document.getElementById('histStart').value;
+      var end = document.getElementById('histEnd').value;
+      var type = document.getElementById('histType').value;
+      var sabun = (document.getElementById('histSabun').value || '').trim();
+      document.getElementById('histTableArea').innerHTML = '<div class="empty-msg">조회 중...</div>';
+
+      var q = supabase.from('inventory_movements').select('*').order('moved_at', { ascending: false });
+      if (start) q = q.gte('moved_at', start + 'T00:00:00');
+      if (end) q = q.lte('moved_at', end + 'T23:59:59');
+      if (type) q = q.eq('movement_type', type);
+      if (sabun) q = q.ilike('product_code', '%' + sabun + '%');
+      q = q.limit(1000);
+
+      q.then(function(res) {
+        var movements = res.data || [];
+        if (movements.length === 0) {
+          document.getElementById('histTableArea').innerHTML = '<div class="empty-msg">조회된 이력이 없습니다</div>';
+          return;
         }
-      }
+        var h2 = '<div class="section-box">';
+        h2 += '<div style="padding:0 4px 8px;font-size:12px;color:#888;">총 ' + movements.length + '건</div>';
+        h2 += '<div class="data-table-wrap"><table class="data-table"><thead><tr>';
+        h2 += '<th>일시</th><th>유형</th><th>사번</th><th>LOT</th>';
+        h2 += '<th style="text-align:right">수량</th><th>위치</th><th>사유</th>';
+        h2 += '</tr></thead><tbody>';
+        for (var i = 0; i < movements.length; i++) {
+          var m = movements[i];
+          var typeText = m.movement_type === 'inbound' ? '입고' : (m.movement_type === 'outbound' ? '출고' : '조정');
+          var typeBadge = m.movement_type === 'inbound' ? 'stocked' : (m.movement_type === 'outbound' ? 'shipped' : 'waiting');
+          var loc = m.movement_type === 'inbound' ? (m.to_location || '-') : (m.from_location || '-');
+          h2 += '<tr>';
+          h2 += '<td>' + (m.moved_at ? m.moved_at.slice(0, 16).replace('T', ' ') : '-') + '</td>';
+          h2 += '<td><span class="status-badge ' + typeBadge + '">' + typeText + '</span></td>';
+          h2 += '<td><strong>' + (m.product_code || '-') + '</strong></td>';
+          h2 += '<td>' + (m.lot_no || '-') + '</td>';
+          h2 += '<td class="qty-cell">' + (m.quantity || 0).toLocaleString() + '</td>';
+          h2 += '<td>' + loc + '</td>';
+          h2 += '<td style="font-size:12px;color:#888;">' + (m.reason || '-') + '</td>';
+          h2 += '</tr>';
+        }
+        h2 += '</tbody></table></div></div>';
+        document.getElementById('histTableArea').innerHTML = h2;
+      });
+    }
+
+    function resetHistory() {
+      document.getElementById('histStart').value = '';
+      document.getElementById('histEnd').value = '';
+      document.getElementById('histType').value = '';
+      document.getElementById('histSabun').value = '';
+      loadHistory();
     }
 
     // ── 유틸 ──
