@@ -362,7 +362,7 @@
       var h = '';
       h += '<div class="filter-bar">';
       h += '<select id="slotRackFilter" onchange="filterSlotTable()">' + rackOptions + '</select>';
-      h += '<select id="slotStatusFilter" onchange="filterSlotTable()"><option value="">전체</option><option value="occupied">적재중</option><option value="empty">비어있음</option></select>';
+      h += '<select id="slotStatusFilter" onchange="filterSlotTable()"><option value="">전체</option><option value="occupied">적재중</option><option value="kept">재고 0 (사번 유지)</option><option value="shortage">출고부족</option><option value="empty">비어있음</option></select>';
       h += '<input type="text" id="slotSearch" placeholder="사번 검색" style="width:200px">';
       h += '<button class="btn-filter" onclick="filterSlotTable()">🔍 조회</button>';
       h += '<button class="btn-excel" onclick="exportSlot()">📥 엑셀 다운로드</button>';
@@ -382,10 +382,16 @@
         var s = allSlots[i];
         var rackName = s.inventory_racks ? s.inventory_racks.rack_name : '-';
         var rackId = s.rack_id || '';
+        var hasShort = s.shortage_qty && s.shortage_qty > 0;
         var isOccupied = s.product_code && s.quantity > 0;
-        var statusBadge = isOccupied ? '<span class="status-badge stocked">적재중</span>' : '<span class="status-badge empty">비어있음</span>';
+        var isKept = s.product_code && (!s.quantity || s.quantity === 0) && !hasShort;
+        var statusBadge, dataStatus;
+        if (hasShort) { statusBadge = '<span class="status-badge" style="background:#ffe0e0;color:#C62828;">출고부족 -' + Number(s.shortage_qty).toLocaleString() + '</span>'; dataStatus = 'shortage'; }
+        else if (isOccupied) { statusBadge = '<span class="status-badge stocked">적재중</span>'; dataStatus = 'occupied'; }
+        else if (isKept) { statusBadge = '<span class="status-badge" style="background:#eef1f5;color:#555;">재고 0</span>'; dataStatus = 'kept'; }
+        else { statusBadge = '<span class="status-badge empty">비어있음</span>'; dataStatus = 'empty'; }
 
-        h += '<tr data-rack="' + rackId + '" data-status="' + (isOccupied ? 'occupied' : 'empty') + '" data-code="' + (s.product_code || '') + '">';
+        h += '<tr data-rack="' + rackId + '" data-status="' + dataStatus + '" data-code="' + (s.product_code || '') + '">';
         h += '<td>' + rackName + '</td>';
         h += '<td><strong>' + (s.slot_code || '') + '</strong></td>';
         h += '<td>' + statusBadge + '</td>';

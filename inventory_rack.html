@@ -61,10 +61,15 @@
       justify-content: center; position: relative;
     }
     .slot-cell:hover { border-color: #4A90D9; box-shadow: 0 2px 8px rgba(74,144,217,0.2); transform: translateY(-1px); }
-    .slot-cell.empty { background: #fafafa; }
+    .slot-cell.empty { background: #8E8D86; border-color: #6F6E69; }
+    .slot-cell.empty .slot-code { color: #F1EFE8; }
+    .slot-cell.empty .slot-qty { color: #E4E2DA; }
+    .slot-cell.kept { background: #ffffff; border-color: #d8dee9; }
     .slot-cell.occupied { background: #e8f5e9; border-color: #81C784; }
     .slot-cell.reserved { background: #fff3e0; border-color: #FFB74D; }
     .slot-cell.negative { background: #ffebee; border-color: #E57373; }
+    .slot-cell.shortage { background: #ffe0e0; border-color: #E57373; }
+    .slot-cell .slot-short { font-size: 11px; font-weight: 700; color: #C62828; margin-top: 2px; }
     .slot-cell .slot-code { font-size: 12px; font-weight: 700; color: #333; }
     .slot-cell .slot-product { font-size: 11px; color: #555; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .slot-cell .slot-qty { font-size: 13px; font-weight: 700; margin-top: 2px; }
@@ -244,10 +249,10 @@
         </div>
         <div style="flex:1;"></div>
         <div class="slot-legend">
-          <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#fafafa;"></div> 빈 슬롯</div>
           <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#e8f5e9;border-color:#81C784;"></div> 적재중</div>
-          <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#fff3e0;border-color:#FFB74D;"></div> 예약</div>
-          <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#ffebee;border-color:#E57373;"></div> 마이너스</div>
+          <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#ffffff;border-color:#d8dee9;"></div> 사번 유지·재고 0</div>
+          <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#ffe0e0;border-color:#E57373;"></div> 출고부족</div>
+          <div class="slot-legend-item"><div class="slot-legend-dot" style="background:#8E8D86;border-color:#6F6E69;"></div> 빈 슬롯</div>
         </div>
       </div>
       <div class="rack-stats">
@@ -255,7 +260,7 @@
         <div class="rack-stat-item">사용 <strong id="sSUsed">0</strong>칸</div>
         <div class="rack-stat-item">빈칸 <strong id="sSEmpty">0</strong>칸</div>
         <div class="rack-stat-item">사용률 <strong id="sSRate">0%</strong></div>
-        <div class="rack-stat-item highlight">마이너스 <strong id="sSNeg">0</strong>건</div>
+        <div class="rack-stat-item highlight">출고부족 <strong id="sSNeg">0</strong>건</div>
       </div>
       <div class="batch-bar" id="batchBar">
         <div class="batch-bar-title">📦 일괄 입고 모드</div>
@@ -345,8 +350,8 @@
     function updateStats() {
       var total = currentSlots.length, used = 0, neg = 0;
       for (var i = 0; i < currentSlots.length; i++) {
-        if (currentSlots[i].status === 'occupied') used++;
-        if (currentSlots[i].quantity < 0) neg++;
+        if (currentSlots[i].quantity > 0) used++;
+        if ((currentSlots[i].shortage_qty && currentSlots[i].shortage_qty > 0) || currentSlots[i].quantity < 0) neg++;
       }
       document.getElementById('sSTotal').textContent = total;
       document.getElementById('sSUsed').textContent = used;
@@ -364,9 +369,11 @@
         for (var c = 1; c <= cols; c++) {
           var slot = findSlot(r, c);
           if (!slot) { h += '<div class="slot-cell empty" style="opacity:0.3;"><div class="slot-code">-</div></div>'; continue; }
-          var cellClass = 'empty', qtyClass = 'zero', qtyText = '-', prodText = '';
-          if (slot.quantity < 0) { cellClass = 'negative'; qtyClass = 'neg'; qtyText = slot.quantity.toLocaleString(); prodText = slot.product_code || ''; }
-          else if (slot.status === 'occupied' && slot.quantity > 0) { cellClass = 'occupied'; qtyClass = 'positive'; qtyText = slot.quantity.toLocaleString(); prodText = slot.product_code || ''; }
+          var cellClass = 'empty', qtyClass = 'zero', qtyText = '-', prodText = '', shortText = '';
+          if (slot.shortage_qty && slot.shortage_qty > 0) { cellClass = 'shortage'; qtyClass = 'zero'; qtyText = '0'; prodText = slot.product_code || ''; shortText = '출고부족 -' + Number(slot.shortage_qty).toLocaleString(); }
+          else if (slot.quantity < 0) { cellClass = 'negative'; qtyClass = 'neg'; qtyText = slot.quantity.toLocaleString(); prodText = slot.product_code || ''; }
+          else if (slot.product_code && slot.quantity > 0) { cellClass = 'occupied'; qtyClass = 'positive'; qtyText = slot.quantity.toLocaleString(); prodText = slot.product_code; }
+          else if (slot.product_code && slot.quantity === 0) { cellClass = 'kept'; qtyClass = 'zero'; qtyText = '0'; prodText = slot.product_code; }
           else if (slot.status === 'reserved') { cellClass = 'reserved'; prodText = slot.product_code || '예약'; }
 
           // 일괄 입고 모드
@@ -381,7 +388,9 @@
           }
           h += '<div class="slot-code">' + slot.slot_code + '</div>';
           if (prodText) h += '<div class="slot-product">' + prodText + '</div>';
-          h += '<div class="slot-qty ' + qtyClass + '">' + qtyText + '</div></div>';
+          h += '<div class="slot-qty ' + qtyClass + '">' + qtyText + '</div>';
+          if (shortText) h += '<div class="slot-short">' + shortText + '</div>';
+          h += '</div>';
         }
       }
       h += '</div>';
@@ -623,7 +632,7 @@
       if (!pc) { showToast('사번을 입력해주세요'); return; }
       if (qty <= 0) { showToast('수량을 입력해주세요'); return; }
 
-      supabase.from('inventory_rack_slots').update({ product_code: pc, lot_no: ln, quantity: qty, status: 'occupied' }).eq('id', slotId)
+      supabase.from('inventory_rack_slots').update({ product_code: pc, lot_no: ln, quantity: qty, status: 'occupied', shortage_qty: 0 }).eq('id', slotId)
         .then(function(res) {
           if (res.error) { showToast('오류: ' + res.error.message); return; }
           logMovement(pc, 'inbound', null, currentRack.rack_name + '-' + findSlotById(slotId).slot_code, qty, ln, '슬롯 입고');
@@ -638,7 +647,7 @@
       if (addQty <= 0) { showToast('추가 수량을 입력해주세요'); return; }
       var newQty = slot.quantity + addQty;
 
-      supabase.from('inventory_rack_slots').update({ quantity: newQty }).eq('id', slotId)
+      supabase.from('inventory_rack_slots').update({ quantity: newQty, shortage_qty: 0 }).eq('id', slotId)
         .then(function(res) {
           if (res.error) { showToast('오류: ' + res.error.message); return; }
           logMovement(slot.product_code, 'inbound', null, currentRack.rack_name + '-' + slot.slot_code, addQty, slot.lot_no, '추가 입고 (' + slot.quantity + ' → ' + newQty + ')');
@@ -668,7 +677,7 @@
       var slot = findSlotById(slotId);
       if (!confirm(slot.slot_code + ' 슬롯 ' + slot.product_code + ' ' + (slot.quantity || 0).toLocaleString() + '개를 전량 출고하시겠습니까?')) return;
 
-      supabase.from('inventory_rack_slots').update({ product_code: null, lot_no: null, quantity: 0, status: 'empty' }).eq('id', slotId)
+      supabase.from('inventory_rack_slots').update({ quantity: 0, status: 'empty', shortage_qty: 0 }).eq('id', slotId)
         .then(function(res) {
           if (res.error) { showToast('오류: ' + res.error.message); return; }
           logMovement(slot.product_code, 'outbound', currentRack.rack_name + '-' + slot.slot_code, null, slot.quantity, slot.lot_no, '전량 출고');
@@ -719,11 +728,11 @@
 
       // 원본 슬롯 차감
       var fromNewQty = slot.quantity - moveQty;
-      var fromUpdate = { quantity: fromNewQty };
+      var fromUpdate = { quantity: fromNewQty, shortage_qty: 0 };
       if (fromNewQty <= 0) { fromUpdate.status = 'empty'; fromUpdate.product_code = null; fromUpdate.lot_no = null; fromUpdate.quantity = 0; }
 
       // 대상 슬롯 입고
-      var toUpdate = { product_code: slot.product_code, lot_no: slot.lot_no, quantity: moveQty, status: 'occupied' };
+      var toUpdate = { product_code: slot.product_code, lot_no: slot.lot_no, quantity: moveQty, status: 'occupied', shortage_qty: 0 };
 
       Promise.all([
         supabase.from('inventory_rack_slots').update(fromUpdate).eq('id', slotId),
@@ -747,7 +756,7 @@
       if (!reason) { showToast('사유를 반드시 입력해주세요'); return; }
       if (newQty === slot.quantity) { showToast('변경사항이 없습니다'); return; }
 
-      var updateData = { quantity: newQty };
+      var updateData = { quantity: newQty, shortage_qty: 0 };
       if (newQty <= 0) { updateData.status = 'empty'; updateData.product_code = null; updateData.lot_no = null; updateData.quantity = 0; }
 
       supabase.from('inventory_rack_slots').update(updateData).eq('id', slotId)
@@ -766,7 +775,7 @@
     function doClear(slotId) {
       var slot = findSlotById(slotId);
       if (!confirm(slot.slot_code + ' 슬롯을 비우시겠습니까?')) return;
-      supabase.from('inventory_rack_slots').update({ product_code: null, lot_no: null, quantity: 0, status: 'empty' }).eq('id', slotId)
+      supabase.from('inventory_rack_slots').update({ product_code: null, lot_no: null, quantity: 0, status: 'empty', shortage_qty: 0 }).eq('id', slotId)
         .then(function(res) {
           if (res.error) { showToast('오류: ' + res.error.message); return; }
           showToast('슬롯 초기화 완료!'); closeModal(); loadSlots();

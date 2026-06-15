@@ -542,7 +542,8 @@
         product_code: lot.product_code,
         lot_no: lot.lot_no,
         quantity: lot.quantity,
-        status: 'occupied'
+        status: 'occupied',
+        shortage_qty: 0
       }).eq('id', slotId);
 
       var rackName = '';
@@ -912,7 +913,8 @@
           for (var j = 0; j < mr.matched_slots.length; j++) {
             var ms = mr.matched_slots[j];
             var ud = { quantity: ms.after_qty };
-            if (ms.after_qty <= 0) { ud.status = 'empty'; ud.product_code = null; ud.lot_no = null; ud.quantity = 0; }
+            if (ms.after_qty <= 0) { ud.quantity = 0; ud.status = 'empty'; }
+            if (j === mr.matched_slots.length - 1 && mr.remain_qty > 0) { ud.shortage_qty = mr.remain_qty; }
             promises.push(supabase.from('inventory_rack_slots').update(ud).eq('id', ms.slot_id));
             promises.push(supabase.from('inventory_movements').insert({
               product_code: row.product_code, movement_type: 'outbound',
