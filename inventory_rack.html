@@ -660,8 +660,21 @@
       var slot = findSlotById(slotId);
       var outQty = parseInt(document.getElementById('outQty').value) || 0;
       if (outQty <= 0) { showToast('출고 수량을 입력해주세요'); return; }
-      if (outQty > slot.quantity) { showToast('현재 수량(' + slot.quantity.toLocaleString() + ')보다 많습니다'); return; }
       if (outQty === slot.quantity) { doFullOut(slotId); return; }
+
+      // 재고보다 많이 출고 → 전량 출고 + 부족분을 '출고부족'으로 표시 (사번 유지)
+      if (outQty > slot.quantity) {
+        var shortage = outQty - slot.quantity;
+        if (!confirm('현재 재고(' + slot.quantity.toLocaleString() + '개)보다 ' + shortage.toLocaleString() + '개 많습니다.\n재고 전량을 출고하고 부족분 ' + shortage.toLocaleString() + '개를 "출고부족"으로 표시할까요?')) return;
+        var shipped = slot.quantity;
+        supabase.from('inventory_rack_slots').update({ quantity: 0, status: 'empty', shortage_qty: shortage }).eq('id', slotId)
+          .then(function(res) {
+            if (res.error) { showToast('오류: ' + res.error.message); return; }
+            logMovement(slot.product_code, 'outbound', currentRack.rack_name + '-' + slot.slot_code, null, shipped, slot.lot_no, '출고 (출고부족 ' + shortage.toLocaleString() + ')');
+            showToast('출고 완료 · 출고부족 ' + shortage.toLocaleString() + '개 표시됨'); closeModal(); loadSlots();
+          });
+        return;
+      }
 
       var newQty = slot.quantity - outQty;
       supabase.from('inventory_rack_slots').update({ quantity: newQty }).eq('id', slotId)
