@@ -126,9 +126,10 @@
         </div>
         <div class="form-grid form-grid-2" id="workerFields">
           <div class="form-group"><label class="form-label">공정 <span class="required">*</span></label>
-            <select class="form-select" id="add_process"><option value="포장">포장</option><option value="재단">재단</option><option value="도포">도포</option><option value="검사">검사</option><option value="쇼트">쇼트</option><option value="성형">성형</option><option value="혼련(CMB)">혼련(CMB)</option></select>
+            <select class="form-select" id="add_process"><option value="포장">포장</option><option value="재단">재단</option><option value="도포">도포</option><option value="검사">검사</option><option value="쇼트">쇼트</option><option value="사상">사상</option><option value="조립">조립</option><option value="성형">성형</option><option value="2차가류">2차가류</option><option value="혼련(CMB)">혼련(CMB)</option></select>
           </div>
           <div class="form-group"><label class="form-label">직책 (선택)</label><input class="form-input" id="add_position" placeholder="예: 반장, 사원" /></div>
+          <div class="form-group" style="grid-column:1/-1"><label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="add_use_unified" style="width:16px;height:16px" />통합작업일지 사용 (병행 작업: 사상·조립·검사·포장)</label></div>
         </div>
         <div class="form-grid form-grid-2 hidden" id="adminFields">
           <div class="form-group"><label class="form-label">부서 <span class="required">*</span></label>
@@ -200,9 +201,10 @@
       </div>
       <div class="form-grid form-grid-2" id="edit_workerFields">
         <div class="form-group"><label class="form-label">공정 <span class="required">*</span></label>
-          <select class="form-select" id="edit_process"><option value="포장">포장</option><option value="재단">재단</option><option value="도포">도포</option><option value="검사">검사</option><option value="쇼트">쇼트</option><option value="성형">성형</option><option value="혼련(CMB)">혼련(CMB)</option></select>
+          <select class="form-select" id="edit_process"><option value="포장">포장</option><option value="재단">재단</option><option value="도포">도포</option><option value="검사">검사</option><option value="쇼트">쇼트</option><option value="사상">사상</option><option value="조립">조립</option><option value="성형">성형</option><option value="2차가류">2차가류</option><option value="혼련(CMB)">혼련(CMB)</option></select>
         </div>
         <div class="form-group"><label class="form-label">직책 (선택)</label><input class="form-input" id="edit_position_w" placeholder="예: 반장, 사원" /></div>
+        <div class="form-group" style="grid-column:1/-1"><label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="edit_use_unified" style="width:16px;height:16px" />통합작업일지 사용 (병행 작업: 사상·조립·검사·포장)</label></div>
       </div>
       <div class="form-grid form-grid-2 hidden" id="edit_adminFields">
         <div class="form-group"><label class="form-label">부서 <span class="required">*</span></label>
@@ -397,6 +399,9 @@ async function addUser() {
   var result = await callFunction(payload);
   btn.disabled = false; btn.textContent = '계정 생성';
   if (result && result.success) {
+    if (currentUserType === 'worker' && document.getElementById('add_use_unified').checked) {
+      await db.from('users').update({ use_unified: true }).eq('emp_code', empCode);
+    }
     showToast(name + ' 계정 생성 완료! 초기 비번: ' + empCode);
     resetAddForm();
     switchTab('list');
@@ -409,6 +414,7 @@ function resetAddForm() {
   document.getElementById('add_name').value = '';
   document.getElementById('add_position').value = '';
   document.getElementById('add_position2').value = '';
+  var au = document.getElementById('add_use_unified'); if (au) au.checked = false;
 }
 
 // ── 사용자 수정 ──
@@ -426,6 +432,7 @@ function openEditModal(id) {
   if (u.user_type === 'worker') {
     document.getElementById('edit_process').value = u.process || '포장';
     document.getElementById('edit_position_w').value = u.position || '';
+    document.getElementById('edit_use_unified').checked = !!u.use_unified;
   } else {
     document.getElementById('edit_department').value = u.department || '연구개발팀';
     document.getElementById('edit_position_a').value = u.position || '';
@@ -454,10 +461,12 @@ async function saveEditUser() {
     updateData.process = document.getElementById('edit_process').value;
     updateData.department = null;
     updateData.position = document.getElementById('edit_position_w').value.trim() || null;
+    updateData.use_unified = document.getElementById('edit_use_unified').checked;
   } else {
     updateData.department = document.getElementById('edit_department').value;
     updateData.process = null;
     updateData.position = document.getElementById('edit_position_a').value.trim() || null;
+    updateData.use_unified = false;
   }
   var btn = document.getElementById('saveEditBtn');
   btn.disabled = true; btn.textContent = '저장 중...';
