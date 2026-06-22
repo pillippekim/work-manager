@@ -363,6 +363,12 @@
     function renderSlotGrid() {
       var rows = currentRack.total_rows;
       var cols = currentRack.total_cols;
+      // 실제 슬롯에 존재하는 최대 단(행)·호(열)까지 그리도록 보정
+      // (슬롯을 추가/변경해 total_rows·total_cols보다 많아져도 모두 표시됨)
+      for (var ci = 0; ci < currentSlots.length; ci++) {
+        if (currentSlots[ci].row_no > rows) rows = currentSlots[ci].row_no;
+        if (currentSlots[ci].col_no > cols) cols = currentSlots[ci].col_no;
+      }
       var h = '<div class="slot-grid" style="grid-template-columns: 40px repeat(' + cols + ', 1fr);">';
       for (var r = rows; r >= 1; r--) {
         h += '<div class="row-label">' + (r * 100) + '번대</div>';

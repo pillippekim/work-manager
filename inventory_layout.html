@@ -284,13 +284,28 @@
       return h;
     }
 
+    function usageRing(rate) {
+      var color = getUsageColor(rate);
+      var r = 15, c = 2 * Math.PI * r;
+      var off = (c * (1 - rate / 100)).toFixed(1);
+      var s = '';
+      s += '<svg width="42" height="42" viewBox="0 0 42 42" style="display:block;margin:6px auto 2px;">';
+      s += '<circle cx="21" cy="21" r="' + r + '" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="4"/>';
+      s += '<circle cx="21" cy="21" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="4" stroke-linecap="round" stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + off + '" transform="rotate(-90 21 21)"/>';
+      s += '<text x="21" y="21" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="11" font-weight="700">' + rate + '%</text>';
+      s += '</svg>';
+      return s;
+    }
+
     function buildVertical(rack) {
       var s = getRackStats(rack.id);
+      var rate = s.total > 0 ? Math.round((s.used / s.total) * 100) : 0;
       var name = rack.rack_name;
       var num = name.replace('동', '');
       var h = '';
       h += '<div class="rack-v" onclick="goToRack(\'' + rack.rack_code + '\')" title="' + rack.rack_name + ' 상세보기">';
       h += '<div class="rv-name">' + num + '<span>동</span></div>';
+      h += usageRing(rate);
       h += '<div class="rv-stat">' + s.used + '/' + s.total + '</div>';
       h += '</div>';
       return h;
@@ -352,9 +367,11 @@
       var r11 = findRack('R11');
       if (r11) {
         var s11 = getRackStats(r11.id);
+        var rate11 = s11.total > 0 ? Math.round((s11.used / s11.total) * 100) : 0;
         h += '<div class="g-left"><div class="rack-v" onclick="goToRack(\'R11\')" title="11동 상세보기">';
         h += '<div class="rv-name">11<span>동</span></div>';
         h += '<div class="rv-stat" style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:4px;">호 1~27</div>';
+        h += usageRing(rate11);
         h += '<div class="rv-stat">' + s11.used + '/' + s11.total + '</div>';
         h += '</div></div>';
       } else { h += '<div class="g-left"></div>'; }
