@@ -462,6 +462,60 @@ th.sortable.desc::after { content:'▼'; color:#243bb2; }
   </div>
 </div>
 
+<!-- 도포 수정 모달 -->
+<div class="modal-overlay" id="editCoatingModal">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-title">🖌️ 도포 작업일지 수정</div>
+    <div class="modal-sub" id="editCoatingMeta">-</div>
+    <input type="hidden" id="eco_id" />
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field"><span class="modal-label">작업일</span><input class="modal-input" type="date" id="eco_work_date" /></div>
+      <div class="modal-field"><span class="modal-label">사번</span><input class="modal-input" id="eco_worker_id" /></div>
+      <div class="modal-field"><span class="modal-label">작업자</span><input class="modal-input" id="eco_worker_name" /></div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field"><span class="modal-label">작업종류</span><input class="modal-input" id="eco_work_type" /></div>
+      <div class="modal-field"><span class="modal-label">줄당EA</span><input class="modal-input" type="number" id="eco_qty_per_line" /></div>
+      <div class="modal-field"><span class="modal-label">줄수</span><input class="modal-input" type="number" id="eco_line_count" /></div>
+    </div>
+    <div class="modal-grid modal-grid-2">
+      <div class="modal-field"><span class="modal-label">불량수량</span><input class="modal-input" type="number" id="eco_defect_qty" /></div>
+      <div class="modal-field"><span class="modal-label">비고</span><input class="modal-input" id="eco_note" /></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal('editCoatingModal')">취소</button>
+      <button class="btn-modal-save" onclick="saveEditCoating()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 2차가류 수정 모달 -->
+<div class="modal-overlay" id="editPostcureModal">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-title">🔥 2차가류 작업일지 수정</div>
+    <div class="modal-sub" id="editPostcureMeta">-</div>
+    <input type="hidden" id="epc_id" />
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field"><span class="modal-label">작업일</span><input class="modal-input" type="date" id="epc_work_date" /></div>
+      <div class="modal-field"><span class="modal-label">사번</span><input class="modal-input" id="epc_worker_id" /></div>
+      <div class="modal-field"><span class="modal-label">작업자</span><input class="modal-input" id="epc_worker_name" /></div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field"><span class="modal-label">온도(℃)</span><input class="modal-input" type="number" id="epc_temperature" /></div>
+      <div class="modal-field"><span class="modal-label">시간(분)</span><input class="modal-input" type="number" id="epc_duration_min" /></div>
+      <div class="modal-field"><span class="modal-label">투입량</span><input class="modal-input" type="number" id="epc_input_qty" /></div>
+    </div>
+    <div class="modal-grid modal-grid-2">
+      <div class="modal-field"><span class="modal-label">경도</span><input class="modal-input" id="epc_hardness" /></div>
+      <div class="modal-field"><span class="modal-label">비고</span><input class="modal-input" id="epc_note" /></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal('editPostcureModal')">취소</button>
+      <button class="btn-modal-save" onclick="saveEditPostcure()">저장</button>
+    </div>
+  </div>
+</div>
+
 <!-- 조립 수정 모달 -->
 <div class="modal-overlay" id="editAssemblyModal">
   <div class="modal-box" style="max-width:680px">
@@ -2074,33 +2128,35 @@ function renderCoatingTable(data) {
 let editingCoatingBefore = null;
 function openEditCoating(r) {
   editingCoatingBefore = JSON.parse(JSON.stringify(r));
-  // 간단한 프롬프트 방식 수정 (모달 없이)
-  const newWorkType = prompt('작업종류:', r.work_type || '');
-  if (newWorkType === null) return;
-  const newPerLine = prompt('줄당EA:', r.qty_per_line || '0');
-  if (newPerLine === null) return;
-  const newLines = prompt('줄수:', r.line_count || '0');
-  if (newLines === null) return;
-  const newDefect = prompt('불량수량:', r.defect_qty || '0');
-  if (newDefect === null) return;
-  const newNote = prompt('비고:', r.note || '');
-  if (newNote === null) return;
+  document.getElementById('eco_id').value = r.id;
+  document.getElementById('eco_work_date').value = r.work_date || '';
+  document.getElementById('eco_worker_id').value = r.worker_id || '';
+  document.getElementById('eco_worker_name').value = r.worker_name || '';
+  document.getElementById('eco_work_type').value = r.work_type || '';
+  document.getElementById('eco_qty_per_line').value = r.qty_per_line || 0;
+  document.getElementById('eco_line_count').value = r.line_count || 0;
+  document.getElementById('eco_defect_qty').value = r.defect_qty || 0;
+  document.getElementById('eco_note').value = r.note || '';
+  document.getElementById('editCoatingMeta').textContent = '작업일: ' + (r.work_date||'-') + ' · 작업자: ' + (r.worker_name||'-');
+  document.getElementById('editCoatingModal').classList.add('open');
+}
 
-  const pl = parseInt(newPerLine) || 0;
-  const lc = parseInt(newLines) || 0;
-
-  saveEditCoating(r.id, {
-    work_type: newWorkType,
+async function saveEditCoating() {
+  const id = parseInt(document.getElementById('eco_id').value);
+  const pl = parseInt(document.getElementById('eco_qty_per_line').value) || 0;
+  const lc = parseInt(document.getElementById('eco_line_count').value) || 0;
+  const updates = {
+    work_date: document.getElementById('eco_work_date').value,
+    worker_id: document.getElementById('eco_worker_id').value.trim(),
+    worker_name: document.getElementById('eco_worker_name').value.trim(),
+    work_type: document.getElementById('eco_work_type').value.trim(),
     qty_per_line: pl,
     line_count: lc,
     total_qty: pl * lc,
-    defect_qty: parseInt(newDefect) || 0,
-    note: newNote,
+    defect_qty: parseInt(document.getElementById('eco_defect_qty').value) || 0,
+    note: document.getElementById('eco_note').value.trim(),
     updated_at: new Date().toISOString()
-  });
-}
-
-async function saveEditCoating(id, updates) {
+  };
   const { error } = await db.from('coating_reports').update(updates).eq('id', id);
   if (error) { alert('수정 실패: ' + error.message); return; }
 
@@ -2117,6 +2173,7 @@ async function saveEditCoating(id, updates) {
     });
   } catch(e) {}
 
+  closeModal('editCoatingModal');
   alert('수정 완료!');
   loadData();
 }
@@ -2194,33 +2251,38 @@ function renderPostcureTable(data) {
 let editingPostcureBefore = null;
 function openEditPostcure(r) {
   editingPostcureBefore = JSON.parse(JSON.stringify(r));
-  const newTemp = prompt('온도(℃):', r.temperature || '');
-  if (newTemp === null) return;
-  const newDur = prompt('시간(분):', r.duration_min || '');
-  if (newDur === null) return;
-  const newInput = prompt('투입량:', r.input_qty || '0');
-  if (newInput === null) return;
-  const newHardness = prompt('경도:', r.hardness || '');
-  if (newHardness === null) return;
-  const newNote = prompt('비고:', r.note || '');
-  if (newNote === null) return;
-
-  saveEditPostcure(r.id, {
-    temperature: parseFloat(newTemp) || null,
-    duration_min: parseInt(newDur) || null,
-    input_qty: parseInt(newInput) || 0,
-    hardness: newHardness,
-    note: newNote,
-    updated_at: new Date().toISOString()
-  });
+  document.getElementById('epc_id').value = r.id;
+  document.getElementById('epc_work_date').value = r.work_date || '';
+  document.getElementById('epc_worker_id').value = r.worker_id || '';
+  document.getElementById('epc_worker_name').value = r.worker_name || '';
+  document.getElementById('epc_temperature').value = r.temperature || '';
+  document.getElementById('epc_duration_min').value = r.duration_min || '';
+  document.getElementById('epc_input_qty').value = r.input_qty || 0;
+  document.getElementById('epc_hardness').value = r.hardness || '';
+  document.getElementById('epc_note').value = r.note || '';
+  document.getElementById('editPostcureMeta').textContent = '작업일: ' + (r.work_date||'-') + ' · 작업자: ' + (r.worker_name||'-');
+  document.getElementById('editPostcureModal').classList.add('open');
 }
 
-async function saveEditPostcure(id, updates) {
+async function saveEditPostcure() {
+  const id = parseInt(document.getElementById('epc_id').value);
+  const updates = {
+    work_date: document.getElementById('epc_work_date').value,
+    worker_id: document.getElementById('epc_worker_id').value.trim(),
+    worker_name: document.getElementById('epc_worker_name').value.trim(),
+    temperature: parseFloat(document.getElementById('epc_temperature').value) || null,
+    duration_min: parseInt(document.getElementById('epc_duration_min').value) || null,
+    input_qty: parseInt(document.getElementById('epc_input_qty').value) || 0,
+    hardness: document.getElementById('epc_hardness').value.trim(),
+    note: document.getElementById('epc_note').value.trim(),
+    updated_at: new Date().toISOString()
+  };
   const { error } = await db.from('postcure_reports').update(updates).eq('id', id);
   if (error) { alert('수정 실패: ' + error.message); return; }
   try {
     await db.from('audit_logs').insert({ table_name: 'postcure_reports', record_id: id, action: 'UPDATE', before_data: editingPostcureBefore, after_data: updates, performed_by: currentUser?.name || '-', performed_at: new Date().toISOString() });
   } catch(e) {}
+  closeModal('editPostcureModal');
   alert('수정 완료!');
   loadData();
 }
