@@ -41,27 +41,32 @@
 
     .map-main {
       display: grid;
-      grid-template-columns: 60px 1fr 28px 1fr 60px 60px;
-      grid-template-rows: auto auto auto;
+      grid-template-columns: 60px 1fr 60px 1fr 60px 60px;
+      grid-template-rows: auto auto auto auto;
       gap: 10px;
     }
 
-    .g-left { grid-column: 1; grid-row: 1 / 4; display: flex; }
-    .g-right1 { grid-column: 5; grid-row: 1 / 4; display: flex; }
-    .g-right2 { grid-column: 6; grid-row: 1 / 4; display: flex; }
+    .g-left { grid-column: 1; grid-row: 1 / 5; display: flex; }
+    .g-right1 { grid-column: 5; grid-row: 2 / 5; display: flex; }
+    .g-right2 { grid-column: 6; grid-row: 2 / 5; display: flex; }
+
+    .top-9 { grid-column: 2; grid-row: 1; }
+    .top-ship { grid-column: 3; grid-row: 1; display: flex; align-items: stretch; }
+    .top-10 { grid-column: 4; grid-row: 1; }
+    .top-scrap { grid-column: 5; grid-row: 1; display: flex; align-items: stretch; }
 
     .cl { grid-column: 2; }
-    .cl.r1 { grid-row: 1; }
-    .cl.r2 { grid-row: 2; }
-    .cl.r3 { grid-row: 3; }
+    .cl.r1 { grid-row: 2; }
+    .cl.r2 { grid-row: 3; }
+    .cl.r3 { grid-row: 4; }
     .cg { grid-column: 3; }
-    .cg.r1 { grid-row: 1; }
-    .cg.r2 { grid-row: 2; }
-    .cg.r3 { grid-row: 3; }
+    .cg.r1 { grid-row: 2; }
+    .cg.r2 { grid-row: 3; }
+    .cg.r3 { grid-row: 4; }
     .cr { grid-column: 4; }
-    .cr.r1 { grid-row: 1; }
-    .cr.r2 { grid-row: 2; }
-    .cr.r3 { grid-row: 3; }
+    .cr.r1 { grid-row: 2; }
+    .cr.r2 { grid-row: 3; }
+    .cr.r3 { grid-row: 4; }
 
     .rack-stack { display: flex; flex-direction: column; gap: 10px; }
 
@@ -153,6 +158,7 @@
       .map-main { grid-template-columns: 1fr; gap: 10px; }
       .g-left, .g-right1, .g-right2 { grid-column: 1; grid-row: auto; height: 60px; }
       .cl, .cr { grid-column: 1; grid-row: auto; }
+      .top-9, .top-ship, .top-10, .top-scrap { grid-column: 1; grid-row: auto; }
       .cg { display: none; }
       .bottom-row { grid-template-columns: 1fr; gap: 10px; }
       .bt-empty { display: none; }
@@ -305,6 +311,32 @@
 
     function rc(code) { var r = findRack(code); return r ? buildRackCard(r) : '<div></div>'; }
 
+    function buildRack4() {
+      var r4 = findRack('R4');
+      if (!r4) return '<div></div>';
+      var s = getRackStats(r4.id);
+      var rate = s.total > 0 ? Math.round((s.used / s.total) * 100) : 0;
+      var color = getUsageColor(rate);
+      var bc = s.used > 0 ? 'active' : 'empty';
+      var bt = s.used > 0 ? '사용중' : '비어있음';
+      var h = '';
+      h += '<div style="display:flex;gap:6px;align-items:stretch;">';
+      h += '<div style="flex:5;border:1.5px dashed rgba(243,156,18,0.45);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-size:11px;color:rgba(243,156,18,0.75);background:rgba(243,156,18,0.06);line-height:1.3;">1~5호<br>삭제</div>';
+      h += '<div class="rack-card" style="flex:20;" onclick="goToRack(\'R4\')" title="4동 상세보기">';
+      h += '<div class="rack-badge ' + bc + '">' + bt + '</div>';
+      h += '<div class="rack-name">4동</div>';
+      h += '<div class="rack-info">';
+      h += '<div class="rack-info-item">슬롯 <strong>' + s.total + '</strong></div>';
+      h += '<div class="rack-info-item">사용 <strong>' + s.used + '</strong></div>';
+      h += '<div class="rack-info-item">빈칸 <strong>' + s.empty + '</strong></div>';
+      h += '<div class="rack-info-item">사용률 <strong>' + rate + '%</strong></div>';
+      h += '</div>';
+      h += '<div class="rack-usage-bar"><div class="rack-usage-fill" style="width:' + rate + '%;background:' + color + ';"></div></div>';
+      h += '</div>';
+      h += '</div>';
+      return h;
+    }
+
     function renderMap() {
       var h = '';
       h += '<div class="map-outer">';
@@ -315,21 +347,24 @@
       h += '<div class="process-tag">조립</div>';
       h += '</div>';
 
-      h += '<div class="bottom-row">';
-      h += '<div class="bt-ship"><div class="label-box shipment">출하<br>준비<div class="label-sub">관리 제외</div></div></div>';
-      h += '<div class="bt-9">' + rc('R9') + '</div>';
-      h += '<div class="bt-gap"></div>';
-      h += '<div class="bt-10">' + rc('R10') + '</div>';
-      h += '<div class="bt-scrap"><div class="label-box scrap">불량<br>폐기<div class="label-sub">관리 제외</div></div></div>';
-      h += '</div>';
-
       h += '<div class="map-main">';
 
       var r11 = findRack('R11');
-      h += '<div class="g-left">' + (r11 ? buildVertical(r11) : '') + '</div>';
+      if (r11) {
+        var s11 = getRackStats(r11.id);
+        h += '<div class="g-left"><div class="rack-v" onclick="goToRack(\'R11\')" title="11동 상세보기">';
+        h += '<div class="rv-name">11<span>동</span></div>';
+        h += '<div class="rv-stat" style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:4px;">호 1~27</div>';
+        h += '<div class="rv-stat">' + s11.used + '/' + s11.total + '</div>';
+        h += '</div></div>';
+      } else { h += '<div class="g-left"></div>'; }
+
+      h += '<div class="top-9">' + rc('R9') + '</div>';
+      h += '<div class="top-ship"><div class="label-box shipment">출하<br>준비<div class="label-sub">관리 제외</div></div></div>';
+      h += '<div class="top-10">' + rc('R10') + '</div>';
+      h += '<div class="top-scrap"><div class="label-box scrap">불량<br>폐기<div class="label-sub">관리 제외</div></div></div>';
 
       h += '<div class="cl r1"><div class="rack-stack">' + rc('R6') + rc('R5') + '</div></div>';
-      h += '<div class="cg r1"></div>';
       h += '<div class="cr r1"><div class="rack-stack">' + rc('R8') + rc('R7') + '</div></div>';
 
       var r12 = findRack('R12');
@@ -342,14 +377,13 @@
       h += '<div class="cl r2"><div class="rack-stack">';
       for (var a = az.length - 1; a >= 0; a--) h += buildZoneCard(az[a]);
       h += '</div></div>';
-      h += '<div class="cg r2"></div>';
       h += '<div class="cr r2"><div class="rack-stack">';
       for (var b = bz.length - 1; b >= 0; b--) h += buildZoneCard(bz[b]);
       h += '</div></div>';
 
+
       h += '<div class="cl r3"><div class="rack-stack">' + rc('R2') + rc('R1') + '</div></div>';
-      h += '<div class="cg r3"></div>';
-      h += '<div class="cr r3"><div class="rack-stack">' + rc('R4') + rc('R3') + '</div></div>';
+      h += '<div class="cr r3"><div class="rack-stack">' + buildRack4() + rc('R3') + '</div></div>';
 
       h += '</div>';
 
