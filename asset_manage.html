@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="common.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script src="auth_guard.js"></script>
 <style>
 /* ── 자산관리 고유 스타일 ── */
@@ -933,11 +934,13 @@ function printLabels() {
     for (var i=0; i<selected.length; i++) {
         var a = selected[i];
         var qrData = BASE_URL + 'asset_manage.html?code=' + encodeURIComponent(a.asset_code);
-        var qrImg = 'https://chart.googleapis.com/chart?chs=' + qrSize + 'x' + qrSize + '&cht=qr&chl=' + encodeURIComponent(qrData) + '&choe=UTF-8';
+        var qrSrc = '';
+        try { var qr = qrcode(0, 'M'); qr.addData(qrData); qr.make(); qrSrc = qr.createDataURL(4, 0); } catch (e) { qrSrc = ''; }
 
         html += '<div style="width:' + cellW + '; height:' + cellH + '; border:1px dashed #ccc; box-sizing:border-box; padding:4px; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; page-break-inside:avoid;">';
-        html += '<img src="' + qrImg + '" style="width:' + qrSize + 'px; height:' + qrSize + 'px;">';
+        html += '<img src="' + qrSrc + '" style="width:' + qrSize + 'px; height:' + qrSize + 'px; image-rendering:pixelated;">';
         html += '<div style="font-size:' + fontSize + '; font-weight:700; margin-top:2px; line-height:1.2;">' + a.asset_code + '</div>';
+        if (a.accounting_code) html += '<div style="font-size:' + fontSize + '; color:#111; line-height:1.2;">' + a.accounting_code + '</div>';
         html += '<div style="font-size:' + (parseInt(fontSize)-1) + 'px; color:#666; line-height:1.2; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; max-width:100%;">' + (a.asset_name||'') + '</div>';
         html += '</div>';
     }
