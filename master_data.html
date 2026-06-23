@@ -223,7 +223,7 @@ th.sortable.sorted .sort-ind { color: #243bb2; font-size: 11px; }
             <th class="sortable" data-table="worker" data-key="name" onclick="sortBy('worker','name')">이름<span class="sort-ind"></span></th>
             <th class="sortable" data-table="worker" data-key="name_local" onclick="sortBy('worker','name_local')">한국어명<span class="sort-ind"></span></th>
             <th class="sortable" data-table="worker" data-key="process" onclick="sortBy('worker','process')">공정<span class="sort-ind"></span></th>
-            <th class="sortable" data-table="worker" data-key="is_active" onclick="sortBy('worker','is_active')">상태<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="worker" data-key="active" onclick="sortBy('worker','active')">상태<span class="sort-ind"></span></th>
             <th class="sortable" data-table="worker" data-key="created_at" onclick="sortBy('worker','created_at')">등록일<span class="sort-ind"></span></th>
             <th></th>
           </tr></thead>
@@ -725,10 +725,10 @@ function renderWorkers(data, isSearch) {
       '<td style="font-weight:500">' + r.name + '</td>' +
       '<td style="font-size:12px;color:' + (r.name_local ? '#555' : '#ccc') + '">' + (r.name_local || '-') + '</td>' +
       '<td>' + r.process + '</td>' +
-      '<td><span class="active-badge ' + (r.is_active ? 'active-y' : 'active-n') + '">' + (r.is_active ? '재직중' : '퇴직') + '</span></td>' +
+      '<td><span class="active-badge ' + (r.active ? 'active-y' : 'active-n') + '">' + (r.active ? '재직중' : '퇴직') + '</span></td>' +
       '<td style="color:#aaa;font-size:12px">' + fmtDate(r.created_at) + '</td>' +
       '<td><div class="act-cell">' +
-        '<button class="toggle-btn" title="재직/퇴직 상태 변경" onclick="toggleWorker(' + r.id + ', ' + r.is_active + ')">' + (r.is_active ? '비활성화' : '활성화') + '</button>' +
+        '<button class="toggle-btn" title="재직/퇴직 상태 변경" onclick="toggleWorker(' + r.id + ', ' + r.active + ')">' + (r.active ? '비활성화' : '활성화') + '</button>' +
         '<button class="icon-btn del" title="삭제" onclick="deleteWorker(' + r.id + ')">🗑️</button>' +
       '</div></td></tr>';
   }
@@ -749,7 +749,7 @@ async function saveWorker() {
   var nameLocal = document.getElementById('w_name_local').value.trim();
   var process = document.getElementById('w_process').value;
   if (!name) { showToast('이름을 입력해주세요.'); return; }
-  var payload = { name: name, process: process };
+  var payload = { name: name, process: process, active: true };
   if (nameLocal) payload.name_local = nameLocal;
   var result = await db.from('workers').insert(payload);
   if (result.error) { showToast('저장 실패: ' + result.error.message); return; }
@@ -761,7 +761,7 @@ async function saveWorker() {
 }
 
 async function toggleWorker(id, current) {
-  await db.from('workers').update({ is_active: !current }).eq('id', id);
+  await db.from('workers').update({ active: !current }).eq('id', id);
   showToast(current ? '비활성화됐어요.' : '활성화됐어요.');
   loadWorkers();
 }
