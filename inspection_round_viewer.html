@@ -405,7 +405,8 @@ function viewDetail(id) {
     html += '<div class="detail-row"><div class="detail-label">사번</div><div class="detail-value">'+(d.sabun||'-')+'</div></div>';
     html += '<div class="detail-row"><div class="detail-label">재질</div><div class="detail-value">'+(d.material||'-')+'</div></div>';
     html += '<div class="detail-row"><div class="detail-label">사상 방법</div><div class="detail-value">'+(d.trim_method||'-')+'</div></div>';
-    html += '<div class="detail-row"><div class="detail-label">금형온도</div><div class="detail-value">'+(d.mold_temp||'-')+' ℃</div></div>';
+    html += '<div class="detail-row"><div class="detail-label">금형온도(상판)</div><div class="detail-value">'+(d.mold_temp||'-')+' ℃</div></div>';
+    html += '<div class="detail-row"><div class="detail-label">금형온도(하판)</div><div class="detail-value">'+(d.mold_temp_lower||'-')+' ℃</div></div>';
     html += '<div class="detail-row"><div class="detail-label">가류시간</div><div class="detail-value">'+(d.cure_time||'-')+' 초</div></div>';
     html += '<div class="detail-row"><div class="detail-label">성형압</div><div class="detail-value">'+(d.mold_pressure||'-')+' ㎏f/㎠</div></div>';
     html += '<div class="detail-row"><div class="detail-label">진공압</div><div class="detail-value">'+(d.vacuum_pressure||'-')+' Mpa</div></div>';
@@ -443,7 +444,7 @@ function downloadExcel() {
 
     var headers = [
         '검사일','작성자','설비','타입','면','비가동','사번','Cavity','재질','사상방법',
-        '금형온도','가류시간','성형압','진공압','외관불량',
+        '금형온도(상판)','금형온도(하판)','가류시간','성형압','진공압','외관불량',
         '경도(초)X1','경도(초)X2','경도(초)X3','경도(초)X4','경도(초)X5',
         '경도(중)X1','경도(중)X2','경도(중)X3','경도(중)X4','경도(중)X5',
         '경도(종)X1','경도(종)X2','경도(종)X3','경도(종)X4','경도(종)X5',
@@ -488,7 +489,8 @@ function downloadExcel() {
         row['Cavity'] = d.cavity_count||'';
         row['재질'] = d.material||'';
         row['사상방법'] = d.trim_method||'';
-        row['금형온도'] = d.mold_temp||'';
+        row['금형온도(상판)'] = d.mold_temp||'';
+        row['금형온도(하판)'] = d.mold_temp_lower||'';
         row['가류시간'] = d.cure_time||'';
         row['성형압'] = d.mold_pressure||'';
         row['진공압'] = d.vacuum_pressure||'';
