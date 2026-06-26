@@ -158,6 +158,7 @@ function renderPanel(){
       '<label>기간</label>'+
       '<input type="date" id="fStart"> ~ <input type="date" id="fEnd">'+
       '<button class="pbtn" onclick="setRange(\'today\')">당일</button>'+
+      '<button class="pbtn" onclick="stepPrevDay()">전일</button>'+
       '<button class="pbtn" onclick="setRange(\'month\')">당월</button>'+
       '<button class="pbtn" onclick="setRange(\'all\')">전체</button>'+
       '<label style="margin-left:6px">제품번호</label>'+
@@ -187,6 +188,16 @@ function setRange(type){
   else if(type==='all'){ s='2000-01-01'; e='2999-12-31'; }
   document.getElementById('fStart').value=s;
   document.getElementById('fEnd').value=e;
+}
+// 전일: 누를 때마다 하루씩 거슬러 올라가며 즉시 조회 (당일→전일→전전일→…)
+function stepPrevDay(){
+  var s=document.getElementById('fStart').value, e=document.getElementById('fEnd').value, base;
+  if(s && s===e){ var p=s.split('-'); base=new Date(+p[0], (+p[1])-1, +p[2]); base.setDate(base.getDate()-1); }
+  else { base=new Date(); base.setDate(base.getDate()-1); }
+  var d=base.getFullYear()+'-'+String(base.getMonth()+1).padStart(2,'0')+'-'+String(base.getDate()).padStart(2,'0');
+  document.getElementById('fStart').value=d;
+  document.getElementById('fEnd').value=d;
+  loadData();
 }
 
 // ── 업로드 ──
