@@ -57,12 +57,12 @@ function initSidebar() {
     var assetActive = (page === 'asset_manage.html') ? ' nav-active' : '';
 
     // 자동 펼침
-    var prodOpen = (isMoldPage || isMesPage) ? ' open' : '';
+    var prodOpen = isMoldPage ? ' open' : '';
     var mesOpen = isMesPage ? ' open' : '';
     var moldOpen = isMoldPage ? ' open' : '';
     var qualityOpen = isQualityPage ? ' open' : '';
     var inspOpen = isQualityPage ? ' open' : '';
-    var dataOpen = isDataPage ? ' open' : '';
+    var dataOpen = (isDataPage || isMesPage) ? ' open' : '';
     var systemOpen = isSystemPage ? ' open' : '';
     var logisticsOpen = isInventoryPage ? ' open' : '';
     var inventoryOpen = isInventoryPage ? ' open' : '';
@@ -146,16 +146,6 @@ function initSidebar() {
                             '<a class="nav-link' + detailActive + '" href="mold_detail.html"><span class="n-icon">📋</span>금형 상세관리</a>' +
                         '</div>' +
                     '</div>' +
-                    /* MES 자료 */
-                    '<div class="sub-item' + mesOpen + '" id="s-mes">' +
-                        '<button class="sub-btn" onclick="toggleCat(\'s-mes\')">' +
-                            '<span class="s-icon">📂</span><span class="s-label">MES 자료</span>' +
-                            '<span class="s-arrow">▼</span>' +
-                        '</button>' +
-                        '<div class="sub-body">' +
-                            '<a class="nav-link' + mesActive + '" href="mes_data.html"><span class="n-icon">📥</span>재단·혼련·평량</a>' +
-                        '</div>' +
-                    '</div>' +
             '</div>' +
 
             /* 품질관리 */
@@ -236,6 +226,7 @@ function initSidebar() {
                     '<a class="nav-link' + dataViewActive + '" href="data_viewer.html"><span class="n-icon">📊</span>데이터 조회 및 추출</a>' +
                     '<a class="nav-link' + safetyViewActive + '" href="safety_viewer.html"><span class="n-icon">🔍</span>설비 점검 조회</a>' +
                     '<a class="nav-link' + docsActive + '" href="docs_manager.html"><span class="n-icon">📄</span>문서 관리</a>' +
+                    '<a class="nav-link' + mesActive + '" href="mes_data.html"><span class="n-icon">📥</span>MES 자료 (재단·혼련·평량)</a>' +
                 '</div>' +
             '</div>' +
         '</div>' +
