@@ -206,7 +206,7 @@ var SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6I
 var HR = {'apikey':SK,'Authorization':'Bearer '+SK};
 var myInfo = null;
 var allData = [];
-var currentSort = { key: 'inspect_date', dir: 'desc' };
+var currentSort = { key: 'equipment', dir: 'desc' };
 
 function fmtLocal(d) { var dt=new Date(d); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
 function showToast(msg,type) { var el=document.getElementById('toast'); el.textContent=msg; el.className='toast toast-'+type+' show'; setTimeout(function(){el.classList.remove('show');},3000); }
@@ -221,7 +221,7 @@ function showToast(msg,type) { var el=document.getElementById('toast'); el.textC
 
 function initPeriod() {
     var now = new Date();
-    document.getElementById('startDate').value = fmtLocal(new Date(now.getFullYear(), now.getMonth(), 1));
+    document.getElementById('startDate').value = fmtLocal(now);
     document.getElementById('endDate').value = fmtLocal(now);
 }
 
@@ -244,7 +244,7 @@ function setPeriod(type, btn) {
 async function loadData() {
     var s = document.getElementById('startDate').value;
     var e = document.getElementById('endDate').value;
-    var q = 'order=inspect_date.desc,face.asc';
+    var q = 'order=equipment.desc,inspect_date.desc,face.asc';
     if (s) q += '&inspect_date=gte.'+s;
     if (e) q += '&inspect_date=lte.'+e;
 
@@ -260,7 +260,7 @@ async function loadData() {
     try {
         var r = await fetch(SU+'/rest/v1/inspection_rounds?'+q, {headers:HR});
         allData = await r.json();
-        currentSort = { key: 'inspect_date', dir: 'desc' };
+        currentSort = { key: 'equipment', dir: 'desc' };
         renderTable();
         renderStats();
     } catch(err) {
