@@ -24,6 +24,9 @@
 .btn-up:disabled { background:#cbd5e1; cursor:not-allowed; }
 .u-fname { font-size:12px; color:#334155; }
 .u-result { font-size:12px; margin-top:8px; white-space:pre-wrap; }
+.dropzone { border:2px dashed #c7ceff; border-radius:8px; padding:14px; background:#fff; transition:all .15s; }
+.dropzone.dragover { border-color:#243bb2; background:#eef2ff; box-shadow:0 0 0 3px rgba(36,59,178,.12) inset; }
+.dropzone .dz-hint { font-size:12px; color:#94a3b8; margin-bottom:10px; }
 .filter-card { display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#fff; padding:12px 16px; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.08); margin:14px 0; }
 .filter-card label { font-size:13px; font-weight:700; color:#475569; }
 .filter-card input { padding:7px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; outline:none; font-family:inherit; }
@@ -140,11 +143,14 @@ function renderPanel(){
     '<div class="upload-card">'+
       '<div class="u-title">⬆️ '+P.title+' MES 엑셀 업로드</div>'+
       '<div class="u-desc">MES에서 취출한 '+P.title+' 작업일보 엑셀을 올리세요. 소계([▶…])·총계 행은 자동 제거되고, 시간(분)·온도(숫자) 변환 후 저장됩니다.<br>※ 같은 날짜의 기존 데이터는 새 파일로 <b>교체</b>됩니다.</div>'+
-      '<div class="u-row">'+
-        '<input type="file" id="mesFile" accept=".xlsx,.xls" style="display:none" onchange="onPick(this)">'+
-        '<button class="btn-pick" onclick="document.getElementById(\'mesFile\').click()">📄 엑셀 선택</button>'+
-        '<span class="u-fname" id="uFname">선택된 파일 없음</span>'+
-        '<button class="btn-up" id="uBtn" disabled onclick="doUpload()">업로드</button>'+
+      '<div class="dropzone" id="dropZone" ondragover="dzOver(event)" ondragleave="dzLeave(event)" ondrop="dzDrop(event)">'+
+        '<div class="dz-hint">⬇️ 엑셀 파일을 이 영역으로 <b>끌어다 놓거나</b>, 아래 버튼으로 선택하세요</div>'+
+        '<div class="u-row">'+
+          '<input type="file" id="mesFile" accept=".xlsx,.xls" style="display:none" onchange="onPick(this)">'+
+          '<button class="btn-pick" onclick="document.getElementById(\'mesFile\').click()">📄 엑셀 선택</button>'+
+          '<span class="u-fname" id="uFname">선택된 파일 없음</span>'+
+          '<button class="btn-up" id="uBtn" disabled onclick="doUpload()">업로드</button>'+
+        '</div>'+
       '</div>'+
       '<div class="u-result" id="uResult"></div>'+
     '</div>'+
@@ -184,11 +190,17 @@ function setRange(type){
 }
 
 // ── 업로드 ──
-function onPick(input){
+function onPick(input){ if(input.files && input.files[0]) handleFile(input.files[0]); }
+function handleFile(file){
   var P=PROC[curProc];
-  var file=input.files[0];
   document.getElementById('uResult').innerHTML='';
   if(!file){ return; }
+  if(!/\.(xlsx|xls)$/i.test(file.name)){
+    document.getElementById('uBtn').disabled=true;
+    document.getElementById('uResult').style.color='#dc2626';
+    document.getElementById('uResult').textContent='❌ 엑셀(.xlsx/.xls) 파일만 업로드할 수 있어요.';
+    return;
+  }
   document.getElementById('uFname').textContent=file.name;
   var reader=new FileReader();
   reader.onload=function(ev){
@@ -317,6 +329,18 @@ function exportXlsx(){
   XLSX.utils.book_append_sheet(wb, ws, P.title);
   XLSX.writeFile(wb, 'MES_'+P.title+'_'+fmtToday().replace(/-/g,'')+'.xlsx');
 }
+
+// ── 드래그 앤 드롭 ──
+function dzOver(e){ e.preventDefault(); var z=document.getElementById('dropZone'); if(z) z.classList.add('dragover'); }
+function dzLeave(e){ e.preventDefault(); var z=document.getElementById('dropZone'); if(z) z.classList.remove('dragover'); }
+function dzDrop(e){
+  e.preventDefault();
+  var z=document.getElementById('dropZone'); if(z) z.classList.remove('dragover');
+  var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f) handleFile(f);
+}
+// 영역 밖에 떨어뜨려도 브라우저가 파일을 열지 않도록 차단
+['dragover','drop'].forEach(function(ev){ window.addEventListener(ev, function(e){ e.preventDefault(); }, false); });
 
 // 시작
 renderPanel();
