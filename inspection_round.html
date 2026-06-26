@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>공정 공정검사 CHECK SHEET</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth_guard.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Noto Sans KR',sans-serif; background:#f1f3f9; color:#1e293b; padding-bottom:80px; }
+.page-header { background:linear-gradient(135deg,#1e293b 0%,#334155 100%); color:#fff; padding:16px 20px; position:sticky; top:0; z-index:50; }
+.page-header h1 { font-size:16px; font-weight:700; }
+.page-header .sub { font-size:11px; color:#94a3b8; margin-top:2px; }
+.header-row { display:flex; justify-content:space-between; align-items:center; }
+.header-actions { display:flex; gap:8px; }
+.header-actions button { padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:none; }
+.btn-save { background:#22c55e; color:#fff; }
+.btn-save:hover { background:#16a34a; }
+.btn-temp { background:rgba(255,255,255,0.15); color:#fff; border:1px solid rgba(255,255,255,0.3) !important; }
+.btn-list { background:rgba(255,255,255,0.15); color:#fff; border:1px solid rgba(255,255,255,0.3) !important; text-decoration:none; display:inline-flex; align-items:center; }
+.container { max-width:800px; margin:0 auto; padding:16px; }
+.section-card { background:#fff; border-radius:14px; padding:18px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+.section-title { font-size:14px; font-weight:700; color:#243bb2; margin-bottom:14px; display:flex; align-items:center; gap:6px; padding-bottom:10px; border-bottom:2px solid #e8ecf3; }
+.form-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px; }
+.form-grid-4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; margin-bottom:10px; }
+.form-grid-5 { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:10px; }
+.row-label { font-size:10px; font-weight:600; color:#94a3b8; letter-spacing:0.5px; margin-bottom:6px; padding-left:2px; }
+.form-group label { display:block; font-size:11px; font-weight:600; color:#64748b; margin-bottom:3px; }
+.form-group input, .form-group select { width:100%; padding:8px 10px; border:1px solid #d1d5db; border-radius:7px; font-size:13px; outline:none; background:#fff; }
+.form-group input:focus, .form-group select:focus { border-color:#243bb2; box-shadow:0 0 0 3px rgba(36,59,178,0.12); }
+.equip-toggle { display:flex; gap:8px; margin-bottom:14px; }
+.equip-toggle button { flex:1; padding:10px; border:2px solid #e2e8f0; border-radius:10px; background:#fff; font-size:14px; font-weight:700; cursor:pointer; transition:all 0.2s; color:#64748b; }
+.equip-toggle button.active { border-color:#243bb2; background:#eef0ff; color:#243bb2; }
+.face-tabs { display:flex; gap:0; margin-bottom:14px; border-bottom:2px solid #e2e8f0; }
+.face-tab { padding:10px 24px; font-size:14px; font-weight:600; color:#94a3b8; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; }
+.face-tab.active { color:#243bb2; border-bottom-color:#243bb2; }
+.face-tab:hover { color:#243bb2; }
+.face-tab.inactive-tab { color:#dc2626; background:#fef2f2; }
+.inspect-card { background:#f8fafc; border-radius:10px; padding:14px; margin-bottom:10px; border:1px solid #e8ecf3; }
+.inspect-card-header { display:flex; align-items:center; margin-bottom:10px; }
+.inspect-card-title { font-size:13px; font-weight:700; color:#334155; display:flex; align-items:center; gap:6px; }
+.inspect-card-badge { font-size:10px; padding:3px 8px; border-radius:6px; font-weight:600; }
+.badge-visual { background:#dbeafe; color:#1d4ed8; }
+.badge-measure { background:#fef3c7; color:#92400e; }
+.badge-dimension { background:#dcfce7; color:#166534; }
+.spec-info { display:flex; gap:12px; font-size:11px; color:#64748b; margin-bottom:8px; flex-wrap:wrap; }
+.spec-info span { background:#f1f5f9; padding:3px 8px; border-radius:4px; }
+.timing-section { margin-top:12px; }
+.timing-label { font-size:12px; font-weight:700; color:#475569; margin-bottom:8px; display:flex; align-items:center; gap:4px; }
+.timing-label .dot { width:8px; height:8px; border-radius:50%; }
+.dot-first { background:#3b82f6; }
+.dot-mid { background:#f59e0b; }
+.dot-last { background:#22c55e; }
+.defect-row { display:flex; align-items:center; gap:12px; padding:6px 0; flex-wrap:wrap; }
+.defect-check { display:flex; align-items:center; gap:4px; font-size:12px; color:#334155; cursor:pointer; padding:4px 10px; border:1px solid #e2e8f0; border-radius:6px; background:#fff; transition:all 0.15s; }
+.defect-check:hover { border-color:#fca5a5; }
+.defect-check input { width:15px; height:15px; margin:0; cursor:pointer; }
+.defect-check.checked { background:#fef2f2; border-color:#fca5a5; color:#dc2626; font-weight:600; }
+.measure-header { display:grid; grid-template-columns:50px repeat(5,1fr); gap:0; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px 8px 0 0; font-size:11px; font-weight:600; color:#64748b; text-align:center; }
+.measure-header div { padding:6px 4px; border-right:1px solid #e2e8f0; }
+.measure-header div:last-child { border-right:none; }
+.measure-body { border:1px solid #e2e8f0; border-top:none; border-radius:0 0 8px 8px; overflow:hidden; }
+.measure-row { display:grid; grid-template-columns:50px repeat(5,1fr); gap:0; border-bottom:1px solid #f1f5f9; }
+.measure-row:last-child { border-bottom:none; }
+.measure-row .mv-label { font-size:11px; font-weight:600; color:#475569; background:#f8fafc; border-right:1px solid #e2e8f0; display:flex; align-items:center; justify-content:center; padding:4px; }
+.measure-row input { width:100%; padding:8px 4px; border:none; border-right:1px solid #f1f5f9; font-size:12px; text-align:center; outline:none; }
+.measure-row input:focus { background:#eef0ff; }
+.change-section { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.change-box { background:#f8fafc; border:1px solid #e8ecf3; border-radius:10px; padding:14px; }
+.change-box-title { font-size:12px; font-weight:700; color:#475569; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid #e8ecf3; }
+.change-item { display:flex; align-items:center; gap:6px; padding:6px 0; font-size:13px; color:#334155; cursor:pointer; }
+.change-item input { width:16px; height:16px; margin:0; }
+.free-textarea { width:100%; min-height:100px; padding:12px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; font-family:inherit; outline:none; resize:vertical; line-height:1.6; }
+.free-textarea:focus { border-color:#243bb2; box-shadow:0 0 0 3px rgba(36,59,178,0.12); }
+.bottom-actions { position:fixed; bottom:0; left:0; right:0; background:#fff; padding:14px 20px; border-top:1px solid #e8ecf3; display:flex; gap:10px; justify-content:center; box-shadow:0 -2px 10px rgba(0,0,0,0.05); z-index:40; }
+.bottom-actions button { padding:12px 32px; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; border:none; }
+.btn-submit { background:#243bb2; color:#fff; flex:1; max-width:400px; }
+.btn-submit:hover { background:#1e32a0; }
+.toast { position:fixed; top:70px; right:16px; padding:12px 20px; border-radius:8px; color:#fff; font-size:14px; font-weight:600; z-index:300; opacity:0; transform:translateY(-10px); transition:all 0.3s; }
+.toast.show { opacity:1; transform:translateY(0); }
+.toast-success { background:#16a34a; }
+.toast-error { background:#dc2626; }
+.inactive-check-wrap { display:flex; align-items:center; gap:8px; padding:10px 14px; margin-bottom:14px; background:#fef2f2; border:2px solid #fca5a5; border-radius:10px; cursor:pointer; }
+.inactive-check-wrap input { width:18px; height:18px; cursor:pointer; }
+.inactive-check-wrap span { font-size:14px; font-weight:700; color:#dc2626; }
+.face-disabled .inspect-card,
+.face-disabled .form-grid-4,
+.face-disabled .row-label { opacity:0.35; pointer-events:none; }
+@media(max-width:600px) {
+    .form-grid-3 { grid-template-columns:1fr; }
+    .form-grid-4 { grid-template-columns:1fr 1fr; }
+    .form-grid-5 { grid-template-columns:1fr 1fr; }
+    .change-section { grid-template-columns:1fr; }
+    .face-tab { padding:10px 16px; font-size:13px; }
+    .defect-check { font-size:11px; padding:4px 8px; }
+    .measure-header, .measure-row { grid-template-columns:40px repeat(5,1fr); }
+}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+    <div class="header-row">
+        <div>
+            <h1>📋 공정 공정검사 CHECK SHEET</h1>
+            <div class="sub">성형 공정 품질 공정검사</div>
+        </div>
+        <div class="header-actions">
+            <a href="index.html" class="btn-list" style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;">🏠 메인으로</a>
+            <a href="https://pillippekim.github.io/work-manager/inspection_round_viewer.html" class="btn-list" style="padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;">&#128194; 조회</a>
+            <button class="btn-save" onclick="submitForm()">제출</button>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+
+<!-- 기본정보 카드: 설비타입 + 검사일/작성자/설비만 -->
+<div class="section-card">
+    <div class="section-title">📝 기본 정보</div>
+    <div class="equip-toggle">
+        <button class="active" onclick="switchEquipType('press',this)">Press (3면 프레스)</button>
+        <button onclick="switchEquipType('injection',this)">Injection (사출)</button>
+    </div>
+    <div class="row-label">기본정보</div>
+    <div class="form-grid-3">
+        <div class="form-group"><label>검사일</label><input type="date" id="inspDate"></div>
+        <div class="form-group"><label>작성자</label><input type="text" id="inspector" readonly></div>
+        <div class="form-group"><label>설비</label>
+            <select id="equipment"><option value="">-- 설비 선택 --</option></select>
+        </div>
+    </div>
+</div>
+
+<!-- 검사 입력 카드: 면 탭 + 면별 독립 입력 -->
+<div class="section-card">
+    <div class="section-title">🔍 검사 입력</div>
+    <div class="face-tabs" id="faceTabs">
+        <div class="face-tab active" onclick="switchFace('A',this)">가 면</div>
+        <div class="face-tab" onclick="switchFace('B',this)">나 면</div>
+        <div class="face-tab" onclick="switchFace('C',this)">다 면</div>
+    </div>
+
+    <!-- 면별 콘텐츠 영역 -->
+    <div id="faceContent">
+        <!-- 비가동 체크박스 -->
+        <label class="inactive-check-wrap" id="inactiveWrap">
+            <input type="checkbox" id="inactiveCheck" onchange="toggleInactive(this.checked)">
+            <span>🚫 비가동 (이 면은 가동하지 않음)</span>
+        </label>
+
+        <!-- 면별 입력 영역 (비가동 시 비활성화됨) -->
+        <div id="faceInputArea">
+            <!-- 제품정보 (면별 독립) -->
+            <div class="row-label">제품정보</div>
+            <div class="form-grid-4">
+                <div class="form-group"><label>사번</label><input type="text" id="faceSabun" placeholder="502264"></div>
+                <div class="form-group"><label>Cavity 수량</label><input type="number" id="faceCavity" placeholder="4"></div>
+                <div class="form-group"><label>재질</label>
+                    <select id="faceMaterial"><option value="">-- 재질 선택 --</option>
+                        <option>NBR(A)</option><option>EPDM(E)</option><option>NR(N)</option><option>SBR(B)</option><option>CR(C)</option>
+                        <option>FMK불소고무(F)</option><option>VMQ실리콘고무(S)</option><option>U 우레탄(U)</option>
+                        <option>아크릴(T)</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>사상 방법</label>
+                    <select id="faceTrimMethod"><option value="">-- 선택 --</option><option>바렐</option><option>냉동</option><option>수사상</option></select>
+                </div>
+            </div>
+
+            <!-- 설비정보 (면별 독립) -->
+            <div class="row-label">설비정보</div>
+            <div class="form-grid-5">
+                <div class="form-group"><label>금형온도 상판 (℃)</label><input type="text" id="faceMoldTemp"></div>
+                <div class="form-group"><label>금형온도 하판 (℃)</label><input type="text" id="faceMoldTempLower"></div>
+                <div class="form-group"><label>가류시간 (초)</label><input type="text" id="faceCureTime"></div>
+                <div class="form-group"><label>성형압 (㎏f/㎠)</label><input type="text" id="faceMoldPressure"></div>
+                <div class="form-group"><label>진공압 (Mpa)</label><input type="text" id="faceVacuum"></div>
+            </div>
+
+            <!-- 외관 검사 -->
+            <div class="inspect-card">
+                <div class="inspect-card-header">
+                    <div class="inspect-card-title">👁️ 외관 검사 <span class="inspect-card-badge badge-visual">cavity 전체 육안</span></div>
+                </div>
+                <div class="spec-info"><span>제품 전 표면에 유해한 흠 없을 것</span><span>판정: 육안검사</span></div>
+                <div id="visualInspArea"></div>
+            </div>
+
+            <!-- 경도 검사 -->
+            <div class="inspect-card">
+                <div class="inspect-card-header">
+                    <div class="inspect-card-title">📐 경도 검사 <span class="inspect-card-badge badge-measure">Shore A ±5</span></div>
+                </div>
+                <div class="spec-info"><span>SPEC: Shore A ±5</span></div>
+                <div class="measure-header"><div></div><div>X1</div><div>X2</div><div>X3</div><div>X4</div><div>X5</div></div>
+                <div class="measure-body" id="hardnessGrid">
+                    <div class="measure-row"><div class="mv-label">초품</div><input type="number" placeholder="-"><input type="number" placeholder="-"><input type="number" placeholder="-"><input type="number" placeholder="-"><input type="number" placeholder="-"></div>
+                    <div class="measure-row"><div class="mv-label">중품</div><input type="number" placeholder="-"><input type="number" placeholder="-"><input type="number" placeholder="-"><input type="number" placeholder="-"><input type="number" placeholder="-"></div>
+                    <div class="measure-row"><div class="mv-label">종품</div><input type="number" placeholder="-"><input type="number" placeholder="-"><input type="number" placeholder="-"><input type="number" placeholder="-"><input type="number" placeholder="-"></div>
+                </div>
+            </div>
+
+            <!-- 치수 검사 -->
+            <div class="inspect-card">
+                <div class="inspect-card-header">
+                    <div class="inspect-card-title">📏 중요 치수 <span class="inspect-card-badge badge-dimension">Vernier Calipers</span></div>
+                </div>
+                <div class="spec-info"><span>Vernier Calipers 측정</span></div>
+                <div class="measure-header"><div></div><div>X1</div><div>X2</div><div>X3</div><div>X4</div><div>X5</div></div>
+                <div class="measure-body" id="dimensionGrid">
+                    <div class="measure-row"><div class="mv-label">초품</div><input type="text" placeholder="-"><input type="text" placeholder="-"><input type="text" placeholder="-"><input type="text" placeholder="-"><input type="text" placeholder="-"></div>
+                    <div class="measure-row"><div class="mv-label">중품</div><input type="text" placeholder="-"><input type="text" placeholder="-"><input type="text" placeholder="-"><input type="text" placeholder="-"><input type="text" placeholder="-"></div>
+                    <div class="measure-row"><div class="mv-label">종품</div><input type="text" placeholder="-"><input type="text" placeholder="-"><input type="text" placeholder="-"><input type="text" placeholder="-"><input type="text" placeholder="-"></div>
+                </div>
+            </div>
+        </div><!-- faceInputArea -->
+
+        <!-- 원인 및 조치 (면별 독립) -->
+        <div style="margin-top:10px;">
+            <div class="row-label">원인 및 조치 (이 면에 대한 비고)</div>
+            <textarea class="free-textarea" id="actionDetail" placeholder="불량 원인, 조치 사항, 특이사항 등 자유롭게 기재해주세요." style="min-height:70px;"></textarea>
+        </div>
+    </div><!-- faceContent -->
+</div>
+
+<div class="section-card">
+    <div class="section-title">🔄 변동점 관리</div>
+    <div class="change-section">
+        <div class="change-box">
+            <div class="change-box-title">🔧 금형</div>
+            <label class="change-item"><input type="checkbox" value="금형 교체"> 금형 교체</label>
+            <label class="change-item"><input type="checkbox" value="금형 수정/파손"> 금형 수정/파손</label>
+            <label class="change-item"><input type="checkbox" value="금형 세척"> 금형 세척</label>
+        </div>
+        <div class="change-box">
+            <div class="change-box-title">🏭 설비/제품</div>
+            <label class="change-item"><input type="checkbox" value="설비 재가동"> 설비 재가동</label>
+            <label class="change-item"><input type="checkbox" value="설비 조건변경"> 설비 조건변경</label>
+            <label class="change-item"><input type="checkbox" value="작업 정지"> 작업 정지</label>
+            <label class="change-item"><input type="checkbox" value="불량 발생"> 불량 발생</label>
+        </div>
+    </div>
+</div>
+
+
+
+</div><!-- container -->
+
+<div class="bottom-actions">
+    <button class="btn-submit" onclick="submitForm()">✅ 검사 완료 제출</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var SU = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+var SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+var H = {'apikey':SK,'Authorization':'Bearer '+SK,'Content-Type':'application/json','Prefer':'return=representation'};
+var HR = {'apikey':SK,'Authorization':'Bearer '+SK};
+
+var myInfo = null;
+var currentEquipType = 'press';
+var currentFace = 'A';
+var editRecordId = null;   // 수정 모드: 클릭한 단일 레코드 id
+var editFace = null;       // 수정 모드: 그 레코드의 면(A/B/C)
+var DEFECT_TYPES = ['미성형','이물','Burr','찍힘','찢어짐','기타'];
+
+// 면별 데이터 저장 (제품정보 + 설비정보 + 검사데이터 + 비가동)
+var faceData = {
+    A: { inactive:false, sabun:'', cavity:'', material:'', trimMethod:'', moldTemp:'', moldTempLower:'', cureTime:'', moldPressure:'', vacuum:'', actionDetail:'' },
+    B: { inactive:false, sabun:'', cavity:'', material:'', trimMethod:'', moldTemp:'', moldTempLower:'', cureTime:'', moldPressure:'', vacuum:'', actionDetail:'' },
+    C: { inactive:false, sabun:'', cavity:'', material:'', trimMethod:'', moldTemp:'', moldTempLower:'', cureTime:'', moldPressure:'', vacuum:'', actionDetail:'' }
+};
+
+function fmtLocal(d) { if(!d) return ''; var dt = new Date(d); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
+function showToast(msg,type) { var el=document.getElementById('toast'); el.textContent=msg; el.className='toast toast-'+type+' show'; setTimeout(function(){el.classList.remove('show');},3000); }
+
+// 초기화
+(async function(){
+    myInfo = await checkPageAccess('inspection_round.html');
+    if (!myInfo) return;
+    document.getElementById('inspector').value = myInfo.name || '';
+    document.getElementById('inspDate').value = fmtLocal(new Date());
+    loadEquipments();
+    buildVisualInspection();
+
+    // URL 파라미터로 수정 모드
+    var params = new URLSearchParams(location.search);
+    var editId = params.get('edit');
+    if (editId) loadForEdit(editId);
+})();
+
+// 설비 목록 로딩 (equipments DB 테이블에서 로드)
+async function loadEquipments() {
+    var sel = document.getElementById('equipment');
+    try {
+        var r = await fetch(SU+'/rest/v1/equipments?process=eq.성형&is_active=eq.true&order=sort_order', {headers:HR});
+        var data = await r.json();
+        if (data && data.length > 0) {
+            // 그룹별 분류
+            var groups = {};
+            for (var i = 0; i < data.length; i++) {
+                var eq = data[i];
+                var grp = eq.group_name || 'A반';
+                if (!groups[grp]) groups[grp] = [];
+                groups[grp].push(eq);
+            }
+            var grpNames = Object.keys(groups);
+            for (var g = 0; g < grpNames.length; g++) {
+                var grpName = grpNames[g];
+                var optgroup = document.createElement('optgroup');
+                optgroup.label = grpName + ' (' + groups[grpName].length + '대)';
+                for (var j = 0; j < groups[grpName].length; j++) {
+                    var eq2 = groups[grpName][j];
+                    if (eq2.is_dormant) continue; // 휴면설비 제외
+                    var o = document.createElement('option');
+                    o.value = eq2.equipment_no;
+                    o.textContent = eq2.equipment_no;
+                    optgroup.appendChild(o);
+                }
+                sel.appendChild(optgroup);
+            }
+            return;
+        }
+    } catch(e) { console.error('설비 DB 로드 실패:', e); }
+
+    // fallback: DB 실패 시 하드코딩
+    var FALLBACK = {
+        'A반': ['A반-01호기','A반-02호기','A반-03호기','A반-05호기','A반-06호기','A반-07호기','A반-08호기','A반-09호기','A반-10호기'],
+        'B반': ['B반-01호기','B반-02호기','B반-03호기','B반-04호기','B반-05호기','B반-06호기','B반-07호기','B반-08호기','B반-09호기']
+    };
+    var fGroups = Object.keys(FALLBACK);
+    for (var fg = 0; fg < fGroups.length; fg++) {
+        var fGrp = fGroups[fg];
+        var fOg = document.createElement('optgroup');
+        fOg.label = fGrp;
+        for (var fi = 0; fi < FALLBACK[fGrp].length; fi++) {
+            var fo = document.createElement('option');
+            fo.value = FALLBACK[fGrp][fi];
+            fo.textContent = FALLBACK[fGrp][fi];
+            fOg.appendChild(fo);
+        }
+        sel.appendChild(fOg);
+    }
+}
+
+// 설비 타입 전환
+function switchEquipType(type, btn) {
+    currentEquipType = type;
+    var btns = document.querySelectorAll('.equip-toggle button');
+    for (var i=0;i<btns.length;i++) btns[i].classList.remove('active');
+    btn.classList.add('active');
+    document.getElementById('faceTabs').style.display = type === 'injection' ? 'none' : 'flex';
+    if (type === 'injection') { currentFace = 'A'; }
+}
+
+// 비가동 토글
+function toggleInactive(checked) {
+    var area = document.getElementById('faceInputArea');
+    if (checked) {
+        area.classList.add('face-disabled');
+    } else {
+        area.classList.remove('face-disabled');
+    }
+    // 탭에 비가동 표시
+    updateTabStyle(currentFace, checked);
+}
+
+function updateTabStyle(face, inactive) {
+    var faceMap = {A:0, B:1, C:2};
+    var idx = faceMap[face];
+    var tabs = document.querySelectorAll('.face-tab');
+    if (tabs[idx]) {
+        if (inactive) {
+            tabs[idx].classList.add('inactive-tab');
+        } else {
+            tabs[idx].classList.remove('inactive-tab');
+        }
+    }
+}
+
+// 면 전환 (데이터 저장/복원)
+function switchFace(face, tab) {
+    saveFaceData(currentFace);
+    currentFace = face;
+    var tabs = document.querySelectorAll('.face-tab');
+    for (var i=0;i<tabs.length;i++) tabs[i].classList.remove('active');
+    tab.classList.add('active');
+    restoreFaceData(face);
+}
+
+function saveFaceData(face) {
+    faceData[face] = {
+        inactive: document.getElementById('inactiveCheck').checked,
+        sabun: document.getElementById('faceSabun').value,
+        cavity: document.getElementById('faceCavity').value,
+        material: document.getElementById('faceMaterial').value,
+        trimMethod: document.getElementById('faceTrimMethod').value,
+        moldTemp: document.getElementById('faceMoldTemp').value,
+        moldTempLower: document.getElementById('faceMoldTempLower').value,
+        cureTime: document.getElementById('faceCureTime').value,
+        moldPressure: document.getElementById('faceMoldPressure').value,
+        vacuum: document.getElementById('faceVacuum').value,
+        visual: collectVisualData(),
+        hardness: collectGridData('hardnessGrid'),
+        dimension: collectGridData('dimensionGrid'),
+        actionDetail: document.getElementById('actionDetail').value
+    };
+}
+
+function restoreFaceData(face) {
+    var d = faceData[face] || {};
+
+    // 비가동 상태 복원
+    var inactiveChecked = d.inactive || false;
+    document.getElementById('inactiveCheck').checked = inactiveChecked;
+    toggleInactive(inactiveChecked);
+
+    // 제품정보 복원
+    document.getElementById('faceSabun').value = d.sabun || '';
+    document.getElementById('faceCavity').value = d.cavity || '';
+    document.getElementById('faceMaterial').value = d.material || '';
+    document.getElementById('faceTrimMethod').value = d.trimMethod || '';
+
+    // 설비정보 복원
+    document.getElementById('faceMoldTemp').value = d.moldTemp || '';
+    document.getElementById('faceMoldTempLower').value = d.moldTempLower || '';
+    document.getElementById('faceCureTime').value = d.cureTime || '';
+    document.getElementById('faceMoldPressure').value = d.moldPressure || '';
+    document.getElementById('faceVacuum').value = d.vacuum || '';
+
+    // 검사 데이터 복원
+    if (d.visual) { restoreVisualData(d.visual); } else { clearVisualInputs(); }
+    if (d.hardness) { restoreGridData('hardnessGrid', d.hardness); } else { clearGridInputs('hardnessGrid'); }
+    if (d.dimension) { restoreGridData('dimensionGrid', d.dimension); } else { clearGridInputs('dimensionGrid'); }
+
+    // 비고 복원 (면별 개별)
+    document.getElementById('actionDetail').value = d.actionDetail || '';
+}
+
+function clearVisualInputs() {
+    var cbs = document.querySelectorAll('#visualInspArea input[type="checkbox"]');
+    for(var i=0;i<cbs.length;i++) { cbs[i].checked=false; cbs[i].parentElement.classList.remove('checked'); }
+}
+
+function clearGridInputs(gridId) {
+    var inputs = document.querySelectorAll('#'+gridId+' input');
+    for(var i=0;i<inputs.length;i++) inputs[i].value='';
+}
+
+// 외관 검사 빌드
+function buildVisualInspection() {
+    var timings = [{key:'first',label:'초품',dot:'dot-first'},{key:'mid',label:'중품',dot:'dot-mid'},{key:'last',label:'종품',dot:'dot-last'}];
+    var html = '';
+    for (var t=0;t<timings.length;t++) {
+        var tm = timings[t];
+        html += '<div class="timing-section"><div class="timing-label"><div class="dot '+tm.dot+'"></div> '+tm.label+'</div>';
+        html += '<div class="defect-row">';
+        for (var d=0;d<DEFECT_TYPES.length;d++) {
+            var cbId = 'vis_'+tm.key+'_'+d;
+            html += '<label class="defect-check" id="lbl_'+cbId+'"><input type="checkbox" id="'+cbId+'" onchange="toggleDefectStyle(this,\''+cbId+'\')">'+DEFECT_TYPES[d]+'</label>';
+        }
+        html += '</div></div>';
+    }
+    document.getElementById('visualInspArea').innerHTML = html;
+}
+
+function toggleDefectStyle(cb, id) {
+    var lbl = document.getElementById('lbl_'+id);
+    if(cb.checked) lbl.classList.add('checked'); else lbl.classList.remove('checked');
+}
+
+// 데이터 수집
+function collectVisualData() {
+    var data = {};
+    var timings = ['first','mid','last'];
+    for (var t=0;t<timings.length;t++) {
+        var defects = [];
+        for (var d=0;d<DEFECT_TYPES.length;d++) {
+            var cb = document.getElementById('vis_'+timings[t]+'_'+d);
+            if (cb && cb.checked) defects.push(DEFECT_TYPES[d]);
+        }
+        data[timings[t]] = defects;
+    }
+    return data;
+}
+
+function restoreVisualData(data) {
+    var timings = ['first','mid','last'];
+    for (var t=0;t<timings.length;t++) {
+        for (var d=0;d<DEFECT_TYPES.length;d++) {
+            var cb = document.getElementById('vis_'+timings[t]+'_'+d);
+            if (!cb) continue;
+            var isChecked = data[timings[t]] && data[timings[t]].indexOf(DEFECT_TYPES[d]) !== -1;
+            cb.checked = isChecked;
+            var lbl = document.getElementById('lbl_vis_'+timings[t]+'_'+d);
+            if (lbl) { if(isChecked) lbl.classList.add('checked'); else lbl.classList.remove('checked'); }
+        }
+    }
+}
+
+function collectGridData(gridId) {
+    var rows = document.querySelectorAll('#'+gridId+' .measure-row');
+    var timings = ['first','mid','last'];
+    var data = {};
+    for (var i=0;i<rows.length&&i<3;i++) {
+        var inputs = rows[i].querySelectorAll('input');
+        var vals = [];
+        for (var j=0;j<inputs.length;j++) vals.push(inputs[j].value||'');
+        data[timings[i]] = vals;
+    }
+    return data;
+}
+
+function restoreGridData(gridId, data) {
+    if (!data) return;
+    var rows = document.querySelectorAll('#'+gridId+' .measure-row');
+    var timings = ['first','mid','last'];
+    for (var i=0;i<rows.length&&i<3;i++) {
+        var inputs = rows[i].querySelectorAll('input');
+        var vals = data[timings[i]] || [];
+        for (var j=0;j<inputs.length;j++) inputs[j].value = vals[j] || '';
+    }
+}
+
+// 변동점 수집
+function collectChangeMold() {
+    var items = [];
+    document.querySelectorAll('.change-box:first-child .change-item input:checked').forEach(function(cb){ items.push(cb.value); });
+    return items;
+}
+function collectChangeEquip() {
+    var items = [];
+    document.querySelectorAll('.change-box:last-child .change-item input:checked').forEach(function(cb){ items.push(cb.value); });
+    return items;
+}
+
+// 변동점 '금형 세척' 체크 시 → work-manager 세척 이력(mold_cleaning_logs) 자동 리스트업
+// (실제 세척내용·완료 처리는 생산관리팀이 해당 줄에 이어서 작성)
+async function autoCleanListup(sabun, inspDate, requester) {
+    if (collectChangeMold().indexOf('금형 세척') === -1) return;
+    try {
+        var dupUrl = SU + '/rest/v1/mold_cleaning_logs?product_code=eq.' + encodeURIComponent(sabun || '')
+            + '&request_date=eq.' + encodeURIComponent(inspDate)
+            + '&cleaning_reason=eq.' + encodeURIComponent('공정순회검사') + '&select=id';
+        var dr = await fetch(dupUrl, { headers: HR });
+        var rows = dr.ok ? await dr.json() : [];
+        if (rows && rows.length) return; // 같은 사번+접수일+공정순회검사 이미 있으면 건너뜀
+        await fetch(SU + '/rest/v1/mold_cleaning_logs', {
+            method: 'POST', headers: H,
+            body: JSON.stringify({
+                product_code: sabun || '',
+                request_date: inspDate,
+                requester: requester || null,
+                cleaning_reason: '공정순회검사',
+                note: '공정순회 변동점 자동등록'
+            })
+        });
+    } catch (e) { /* 세척 자동등록 실패가 검사 제출을 막지 않도록 무시 */ }
+}
+
+// 제출
+async function submitForm() {
+    var inspDate = document.getElementById('inspDate').value;
+    var equipment = document.getElementById('equipment').value;
+    if (!inspDate) { showToast('검사일을 입력해주세요','error'); return; }
+    if (!equipment) { showToast('설비를 선택해주세요','error'); return; }
+
+    // 현재 면 데이터 저장
+    saveFaceData(currentFace);
+
+    // 면 목록
+    var faces = currentEquipType === 'press' ? ['A','B','C'] : ['A'];
+    var records = [];
+    for (var f=0;f<faces.length;f++) {
+        var fd = faceData[faces[f]] || {};
+        var isInactive = fd.inactive || false;
+
+        // 빈 면 판별: 비가동이 아닌데, 사번도 없고 주요 데이터도 없으면 건너뛰기
+        if (!isInactive) {
+            var hasSabun = (fd.sabun || '').trim() !== '';
+            var hasMaterial = (fd.material || '') !== '';
+            var hasVisual = false;
+            if (fd.visual) {
+                var vTimings = ['first','mid','last'];
+                for (var vt=0;vt<vTimings.length;vt++) {
+                    if (fd.visual[vTimings[vt]] && fd.visual[vTimings[vt]].length > 0) { hasVisual = true; break; }
+                }
+            }
+            var hasAction = (fd.actionDetail || '').trim() !== '';
+            var hasMoldTemp = (fd.moldTemp || '') !== '' || (fd.moldTempLower || '') !== '';
+            var hasCureTime = (fd.cureTime || '') !== '';
+
+            // 사번, 재질, 외관불량, 비고, 금형온도, 가류시간 모두 없으면 빈 면
+            if (!hasSabun && !hasMaterial && !hasVisual && !hasAction && !hasMoldTemp && !hasCureTime) {
+                continue; // 이 면은 저장 안 함
+            }
+        }
+
+        var rec = {
+            inspect_date: inspDate,
+            inspector: document.getElementById('inspector').value,
+            equip_type: currentEquipType,
+            equipment: equipment,
+            face: faces[f],
+            is_inactive: isInactive,
+            change_mold: collectChangeMold(),
+            change_equip: collectChangeEquip(),
+            action_detail: (fd.actionDetail || '').trim(),
+            created_by: myInfo ? myInfo.name : null
+        };
+
+        if (isInactive) {
+            // 비가동 면: 빈 값으로 저장
+            rec.sabun = '';
+            rec.cavity_count = null;
+            rec.material = '';
+            rec.trim_method = '';
+            rec.mold_temp = '';
+            rec.mold_temp_lower = '';
+            rec.cure_time = '';
+            rec.mold_pressure = '';
+            rec.vacuum_pressure = '';
+            rec.visual_data = {};
+            rec.hardness_data = {};
+            rec.dimension_data = {};
+        } else {
+            // 가동 면: 면별 데이터 사용
+            rec.sabun = (fd.sabun || '').trim();
+            rec.cavity_count = parseInt(fd.cavity) || null;
+            rec.material = fd.material || '';
+            rec.trim_method = fd.trimMethod || '';
+            rec.mold_temp = fd.moldTemp || '';
+            rec.mold_temp_lower = fd.moldTempLower || '';
+            rec.cure_time = fd.cureTime || '';
+            rec.mold_pressure = fd.moldPressure || '';
+            rec.vacuum_pressure = fd.vacuum || '';
+            rec.visual_data = fd.visual || {};
+            rec.hardness_data = fd.hardness || {};
+            rec.dimension_data = fd.dimension || {};
+        }
+
+        records.push(rec);
+    }
+
+    if (records.length === 0) {
+        showToast('입력된 면이 없습니다. 최소 1개 면의 데이터를 입력해주세요.','error');
+        return;
+    }
+
+    // 수정 모드
+    var params = new URLSearchParams(location.search);
+    var editId = params.get('edit') || editRecordId;
+    var cleanSabun = (records.find(function(x){ return (x.sabun||'').trim(); }) || {}).sabun || '';
+    var cleanWho = document.getElementById('inspector').value || '';
+
+    try {
+        if (editId) {
+            // 수정: 클릭한 한 건(id)만 갱신 — 같은 설비/면의 다른 기록(금형교체분 등)은 절대 건드리지 않음
+            var targetFace = editFace || (records[0] && records[0].face);
+            var target = records.find(function(x){ return x.face === targetFace; }) || records[0];
+            if (!target) { showToast('수정할 면 데이터가 비어 있습니다.','error'); return; }
+            delete target.created_by; // 원래 작성자 유지
+            var r = await fetch(SU+'/rest/v1/inspection_rounds?id=eq.'+editId, {method:'PATCH',headers:H,body:JSON.stringify(target)});
+            if (r.ok) {
+                showToast('수정 완료!','success');
+                await autoCleanListup(cleanSabun, inspDate, cleanWho);
+                setTimeout(function(){ location.href='https://pillippekim.github.io/work-manager/inspection_round_viewer.html'; }, 1500);
+            } else { showToast('수정 실패','error'); }
+            return;
+        }
+        // 신규: 면별 개별 레코드로 저장
+        var r = await fetch(SU+'/rest/v1/inspection_rounds', {method:'POST',headers:H,body:JSON.stringify(records)});
+        if (r.ok) {
+            showToast('검사 제출 완료!','success');
+            await autoCleanListup(cleanSabun, inspDate, cleanWho);
+            setTimeout(function(){ location.href='https://pillippekim.github.io/work-manager/inspection_round_viewer.html'; }, 1500);
+        } else { showToast('저장 실패','error'); }
+    } catch(e) { showToast('오류: '+e.message,'error'); }
+}
+
+// 수정 모드 데이터 로드
+async function loadForEdit(id) {
+    try {
+        var r = await fetch(SU+'/rest/v1/inspection_rounds?id=eq.'+id, {headers:HR});
+        var arr = await r.json();
+        if (!arr || !arr[0]) return;
+        var rec = arr[0];
+
+        document.getElementById('inspDate').value = rec.inspect_date || '';
+        document.getElementById('inspector').value = rec.inspector || '';
+
+        // 설비 타입
+        if (rec.equip_type === 'injection') {
+            switchEquipType('injection', document.querySelectorAll('.equip-toggle button')[1]);
+        }
+
+        // 설비 선택
+        setTimeout(function(){ document.getElementById('equipment').value = rec.equipment || ''; }, 500);
+
+        // 변동점 체크
+        if (rec.change_mold) {
+            document.querySelectorAll('.change-box:first-child .change-item input').forEach(function(cb){
+                if (rec.change_mold.indexOf(cb.value) !== -1) cb.checked = true;
+            });
+        }
+        if (rec.change_equip) {
+            document.querySelectorAll('.change-box:last-child .change-item input').forEach(function(cb){
+                if (rec.change_equip.indexOf(cb.value) !== -1) cb.checked = true;
+            });
+        }
+
+        // 수정 모드: 클릭한 단일 레코드(한 건)만 로드 — 같은 설비/면의 다른 기록은 불러오지 않음
+        editRecordId = id;
+        editFace = rec.face;
+        faceData[rec.face] = {
+            inactive: rec.is_inactive || false,
+            sabun: rec.sabun || '',
+            cavity: rec.cavity_count || '',
+            material: rec.material || '',
+            trimMethod: rec.trim_method || '',
+            moldTemp: rec.mold_temp || '',
+            moldTempLower: rec.mold_temp_lower || '',
+            cureTime: rec.cure_time || '',
+            moldPressure: rec.mold_pressure || '',
+            vacuum: rec.vacuum_pressure || '',
+            visual: rec.visual_data || {},
+            hardness: rec.hardness_data || {},
+            dimension: rec.dimension_data || {},
+            actionDetail: rec.action_detail || ''
+        };
+        updateTabStyle(rec.face, rec.is_inactive || false);
+
+        // 수정은 한 건만 다루므로, 클릭한 면 탭만 보이게 한다
+        var faceOrder = ['A','B','C'];
+        document.querySelectorAll('#faceTabs .face-tab').forEach(function(t, idx){
+            if (faceOrder[idx] === rec.face) { t.style.display=''; t.classList.add('active'); }
+            else { t.style.display='none'; t.classList.remove('active'); }
+        });
+        currentFace = rec.face;
+        restoreFaceData(rec.face);
+
+        document.querySelector('.page-header h1').textContent = '📋 공정검사 수정';
+    } catch(e) { showToast('데이터 로드 실패','error'); }
+}
+</script>
+</body>
+</html>
