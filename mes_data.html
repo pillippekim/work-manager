@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MES 자료 - HKHT</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="common.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+.tabs { display:flex; gap:0; border-bottom:2px solid #e2e8f0; background:#fff; border-radius:10px 10px 0 0; }
+.tab { padding:12px 24px; font-size:14px; font-weight:600; color:#64748b; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; transition:all .2s; }
+.tab.active { color:#243bb2; border-bottom-color:#243bb2; }
+.tab:hover { color:#243bb2; }
+.tab-content { display:none; }
+.tab-content.active { display:block; }
+.upload-card { background:#f8fafc; border:1px dashed #c7ceff; border-radius:10px; padding:14px 16px; margin:14px 0; }
+.upload-card .u-title { font-size:13px; font-weight:700; color:#243bb2; margin-bottom:6px; }
+.upload-card .u-desc { font-size:12px; color:#64748b; margin-bottom:10px; line-height:1.6; }
+.u-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.btn-pick { padding:8px 16px; background:#fff; border:1.5px solid #243bb2; color:#243bb2; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+.btn-up { padding:8px 16px; background:#16a34a; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+.btn-up:disabled { background:#cbd5e1; cursor:not-allowed; }
+.u-fname { font-size:12px; color:#334155; }
+.u-result { font-size:12px; margin-top:8px; white-space:pre-wrap; }
+.filter-card { display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#fff; padding:12px 16px; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.08); margin:14px 0; }
+.filter-card label { font-size:13px; font-weight:700; color:#475569; }
+.filter-card input { padding:7px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; outline:none; font-family:inherit; }
+.filter-card input:focus { border-color:#243bb2; }
+.pbtn { padding:6px 12px; border:1px solid #d1d5db; background:#fff; border-radius:6px; font-size:12px; font-weight:600; color:#475569; cursor:pointer; font-family:inherit; }
+.pbtn:hover { border-color:#243bb2; color:#243bb2; }
+.btn-q { padding:7px 18px; background:#243bb2; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+.btn-x { padding:7px 14px; background:#16a34a; color:#fff; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
+.tbl-wrap { background:#fff; border-radius:10px; overflow:auto; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+table.mes { width:100%; border-collapse:collapse; font-size:12px; white-space:nowrap; }
+table.mes thead { background:#f8fafc; }
+table.mes th { padding:9px 8px; text-align:left; font-weight:600; color:#475569; font-size:11px; border-bottom:2px solid #e2e8f0; }
+table.mes td { padding:8px; border-bottom:1px solid #f1f5f9; }
+table.mes tr:hover { background:#f8fafc; }
+.cnt { font-size:12px; color:#64748b; margin:8px 2px; }
+.empty { text-align:center; padding:24px; color:#94a3b8; font-size:13px; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth_guard.js"></script>
+</head>
+<body>
+
+<div id="top-header" class="top-header"></div>
+<nav id="sidebar-nav" class="sidebar"></nav>
+
+<div class="main">
+  <div class="page-header">
+    <div class="header-row">
+      <div>
+        <h1>📂 MES 자료</h1>
+        <div class="sub">MES에서 취출한 재단·혼련·평량 raw-data 업로드 및 조회</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-proc="cutting" onclick="switchTab('cutting')">✂️ 재단</div>
+    <div class="tab" data-proc="mixing" onclick="switchTab('mixing')">🧪 혼련</div>
+    <div class="tab" data-proc="weighing" onclick="switchTab('weighing')">⚖️ 평량</div>
+  </div>
+
+  <div id="panel"></div>
+</div>
+
+<script src="sidebar.js"></script>
+<script>
+var SU = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+var SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+function H(){ return {'apikey':SK,'Authorization':'Bearer '+SK,'Content-Type':'application/json','Prefer':'return=representation'}; }
+function HR(){ return {'apikey':SK,'Authorization':'Bearer '+SK}; }
+
+// ── 공정별 설정 ──────────────────────────────────────────────
+// map: [엑셀헤더, DB컬럼, 변환타입]  /  view: [DB컬럼, 표시헤더]
+var PROC = {
+  cutting: {
+    table:'mes_cutting_raw', title:'재단',
+    map:[['일자','work_date','date'],['호기','machine','text'],['BatchNo','batch_no','text'],
+         ['사번','product_code','text'],['사내재질','material','text'],['기장','length_mm','num'],
+         ['두께','thickness','num'],['중량','weight_spec','num'],['초품','q_first','num'],
+         ['중품','q_mid','num'],['종품','q_last','num'],['재단박스','box_count','int'],
+         ['총수량','total_qty','num'],['총중량','total_weight','num'],['자투리','scrap','num'],
+         ['LabelID','label_id','text'],['작업자','worker','text']],
+    view:[['work_date','일자'],['machine','호기'],['batch_no','BatchNo'],['product_code','제품번호'],
+          ['material','재질'],['length_mm','기장'],['thickness','두께'],['weight_spec','중량'],
+          ['q_first','초품'],['q_mid','중품'],['q_last','종품'],['box_count','박스'],
+          ['total_qty','총수량'],['total_weight','총중량'],['scrap','자투리'],['label_id','LabelID'],['worker','작업자']]
+  },
+  mixing: {
+    table:'mes_mixing_raw', title:'혼련',
+    map:[['일자','work_date','date'],['BatchNo','batch_no','text'],['사번','product_code','text'],
+         ['사내재질','material','text'],['CMBLotNo','cmb_lot_no','text'],['Cmb 품명','cmb_name','text'],
+         ['내리수','batch_qty','num'],['총중량','total_weight','num'],['니다시간','kneader_min','min'],
+         ['니다온도','kneader_temp','temp'],['로라시간','roller_min','min'],['로라온도','roller_temp','temp'],
+         ['기장','length_mm','num'],['두께','thickness','num'],['자투리','scrap','num'],
+         ['작업자','worker','text'],['비고','note','text']],
+    view:[['work_date','일자'],['batch_no','BatchNo'],['product_code','제품번호'],['material','재질'],
+          ['cmb_lot_no','CMBLotNo'],['cmb_name','Cmb품명'],['batch_qty','내리수'],['total_weight','총중량'],
+          ['kneader_min','니다(분)'],['kneader_temp','니다℃'],['roller_min','로라(분)'],['roller_temp','로라℃'],
+          ['length_mm','기장'],['thickness','두께'],['scrap','자투리'],['worker','작업자'],['note','비고']]
+  },
+  weighing: {
+    table:'mes_weighing_raw', title:'평량',
+    map:[['일자','work_date','date'],['호기','machine','text'],['사번','product_code','text'],
+         ['사내재질명','material','text'],['내리수','batch_qty','num'],['품명','item_name','text'],
+         ['총 중량(Kg)','weight_kg','num']],
+    view:[['work_date','일자'],['machine','호기'],['product_code','제품번호'],['material','재질'],
+          ['batch_qty','내리수'],['item_name','품명'],['weight_kg','총중량(Kg)']]
+  }
+};
+
+var curProc = 'cutting';
+var pending = {}; // proc -> {rows, dates, fname}
+
+// ── 변환 유틸 ──
+function toDate(v){
+  if(v==null||v==='') return null;
+  if(typeof v==='number'){ var d=XLSX.SSF.parse_date_code(v); if(d) return d.y+'-'+String(d.m).padStart(2,'0')+'-'+String(d.d).padStart(2,'0'); }
+  var s=String(v).trim();
+  var m=s.match(/^(\d{2})-(\d{2})-(\d{2})$/); if(m) return '20'+m[1]+'-'+m[2]+'-'+m[3];
+  m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+'-'+m[2]+'-'+m[3];
+  return null;
+}
+function toNum(v){ if(v==null||v==='') return null; var n=parseFloat(v); return isNaN(n)?null:Math.round(n*1000)/1000; }
+function toInt(v){ if(v==null||v==='') return null; var n=parseInt(v,10); return isNaN(n)?null:n; }
+function toMin(v){ if(v==null||v==='') return null; var n=parseFloat(v); if(isNaN(n)) return null; return Math.round(n*1440*10)/10; } // 엑셀 시간값(일)→분
+function toTemp(v){ if(v==null||v==='') return null; var n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?null:n; } // '70º'→70
+function conv(type,v){ return type==='date'?toDate(v):type==='num'?toNum(v):type==='int'?toInt(v):type==='min'?toMin(v):type==='temp'?toTemp(v):(v==null?null:String(v).trim()||null); }
+
+// ── 패널 렌더 ──
+function renderPanel(){
+  var P=PROC[curProc];
+  var ths=P.view.map(function(c){return '<th>'+c[1]+'</th>';}).join('');
+  document.getElementById('panel').innerHTML =
+    '<div class="upload-card">'+
+      '<div class="u-title">⬆️ '+P.title+' MES 엑셀 업로드</div>'+
+      '<div class="u-desc">MES에서 취출한 '+P.title+' 작업일보 엑셀을 올리세요. 소계([▶…])·총계 행은 자동 제거되고, 시간(분)·온도(숫자) 변환 후 저장됩니다.<br>※ 같은 날짜의 기존 데이터는 새 파일로 <b>교체</b>됩니다.</div>'+
+      '<div class="u-row">'+
+        '<input type="file" id="mesFile" accept=".xlsx,.xls" style="display:none" onchange="onPick(this)">'+
+        '<button class="btn-pick" onclick="document.getElementById(\'mesFile\').click()">📄 엑셀 선택</button>'+
+        '<span class="u-fname" id="uFname">선택된 파일 없음</span>'+
+        '<button class="btn-up" id="uBtn" disabled onclick="doUpload()">업로드</button>'+
+      '</div>'+
+      '<div class="u-result" id="uResult"></div>'+
+    '</div>'+
+    '<div class="filter-card">'+
+      '<label>기간</label>'+
+      '<input type="date" id="fStart"> ~ <input type="date" id="fEnd">'+
+      '<button class="pbtn" onclick="setRange(\'today\')">당일</button>'+
+      '<button class="pbtn" onclick="setRange(\'month\')">당월</button>'+
+      '<button class="pbtn" onclick="setRange(\'all\')">전체</button>'+
+      '<label style="margin-left:6px">제품번호</label>'+
+      '<input type="text" id="fProd" placeholder="사번 검색" style="width:120px">'+
+      '<button class="btn-q" onclick="loadData()">조회</button>'+
+      '<button class="btn-x" onclick="exportXlsx()">📥 엑셀</button>'+
+    '</div>'+
+    '<div class="cnt" id="mesCnt"></div>'+
+    '<div class="tbl-wrap"><table class="mes"><thead><tr>'+ths+'</tr></thead><tbody id="mesBody">'+
+      '<tr><td class="empty" colspan="'+P.view.length+'">조회 버튼을 눌러주세요</td></tr></tbody></table></div>';
+  setRange('month');
+  loadData();
+}
+
+function switchTab(proc){
+  curProc=proc;
+  var tabs=document.querySelectorAll('.tab');
+  for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('active', tabs[i].getAttribute('data-proc')===proc);
+  renderPanel();
+}
+
+function fmtToday(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function setRange(type){
+  var now=new Date(), s='', e=fmtToday();
+  if(type==='today'){ s=fmtToday(); }
+  else if(type==='month'){ s=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01'; }
+  else if(type==='all'){ s='2000-01-01'; e='2999-12-31'; }
+  document.getElementById('fStart').value=s;
+  document.getElementById('fEnd').value=e;
+}
+
+// ── 업로드 ──
+function onPick(input){
+  var P=PROC[curProc];
+  var file=input.files[0];
+  document.getElementById('uResult').innerHTML='';
+  if(!file){ return; }
+  document.getElementById('uFname').textContent=file.name;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      var wb=XLSX.read(ev.target.result,{type:'array'});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      // 헤더행 찾기: '순' 과 '일자' 가 같이 있는 행
+      var hIdx=-1;
+      for(var i=0;i<Math.min(aoa.length,6);i++){
+        var row=aoa[i].map(function(x){return String(x).trim();});
+        if(row.indexOf('순')!==-1 && row.indexOf('일자')!==-1){ hIdx=i; break; }
+      }
+      if(hIdx===-1){ throw new Error('헤더(순/일자)를 찾지 못했습니다. 올바른 '+P.title+' 일보인지 확인하세요.'); }
+      var header=aoa[hIdx].map(function(x){return String(x).trim();});
+      var sunIdx=header.indexOf('순');
+      // 컬럼 인덱스 매핑
+      var colIdx={};
+      P.map.forEach(function(m){ colIdx[m[1]]=header.indexOf(m[0]); });
+      var missing=P.map.filter(function(m){return colIdx[m[1]]===-1;}).map(function(m){return m[0];});
+      if(missing.length){ throw new Error('엑셀에 다음 컬럼이 없습니다: '+missing.join(', ')); }
+
+      var rows=[], dates={}, skipped=0;
+      for(var r=hIdx+1;r<aoa.length;r++){
+        var raw=aoa[r];
+        if(!raw) continue;
+        var joined=raw.map(function(x){return String(x);}).join(' ');
+        if(joined.indexOf('▶')!==-1){ skipped++; continue; }            // 소계(사번별계/뱃지계)
+        var sun=raw[sunIdx];
+        if(sun===''||sun==null||isNaN(parseFloat(sun))){ skipped++; continue; } // 총계/요약/빈행
+        var rec={ source_file:file.name };
+        P.map.forEach(function(m){ rec[m[1]]=conv(m[2], raw[colIdx[m[1]]]); });
+        if(!rec.work_date || !rec.product_code){ skipped++; continue; }   // 날짜/제품번호 없으면 제외
+        rows.push(rec);
+        dates[rec.work_date]=true;
+      }
+      if(rows.length===0){ throw new Error('업로드할 실제 작업행이 없습니다. (소계/총계만 있는 파일일 수 있어요)'); }
+      pending[curProc]={ rows:rows, dates:Object.keys(dates), fname:file.name };
+      document.getElementById('uBtn').disabled=false;
+      document.getElementById('uResult').style.color='#166534';
+      document.getElementById('uResult').textContent=
+        '✅ 검증 완료: 실제 '+rows.length+'건 (소계·총계 등 '+skipped+'행 제외) · 날짜: '+Object.keys(dates).join(', ')+'\n"업로드" 버튼을 누르면 저장됩니다.';
+    }catch(err){
+      document.getElementById('uBtn').disabled=true;
+      document.getElementById('uResult').style.color='#dc2626';
+      document.getElementById('uResult').textContent='❌ '+err.message;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function doUpload(){
+  var P=PROC[curProc];
+  var pk=pending[curProc];
+  if(!pk||!pk.rows.length){ return; }
+  if(!confirm(P.title+' '+pk.rows.length+'건을 업로드합니다.\n해당 날짜('+pk.dates.join(', ')+')의 기존 데이터는 새 파일로 교체됩니다.\n진행할까요?')){ return; }
+  var btn=document.getElementById('uBtn'); btn.disabled=true; btn.textContent='업로드 중...';
+  var res=document.getElementById('uResult'); res.style.color='#334155';
+  try{
+    // 1) 같은 날짜 기존 데이터 삭제(교체)
+    for(var i=0;i<pk.dates.length;i++){
+      await fetch(SU+'/rest/v1/'+P.table+'?work_date=eq.'+encodeURIComponent(pk.dates[i]), {method:'DELETE', headers:H()});
+    }
+    // 2) 신규 적재 (200건씩)
+    var ok=0;
+    for(var s=0;s<pk.rows.length;s+=200){
+      var chunk=pk.rows.slice(s,s+200);
+      var r=await fetch(SU+'/rest/v1/'+P.table, {method:'POST', headers:H(), body:JSON.stringify(chunk)});
+      if(!r.ok){ throw new Error('저장 실패('+r.status+'): '+(await r.text()).slice(0,200)); }
+      ok+=chunk.length;
+    }
+    res.style.color='#166534';
+    res.textContent='🎉 업로드 완료: '+ok+'건 저장됨';
+    pending[curProc]=null;
+    document.getElementById('uFname').textContent='선택된 파일 없음';
+    document.getElementById('mesFile').value='';
+    loadData();
+  }catch(err){
+    res.style.color='#dc2626';
+    res.textContent='❌ '+err.message;
+  }finally{
+    btn.textContent='업로드';
+  }
+}
+
+// ── 조회 ──
+var lastRows=[];
+async function loadData(){
+  var P=PROC[curProc];
+  var s=document.getElementById('fStart').value, e=document.getElementById('fEnd').value;
+  var prod=(document.getElementById('fProd').value||'').trim();
+  var q='?order=work_date.desc,id.asc&limit=5000';
+  if(s) q+='&work_date=gte.'+s;
+  if(e) q+='&work_date=lte.'+e;
+  if(prod) q+='&product_code=ilike.*'+encodeURIComponent(prod)+'*';
+  document.getElementById('mesBody').innerHTML='<tr><td class="empty" colspan="'+P.view.length+'">불러오는 중...</td></tr>';
+  try{
+    var r=await fetch(SU+'/rest/v1/'+P.table+q, {headers:HR()});
+    var data=await r.json();
+    lastRows=data||[];
+    renderRows();
+  }catch(err){
+    document.getElementById('mesBody').innerHTML='<tr><td class="empty" colspan="'+P.view.length+'">불러오기 실패</td></tr>';
+  }
+}
+function cell(v){ return (v==null||v==='')?'-':String(v); }
+function renderRows(){
+  var P=PROC[curProc];
+  document.getElementById('mesCnt').textContent='총 '+lastRows.length+'건';
+  if(!lastRows.length){ document.getElementById('mesBody').innerHTML='<tr><td class="empty" colspan="'+P.view.length+'">데이터가 없습니다</td></tr>'; return; }
+  var html='';
+  for(var i=0;i<lastRows.length;i++){
+    var d=lastRows[i];
+    html+='<tr>'+P.view.map(function(c){ return '<td>'+cell(d[c[0]])+'</td>'; }).join('')+'</tr>';
+  }
+  document.getElementById('mesBody').innerHTML=html;
+}
+
+// ── 엑셀 내보내기 ──
+function exportXlsx(){
+  var P=PROC[curProc];
+  if(!lastRows.length){ alert('내보낼 데이터가 없습니다. 먼저 조회하세요.'); return; }
+  var out=lastRows.map(function(d){ var o={}; P.view.forEach(function(c){ o[c[1]]=d[c[0]]; }); return o; });
+  var ws=XLSX.utils.json_to_sheet(out);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, P.title);
+  XLSX.writeFile(wb, 'MES_'+P.title+'_'+fmtToday().replace(/-/g,'')+'.xlsx');
+}
+
+// 시작
+renderPanel();
+</script>
+</body>
+</html>

@@ -20,6 +20,7 @@ function initSidebar() {
 
     // ── 페이지별 active / 자동 펼침 ──
     var isMoldPage = ['mold_dashboard.html','mold_layout.html','mold_detail.html'].indexOf(page) !== -1;
+    var isMesPage = ['mes_data.html'].indexOf(page) !== -1;
     var isQualityPage = ['inspection_round_viewer.html'].indexOf(page) !== -1;
     var isDataPage = ['data_viewer.html','safety_viewer.html','docs_manager.html'].indexOf(page) !== -1;
     var isSystemPage = ['master_data.html','users.html'].indexOf(page) !== -1;
@@ -30,6 +31,7 @@ function initSidebar() {
     var dashActive = (page === 'mold_dashboard.html') ? ' nav-active' : '';
     var layoutActive = (page === 'mold_layout.html') ? ' nav-active' : '';
     var detailActive = (page === 'mold_detail.html') ? ' nav-active' : '';
+    var mesActive = (page === 'mes_data.html') ? ' nav-active' : '';
 
     // 품질관리 active
     var inspViewActive = (page === 'inspection_round_viewer.html') ? ' nav-active' : '';
@@ -55,7 +57,8 @@ function initSidebar() {
     var assetActive = (page === 'asset_manage.html') ? ' nav-active' : '';
 
     // 자동 펼침
-    var prodOpen = isMoldPage ? ' open' : '';
+    var prodOpen = (isMoldPage || isMesPage) ? ' open' : '';
+    var mesOpen = isMesPage ? ' open' : '';
     var moldOpen = isMoldPage ? ' open' : '';
     var qualityOpen = isQualityPage ? ' open' : '';
     var inspOpen = isQualityPage ? ' open' : '';
@@ -141,6 +144,16 @@ function initSidebar() {
                             '<a class="nav-link' + dashActive + '" href="mold_dashboard.html"><span class="n-icon">📊</span>대시보드 / 이력</a>' +
                             '<a class="nav-link' + layoutActive + '" href="mold_layout.html"><span class="n-icon">🗄️</span>적치대 현황</a>' +
                             '<a class="nav-link' + detailActive + '" href="mold_detail.html"><span class="n-icon">📋</span>금형 상세관리</a>' +
+                        '</div>' +
+                    '</div>' +
+                    /* MES 자료 */
+                    '<div class="sub-item' + mesOpen + '" id="s-mes">' +
+                        '<button class="sub-btn" onclick="toggleCat(\'s-mes\')">' +
+                            '<span class="s-icon">📂</span><span class="s-label">MES 자료</span>' +
+                            '<span class="s-arrow">▼</span>' +
+                        '</button>' +
+                        '<div class="sub-body">' +
+                            '<a class="nav-link' + mesActive + '" href="mes_data.html"><span class="n-icon">📥</span>재단·혼련·평량</a>' +
                         '</div>' +
                     '</div>' +
             '</div>' +
@@ -325,7 +338,7 @@ function applyAccessRestrictions() {
         if (isLogistics) {
             allowedPages = ['inventory_layout.html','inventory_rack.html','inventory_io.html','inventory_viewer.html','inventory_zone.html'];
         } else {
-            allowedPages = ['mold_layout.html', 'mold_dashboard.html'];
+            allowedPages = ['mold_layout.html', 'mold_dashboard.html', 'mes_data.html'];
             if (isWorker) { allowedPages.push('inspection_round.html'); allowedPages.push('inspection_round_viewer.html'); }
         }
 
