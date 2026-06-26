@@ -180,10 +180,11 @@
             <th data-sort="sabun" onclick="sortTable('sabun')">사번 <span class="sort-icon" id="si_sabun">&#9650;&#9660;</span></th>
             <th data-sort="material" onclick="sortTable('material')">재질 <span class="sort-icon" id="si_material">&#9650;&#9660;</span></th>
             <th>외관불량</th>
+            <th>변동점</th>
             <th data-sort="action_detail" onclick="sortTable('action_detail')">비고 <span class="sort-icon" id="si_action_detail">&#9650;&#9660;</span></th>
             <th>관리</th>
           </tr></thead>
-          <tbody id="tableBody"><tr><td colspan="10" class="empty-msg">조회 버튼을 눌러주세요</td></tr></tbody>
+          <tbody id="tableBody"><tr><td colspan="11" class="empty-msg">조회 버튼을 눌러주세요</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -264,7 +265,7 @@ async function loadData() {
         renderTable();
         renderStats();
     } catch(err) {
-        document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" class="empty-msg">데이터를 불러올 수 없습니다</td></tr>';
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="11" class="empty-msg">데이터를 불러올 수 없습니다</td></tr>';
     }
 }
 
@@ -328,7 +329,7 @@ function renderStats() {
 
 function renderTable() {
     if (!allData.length) {
-        document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" class="empty-msg">데이터가 없습니다</td></tr>';
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="11" class="empty-msg">데이터가 없습니다</td></tr>';
         return;
     }
     var isAdmin = myInfo && (myInfo.user_type === 'super' || myInfo.user_type === 'admin');
@@ -357,6 +358,11 @@ function renderTable() {
             } else { defectHtml = '<span style="color:#27AE60;font-size:11px;">양호</span>'; }
         }
 
+        var chgAll = (d.change_mold || []).concat(d.change_equip || []);
+        var changeHtml = chgAll.length > 0
+            ? '<span style="display:inline-block;background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 6px;font-size:11px;line-height:1.6;">'+chgAll.join(', ')+'</span>'
+            : '<span style="color:#bbb;">-</span>';
+
         var actionHtml = '<button class="btn-row btn-row-view" onclick="viewDetail('+d.id+')">상세</button>';
         if (isAdmin || (myInfo && myInfo.name === d.inspector)) {
             actionHtml += '<button class="btn-row btn-row-edit" onclick="editRecord('+d.id+')">수정</button>';
@@ -372,6 +378,7 @@ function renderTable() {
             + '<td>'+(d.sabun||'-')+'</td>'
             + '<td style="font-size:11px;">'+(d.material||'-')+'</td>'
             + '<td>'+defectHtml+'</td>'
+            + '<td style="max-width:160px;">'+changeHtml+'</td>'
             + '<td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(d.action_detail||'-')+'</td>'
             + '<td style="white-space:nowrap;">'+actionHtml+'</td>'
             + '</tr>';
