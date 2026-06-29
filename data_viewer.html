@@ -2416,22 +2416,23 @@ function renderMoldingTable(data) {
       } catch(e) {
         noteText = r.note || '';
       }
-      // 비가동코드(사유) + 비가동시간(시작~종료 합산)
+      // 비가동(사번 매칭) + 비가동시간(시작~종료(분))
       let dtCode = r.downtime_code || '';
       let dtMin = '';
       try {
         const noteObj = JSON.parse(r.note);
         if (noteObj.downtime && noteObj.downtime.length > 0) {
-          if (!dtCode) dtCode = noteObj.downtime.map(d => d.code).filter(Boolean).join(', ');
-          let tot = 0;
-          noteObj.downtime.forEach(d => {
+          const matched = noteObj.downtime.filter(d => !d.sabun || d.sabun === r.sabun);
+          dtCode = matched.map(d => d.code).filter(Boolean).join(', ');
+          dtMin = matched.map(d => {
             if (d.start && d.end) {
               const [sh,sm] = d.start.split(':').map(Number);
               const [eh,em] = d.end.split(':').map(Number);
-              let m = (eh*60+em) - (sh*60+sm); if (m < 0) m += 1440; tot += m;
+              let m = (eh*60+em) - (sh*60+sm); if (m < 0) m += 1440;
+              return d.start + '~' + d.end + '(' + m + '분)';
             }
-          });
-          if (tot > 0) dtMin = tot + '분';
+            return '';
+          }).filter(Boolean).join(', ');
         }
       } catch(e) {}
       return `<tr style="${st}">
