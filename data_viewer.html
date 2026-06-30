@@ -2394,9 +2394,24 @@ function viewMoldingDay(date, sabun) {
   window.open(url, '_blank');
 }
 
+// 성형 기본 정렬: 작업일 desc → 가나다 면 → 같은 면 내 비가동 행 하단 (제출순 유지)
+function moldingFaceRank(wt){ var m={'가면':0,'나면':1,'다면':2}; return (wt in m) ? m[wt] : 3; }
+function moldingRecHasDt(r){
+  try { var n = JSON.parse(r.note); return (n.downtime||[]).some(function(d){ return (!d.sabun || d.sabun===r.sabun) && d.code; }) ? 1 : 0; } catch(e) { return 0; }
+}
+function sortMoldingDefault(data){
+  return data.slice().sort(function(a,b){
+    if (a.work_date !== b.work_date) return a.work_date < b.work_date ? 1 : -1;
+    var fr = moldingFaceRank(a.work_type) - moldingFaceRank(b.work_type);
+    if (fr !== 0) return fr;
+    return moldingRecHasDt(a) - moldingRecHasDt(b);
+  });
+}
+
 function renderMoldingTable(data) {
   if (!data.length) { document.getElementById('resultArea').innerHTML = '<div class="card"><div style="padding:2rem;text-align:center;color:#aaa;font-size:13px">데이터가 없어요.</div></div>'; return; }
   data = applySortIfNeeded(data);
+  if (!currentSortCol) data = sortMoldingDefault(data);
   document.getElementById('resultArea').innerHTML = `
     <div class="card" style="padding:0"><div class="table-wrap"><table><thead><tr>
       <th>NO</th>${makeSortTh('작업일','work_date')}${makeSortTh('근무','shift')}${makeSortTh('반','team')}${makeSortTh('설비','equipment_no')}${makeSortTh('유형','work_type')}${makeSortTh('사번','worker_id')}${makeSortTh('제품명','_partName')}
