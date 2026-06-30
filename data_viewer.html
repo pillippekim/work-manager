@@ -1070,7 +1070,7 @@ async function loadData() {
     if (!showDeleted) q = q.is('deleted_at', null);
     if (fSabun)  q = q.ilike('sabun', `%${fSabun}%`);
     if (fWorker) q = q.ilike('worker_name', `%${fWorker}%`);
-    const { data } = await q.order('work_date', { ascending: false });
+    const { data } = await q.order('work_date', { ascending: false }).order('created_at', { ascending: false }).order('id', { ascending: true });
     cachedData.성형 = data || [];
   }
 
