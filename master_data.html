@@ -124,10 +124,14 @@ th.sortable.sorted .sort-ind { color: #243bb2; font-size: 11px; }
           <div class="preview-count" id="previewCount"></div>
           <div style="max-height:180px;overflow-y:auto">
             <table class="preview-table">
-              <thead><tr><th>사번</th><th>고객품번</th><th>품명</th></tr></thead>
+              <thead><tr><th>사번</th><th>고객품번</th><th>품명</th><th>재질명</th></tr></thead>
               <tbody id="previewBody"></tbody>
             </table>
           </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+          <input type="checkbox" id="materialOnly" style="width:15px;height:15px;cursor:pointer" />
+          <label for="materialOnly" style="font-size:12px;color:#555;cursor:pointer">재질명만 갱신 (기존 품명·품번은 그대로 유지)</label>
         </div>
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
           <button class="btn-cancel-form" onclick="toggleUpload('product')">취소</button>
@@ -149,6 +153,10 @@ th.sortable.sorted .sort-ind { color: #243bb2; font-size: 11px; }
             <span class="form-label">품명</span>
             <input class="form-input" id="p_partname" placeholder="예: BUSH-MTG" />
           </div>
+          <div class="form-group">
+            <span class="form-label">재질명</span>
+            <input class="form-input" id="p_material" placeholder="예: A701-A0C" />
+          </div>
         </div>
         <div class="form-actions">
           <button class="btn-cancel-form" onclick="toggleForm('product')">취소</button>
@@ -161,6 +169,7 @@ th.sortable.sorted .sort-ind { color: #243bb2; font-size: 11px; }
             <th class="sortable" data-table="product" data-key="sabun" onclick="sortBy('product','sabun')">사번<span class="sort-ind"></span></th>
             <th class="sortable" data-table="product" data-key="part_no" onclick="sortBy('product','part_no')">고객 품번<span class="sort-ind"></span></th>
             <th class="sortable" data-table="product" data-key="part_name" onclick="sortBy('product','part_name')">품명<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="product" data-key="material_name" onclick="sortBy('product','material_name')">재질명<span class="sort-ind"></span></th>
             <th class="sortable" data-table="product" data-key="created_at" onclick="sortBy('product','created_at')">등록일<span class="sort-ind"></span></th>
             <th></th>
           </tr></thead>
@@ -516,6 +525,10 @@ th.sortable.sorted .sort-ind { color: #243bb2; font-size: 11px; }
         <div class="modal-label">품명</div>
         <input class="modal-input" id="ep_partname" />
       </div>
+      <div>
+        <div class="modal-label">재질명</div>
+        <input class="modal-input" id="ep_material" />
+      </div>
     </div>
     <div class="modal-btns">
       <button class="btn-modal-cancel" onclick="closeModal('editProductModal')">취소</button>
@@ -623,6 +636,7 @@ function renderProducts(data, isSearch) {
       '<td style="font-weight:500">' + r.sabun + '</td>' +
       '<td style="color:#555">' + (r.part_no || '-') + '</td>' +
       '<td>' + (r.part_name || '-') + '</td>' +
+      '<td style="color:#555">' + (r.material_name || '-') + '</td>' +
       '<td style="color:#aaa;font-size:12px">' + fmtDate(r.created_at) + '</td>' +
       '<td><div class="act-cell">' +
         '<button class="icon-btn edit" title="수정" onclick="openEditProduct(' + r.id + ')">✏️</button>' +
@@ -648,6 +662,7 @@ function openEditProduct(id) {
   document.getElementById('ep_sabun').value = r.sabun;
   document.getElementById('ep_partno').value = r.part_no || '';
   document.getElementById('ep_partname').value = r.part_name || '';
+  document.getElementById('ep_material').value = r.material_name || '';
   document.getElementById('editProductModal').classList.add('open');
 }
 
@@ -655,12 +670,14 @@ async function saveProduct() {
   var sabun = document.getElementById('p_sabun').value.trim();
   var partNo = document.getElementById('p_partno').value.trim();
   var partName = document.getElementById('p_partname').value.trim();
+  var material = document.getElementById('p_material').value.trim();
   if (!sabun) { showToast('사번을 입력해주세요.'); return; }
-  var result = await db.from('products').upsert({ sabun: sabun, part_no: partNo, part_name: partName }, { onConflict: 'sabun' });
+  var result = await db.from('products').upsert({ sabun: sabun, part_no: partNo, part_name: partName, material_name: material }, { onConflict: 'sabun' });
   if (result.error) { showToast('저장 실패: ' + result.error.message); return; }
   document.getElementById('p_sabun').value = '';
   document.getElementById('p_partno').value = '';
   document.getElementById('p_partname').value = '';
+  document.getElementById('p_material').value = '';
   toggleForm('product');
   showToast('제품이 추가됐어요 ✓');
   loadProducts();
@@ -671,7 +688,8 @@ async function saveEditProduct() {
   var sabun = document.getElementById('ep_sabun').value.trim();
   var partNo = document.getElementById('ep_partno').value.trim();
   var partName = document.getElementById('ep_partname').value.trim();
-  var result = await db.from('products').update({ sabun: sabun, part_no: partNo, part_name: partName }).eq('id', id);
+  var material = document.getElementById('ep_material').value.trim();
+  var result = await db.from('products').update({ sabun: sabun, part_no: partNo, part_name: partName, material_name: material }).eq('id', id);
   if (result.error) { showToast('수정 실패: ' + result.error.message); return; }
   showToast('수정됐어요 ✓');
   closeModal('editProductModal');
@@ -802,7 +820,7 @@ function onExcelSelect(e) {
     var raw = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
     var headerRow = -1;
-    var colIdx = { sabun: -1, part_no: -1, part_name: -1, active: -1 };
+    var colIdx = { sabun: -1, part_no: -1, part_name: -1, active: -1, material: -1 };
     for (var i = 0; i < Math.min(raw.length, 10); i++) {
       var row = raw[i];
       if (!row) continue;
@@ -811,13 +829,22 @@ function onExcelSelect(e) {
         var v = String(row[j]||'').trim();
         if (v === '사번') s = j;
         if (v === '품번') p = j;
-        if (v === '품목명') n = j;
+        if (v === '품목명' || v === '품명') n = j;
       }
       if (s >= 0 && p >= 0 && n >= 0) {
         headerRow = i;
-        var aIdx = -1;
-        for (var j = 0; j < row.length; j++) { if (String(row[j]||'').trim() === '사용') { aIdx = j; break; } }
-        colIdx = { sabun: s, part_no: p, part_name: n, active: aIdx };
+        var aIdx = -1, mIdx = -1;
+        // '사용'(활성), '재질'(정확히 일치 → 도면재질 제외) : 헤더행 + 다음행(2단 헤더 대응)
+        var scanRows = [row, raw[i+1] || []];
+        for (var k = 0; k < scanRows.length; k++) {
+          var hr = scanRows[k];
+          for (var j = 0; j < hr.length; j++) {
+            var hv = String(hr[j]||'').trim();
+            if (hv === '사용' && aIdx < 0) aIdx = j;
+            if (hv === '재질' && mIdx < 0) mIdx = j;
+          }
+        }
+        colIdx = { sabun: s, part_no: p, part_name: n, active: aIdx, material: mIdx };
         break;
       }
     }
@@ -829,10 +856,13 @@ function onExcelSelect(e) {
       var row = raw[i];
       if (!row || !row[colIdx.sabun]) continue;
       if (colIdx.active >= 0 && String(row[colIdx.active]||'').trim() !== 'YES') continue;
+      var mv = colIdx.material >= 0 ? String(row[colIdx.material] || '').trim() : '';
+      if (mv === '-' || mv === 'nan') mv = '';
       excelData.push({
         sabun: String(row[colIdx.sabun] || '').trim(),
         part_no: String(row[colIdx.part_no] || '').trim(),
-        part_name: String(row[colIdx.part_name] || '').trim()
+        part_name: String(row[colIdx.part_name] || '').trim(),
+        material_name: mv
       });
     }
 
@@ -844,9 +874,9 @@ function onExcelSelect(e) {
     var previewHtml = '';
     var limit = Math.min(excelData.length, 8);
     for (var i = 0; i < limit; i++) {
-      previewHtml += '<tr><td>' + excelData[i].sabun + '</td><td>' + excelData[i].part_no + '</td><td>' + excelData[i].part_name + '</td></tr>';
+      previewHtml += '<tr><td>' + excelData[i].sabun + '</td><td>' + excelData[i].part_no + '</td><td>' + excelData[i].part_name + '</td><td>' + (excelData[i].material_name||'') + '</td></tr>';
     }
-    if (excelData.length > 8) previewHtml += '<tr><td colspan="3" style="color:#aaa;text-align:center;padding:6px">... 외 ' + (excelData.length-8) + '건</td></tr>';
+    if (excelData.length > 8) previewHtml += '<tr><td colspan="4" style="color:#aaa;text-align:center;padding:6px">... 외 ' + (excelData.length-8) + '건</td></tr>';
     document.getElementById('previewBody').innerHTML = previewHtml;
     document.getElementById('excelPreview').style.display = 'block';
     document.getElementById('excelUploadBtn').disabled = false;
@@ -856,21 +886,28 @@ function onExcelSelect(e) {
 
 async function uploadExcel() {
   if (!excelData.length) return;
+  var mo = document.getElementById('materialOnly');
+  var matOnly = !!(mo && mo.checked);
   var btn = document.getElementById('excelUploadBtn');
   btn.disabled = true; btn.textContent = '업로드 중...';
   var done = 0, fail = 0;
+  // 재질만 갱신: {사번, 재질명}만 upsert → 기존 품명·품번은 건드리지 않음
+  var payload = matOnly
+    ? excelData.filter(function(r){ return r.material_name; }).map(function(r){ return { sabun: r.sabun, material_name: r.material_name }; })
+    : excelData;
   var chunkSize = 100;
-  for (var i = 0; i < excelData.length; i += chunkSize) {
-    var chunk = excelData.slice(i, i + chunkSize);
+  for (var i = 0; i < payload.length; i += chunkSize) {
+    var chunk = payload.slice(i, i + chunkSize);
     var result = await db.from('products').upsert(chunk, { onConflict: 'sabun' });
     if (result.error) fail += chunk.length; else done += chunk.length;
   }
-  showToast(done + '건 업로드 완료' + (fail ? ', ' + fail + '건 실패' : '') + ' ✓');
+  showToast(done + '건 ' + (matOnly ? '재질 갱신' : '업로드') + ' 완료' + (fail ? ', ' + fail + '건 실패' : '') + ' ✓');
   btn.disabled = false; btn.textContent = '업로드';
   toggleUpload('product');
   document.getElementById('excelInput').value = '';
   document.getElementById('excelSelected').textContent = '';
   document.getElementById('excelPreview').style.display = 'none';
+  if (mo) mo.checked = false;
   excelData = [];
   loadProducts();
 }
@@ -878,10 +915,10 @@ async function uploadExcel() {
 function downloadTemplate() {
   var wb = XLSX.utils.book_new();
   var ws = XLSX.utils.aoa_to_sheet([
-    ['사번', '고객품번', '품명'],
-    ['502284', '9556086', 'BUSH-MTG D/LATCH PWR ACTR'],
+    ['사번', '품번', '품명', '재질'],
+    ['502284', '9556086', 'BUSH-MTG D/LATCH PWR ACTR', 'A701-A0C'],
   ]);
-  ws['!cols'] = [{wch:12},{wch:20},{wch:30}];
+  ws['!cols'] = [{wch:12},{wch:20},{wch:30},{wch:14}];
   XLSX.utils.book_append_sheet(wb, ws, '제품기준정보');
   XLSX.writeFile(wb, '제품기준정보_양식.xlsx');
 }
