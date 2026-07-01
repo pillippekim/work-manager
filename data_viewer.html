@@ -158,6 +158,10 @@ th.sortable.desc::after { content:'▼'; color:#243bb2; }
         <label class="filter-label">작업자</label>
         <input class="filter-input" type="text" id="filterWorker" placeholder="작업자 이름" />
       </div>
+      <div class="filter-group">
+        <label class="filter-label">설비</label>
+        <input class="filter-input" type="text" id="filterEquip" placeholder="설비(호기) 검색" />
+      </div>
       <button class="btn-search" onclick="loadData()">🔍 조회</button>
       <button class="btn-excel" onclick="downloadExcel()">📥 엑셀 다운로드</button>
 
@@ -981,6 +985,7 @@ async function loadData() {
 
   const fSabun  = document.getElementById('filterSabun').value.trim();
   const fWorker = document.getElementById('filterWorker').value.trim();
+  const fEquip  = document.getElementById('filterEquip') ? document.getElementById('filterEquip').value.trim() : '';
 
   // 포장 데이터 로드 (필요 시)
   if (currentProcess === 'all' || currentProcess === '포장') {
@@ -1070,6 +1075,7 @@ async function loadData() {
     if (!showDeleted) q = q.is('deleted_at', null);
     if (fSabun)  q = q.ilike('sabun', `%${fSabun}%`);
     if (fWorker) q = q.ilike('worker_name', `%${fWorker}%`);
+    if (fEquip)  q = q.ilike('equipment_no', `%${fEquip}%`);
     const { data } = await q.order('work_date', { ascending: false }).order('created_at', { ascending: false }).order('id', { ascending: true });
     cachedData.성형 = data || [];
   }
@@ -1080,6 +1086,7 @@ async function loadData() {
     if (!showDeleted) q = q.is('deleted_at', null);
     if (fSabun)  q = q.ilike('sabun', `%${fSabun}%`);
     if (fWorker) q = q.ilike('worker_name', `%${fWorker}%`);
+    if (fEquip)  q = q.ilike('equipment_no', `%${fEquip}%`);
     const { data } = await q.order('work_date', { ascending: false });
     cachedData.조립 = data || [];
   }
@@ -1090,6 +1097,7 @@ async function loadData() {
     if (!showDeleted) q = q.is('deleted_at', null);
     if (fSabun)  q = q.ilike('sabun', `%${fSabun}%`);
     if (fWorker) q = q.ilike('worker_name', `%${fWorker}%`);
+    if (fEquip)  q = q.ilike('equipment_no', `%${fEquip}%`);
     const { data } = await q.order('work_date', { ascending: false });
     cachedData.사상 = data || [];
   }
