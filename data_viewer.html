@@ -2401,10 +2401,11 @@ function moldingRecHasDt(r){
 }
 function sortMoldingDefault(data){
   return data.slice().sort(function(a,b){
-    if (a.work_date !== b.work_date) return a.work_date < b.work_date ? 1 : -1;
-    var fr = moldingFaceRank(a.work_type) - moldingFaceRank(b.work_type);
-    if (fr !== 0) return fr;
-    return moldingRecHasDt(a) - moldingRecHasDt(b);
+    if (a.work_date !== b.work_date) return a.work_date < b.work_date ? 1 : -1;            // 작업일 최신순
+    var ta=(a.team||''), tb=(b.team||''); if (ta!==tb) return ta<tb ? -1 : 1;              // 반
+    var ea=(a.equipment_no||''), eb=(b.equipment_no||''); if (ea!==eb) return ea<eb ? -1 : 1; // 설비(호기)
+    var fr = moldingFaceRank(a.work_type) - moldingFaceRank(b.work_type); if (fr!==0) return fr; // 유형(면)
+    return moldingRecHasDt(a) - moldingRecHasDt(b);                                        // 비가동여부
   });
 }
 
