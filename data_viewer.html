@@ -1101,6 +1101,19 @@ async function loadData() {
 var currentSortCol = '';
 var currentSortDir = 'asc';
 
+// 불량유형 고정 순서 (값이 0이어도 항상 이 순서로 전체 표시)
+const DEFECT_TYPE_ORDER = ['기포','미성형','형상불량','이물질','찢어짐','깨짐','찍힘','뜯김','사상','미가류','접착불량','Burr','홀막힘','찐드기','기타'];
+function orderedDefectTypes(foundSet) {
+  var extras = [];
+  if (foundSet) {
+    (foundSet instanceof Set ? Array.from(foundSet) : foundSet).forEach(function(t){
+      if (DEFECT_TYPE_ORDER.indexOf(t) === -1) extras.push(t);
+    });
+    extras.sort();
+  }
+  return DEFECT_TYPE_ORDER.concat(extras);
+}
+
 function sortTableData(data, col, dir) {
     return data.slice().sort(function(a, b) {
         var va = a[col], vb = b[col];
@@ -1241,7 +1254,7 @@ function renderStats() {
       });
     });
 
-    var typeList = Array.from(allTypes).sort();
+    var typeList = orderedDefectTypes(allTypes);
     var sabunList = Object.keys(defectMap).sort();
 
     var defectHtml = '';
@@ -2698,7 +2711,7 @@ function downloadExcel() {
         else if (p) allDefectTypes.add(p);
       });
     });
-    var defectTypeList = Array.from(allDefectTypes).sort();
+    var defectTypeList = orderedDefectTypes(allDefectTypes);
 
     const rows = cachedData.검사.map((r, i) => {
       const prod = PRODUCTS[r.worker_id] || {};
