@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>기준정보 관리 - HKHT</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="common.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth_guard.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+/* ── master_data 고유 스타일 ── */
+.container { max-width: 100% !important; margin: 0 !important; padding: 16px 20px !important; }
+.excel-preview { margin-bottom: 12px; }
+.preview-count { font-size: 12px; color: #555; margin-bottom: 8px; }
+.count-badge { display: inline-block; font-size: 11px; background: #f3f4f6; color: #555; border-radius: 10px; padding: 2px 8px; margin-left: 6px; }
+.btn-save { font-size: 13px; padding: 8px 18px; border-radius: 8px; background: #243bb2; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
+.btn-save:hover { background: #1e32a0; }
+.btn-cancel-form { font-size: 13px; padding: 8px 14px; border-radius: 8px; background: transparent; color: #888; border: 1px solid #ddd; cursor: pointer; font-family: inherit; }
+
+/* ── 정렬 가능한 표 제목 ── */
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; transition: background .12s; }
+th.sortable:hover { background: #eef1fb; }
+th.sortable .sort-ind { font-size: 10px; margin-left: 4px; color: #c2c7d0; }
+th.sortable.sorted { color: #243bb2; }
+th.sortable.sorted .sort-ind { color: #243bb2; font-size: 11px; }
+
+/* ── 작업 아이콘 버튼 (수정/삭제) ── */
+.act-cell { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+.icon-btn {
+  width: 30px; height: 30px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid #e5e7eb; border-radius: 8px; background: #fff;
+  font-size: 14px; line-height: 1; cursor: pointer;
+  transition: transform .12s, box-shadow .12s, background .12s, border-color .12s;
+}
+.icon-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,.10); }
+.icon-btn.edit:hover { background: #fff7ed; border-color: #fdba74; }
+.icon-btn.del:hover  { background: #fef2f2; border-color: #fca5a5; }
+.icon-btn:active { transform: translateY(0); }
+
+/* ── 상태 토글(활성/비활성) 작은 버튼 ── */
+.toggle-btn {
+  height: 30px; padding: 0 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid #e5e7eb; border-radius: 8px; background: #fff;
+  font-size: 11px; font-weight: 600; color: #555; cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.toggle-btn:hover { background: #fefce8; border-color: #fde68a; color: #92400e; }
+</style>
+</head>
+<body>
+
+<!-- 권한 체크 로딩 화면 -->
+<div id="authCheckOverlay" style="position:fixed;inset:0;background:#f1f3f9;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="width:36px;height:36px;border:3px solid #e5e5e5;border-top-color:#243bb2;border-radius:50%;animation:authSpin 0.8s linear infinite"></div>
+  <div style="font-size:13px;color:#888;font-family:inherit">권한 확인 중...</div>
+  <style>@keyframes authSpin { to { transform: rotate(360deg); } }</style>
+</div>
+
+<!-- WM 레이아웃 -->
+<div id="top-header" class="top-header"></div>
+<nav id="sidebar-nav" class="sidebar"></nav>
+
+<div class="main">
+
+  <!-- 페이지 헤더 (container 밖 = 좌우 여백 없이 꽉 참) -->
+  <div class="page-header">
+    <div class="header-row">
+      <div>
+        <h1>🗂️ 기준정보 관리</h1>
+        <div class="sub">제품, 작업자, BOM, 설비 마스터 데이터 관리</div>
+      </div>
+    </div>
+  </div>
+
+<div class="container">
+
+  <!-- 메인 탭 -->
+  <div class="main-tabs">
+    <button class="main-tab active" onclick="switchTab('product')" id="tabBtn_product">🔧 제품 기준정보</button>
+    <button class="main-tab" onclick="switchTab('worker')" id="tabBtn_worker">👤 작업자 기준정보</button>
+    <button class="main-tab" onclick="switchTab('bom')" id="tabBtn_bom">🔩 조립 BOM</button>
+    <button class="main-tab" onclick="switchTab('fmb')" id="tabBtn_fmb">🧪 FMB-BOM</button>
+    <button class="main-tab" onclick="switchTab('equip')" id="tabBtn_equip">🏭 설비 관리</button>
+  </div>
+
+  <!-- 제품 섹션 -->
+  <div class="section active" id="section_product">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">제품 기준정보</div>
+          <div class="card-sub">사번 ↔ 고객 품번/품명 연동 관리</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn-template" onclick="downloadTemplate()">양식 다운로드</button>
+          <button class="btn-excel" onclick="toggleUpload('product')">엑셀 업로드</button>
+          <button class="btn-add" onclick="toggleForm('product')">+ 행 추가</button>
+        </div>
+      </div>
+      <div class="search-bar">
+        <input class="search-input" id="searchProduct" placeholder="🔍 사번 또는 품명 검색" oninput="filterProducts()" />
+      </div>
+      <!-- 엑셀 업로드 -->
+      <div class="upload-section" id="uploadSection_product"
+        ondragover="onExcelDragOver(event)"
+        ondragleave="onExcelDragLeaveSection(event)"
+        ondrop="onExcelDrop(event)">
+        <div style="font-size:13px;font-weight:500;color:#111;margin-bottom:10px">
+          📊 엑셀 업로드
+          <span style="font-size:11px;color:#888;font-weight:400;margin-left:8px">ERP 다운로드 파일 그대로 올려주세요</span>
+        </div>
+        <div class="excel-zone" id="excelZone" onclick="document.getElementById('excelInput').click()">
+          <div style="font-size:24px;margin-bottom:6px">📎</div>
+          <div style="font-size:13px;color:#888">엑셀 파일을 클릭하거나 드래그해서 올려주세요</div>
+          <div id="excelSelected" style="font-size:13px;color:#243bb2;font-weight:500;margin-top:6px"></div>
+        </div>
+        <input type="file" id="excelInput" accept=".xlsx,.xls" style="display:none" onchange="onExcelSelect(event)" />
+        <div id="excelPreview" class="excel-preview" style="display:none">
+          <div class="preview-count" id="previewCount"></div>
+          <div style="max-height:180px;overflow-y:auto">
+            <table class="preview-table">
+              <thead><tr><th>사번</th><th>고객품번</th><th>품명</th><th>재질명</th></tr></thead>
+              <tbody id="previewBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
+          <button class="btn-cancel-form" onclick="toggleUpload('product')">취소</button>
+          <button class="btn-save" id="excelUploadBtn" onclick="uploadExcel()" disabled>업로드</button>
+        </div>
+      </div>
+      <!-- 행 추가 폼 -->
+      <div class="form-row" id="form_product">
+        <div class="form-grid form-grid-3">
+          <div class="form-group">
+            <span class="form-label">사번 *</span>
+            <input class="form-input" id="p_sabun" placeholder="예: 502284" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">고객 품번</span>
+            <input class="form-input" id="p_partno" placeholder="예: 9556086" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">품명</span>
+            <input class="form-input" id="p_partname" placeholder="예: BUSH-MTG" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">재질명</span>
+            <input class="form-input" id="p_material" placeholder="예: A701-A0C" />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-cancel-form" onclick="toggleForm('product')">취소</button>
+          <button class="btn-save" onclick="saveProduct()">저장</button>
+        </div>
+      </div>
+      <div class="table-scroll-wrap">
+        <table>
+          <thead><tr>
+            <th class="sortable" data-table="product" data-key="sabun" onclick="sortBy('product','sabun')">사번<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="product" data-key="part_no" onclick="sortBy('product','part_no')">고객 품번<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="product" data-key="part_name" onclick="sortBy('product','part_name')">품명<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="product" data-key="material_name" onclick="sortBy('product','material_name')">재질명<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="product" data-key="created_at" onclick="sortBy('product','created_at')">등록일<span class="sort-ind"></span></th>
+            <th></th>
+          </tr></thead>
+          <tbody id="productTable"></tbody>
+        </table>
+      </div>
+      <div class="show-more-row" id="productMoreRow" style="display:none">
+        <button class="btn-show-more" id="productMoreBtn" onclick="toggleShowAll('product')"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 작업자 섹션 -->
+  <div class="section" id="section_worker">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">작업자 기준정보</div>
+          <div class="card-sub">공정별 작업자 목록 관리</div>
+        </div>
+        <button class="btn-add" onclick="toggleForm('worker')">+ 작업자 추가</button>
+      </div>
+      <div class="search-bar">
+        <input class="search-input" id="searchWorker" placeholder="🔍 이름 또는 공정 검색" oninput="filterWorkers()" />
+      </div>
+      <div class="form-row" id="form_worker">
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div class="form-group">
+            <span class="form-label">이름 * (영문 또는 한글)</span>
+            <input class="form-input" id="w_name" placeholder="예: NGUYEN VAN A 또는 홍길동" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">한국어명 (외국인만)</span>
+            <input class="form-input" id="w_name_local" placeholder="예: 응웬반아 (선택)" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">공정</span>
+            <select class="form-select" id="w_process">
+              <option value="포장">포장</option>
+              <option value="검사">검사</option>
+              <option value="혼련(CMB)">혼련(CMB)</option>
+              <option value="재단">재단</option>
+              <option value="도포">도포</option>
+              <option value="쇼트">쇼트</option>
+              <option value="성형">성형</option>
+              <option value="2차가류">2차가류</option>
+              <option value="조립">조립</option>
+              <option value="공정순회">공정순회</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-cancel-form" onclick="toggleForm('worker')">취소</button>
+          <button class="btn-save" onclick="saveWorker()">저장</button>
+        </div>
+      </div>
+      <div class="table-scroll-wrap">
+        <table>
+          <thead><tr>
+            <th class="sortable" data-table="worker" data-key="name" onclick="sortBy('worker','name')">이름<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="worker" data-key="name_local" onclick="sortBy('worker','name_local')">한국어명<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="worker" data-key="process" onclick="sortBy('worker','process')">공정<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="worker" data-key="active" onclick="sortBy('worker','active')">상태<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="worker" data-key="created_at" onclick="sortBy('worker','created_at')">등록일<span class="sort-ind"></span></th>
+            <th></th>
+          </tr></thead>
+          <tbody id="workerTable"></tbody>
+        </table>
+      </div>
+      <div class="show-more-row" id="workerMoreRow" style="display:none">
+        <button class="btn-show-more" id="workerMoreBtn" onclick="toggleShowAll('worker')"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 조립 BOM 섹션 -->
+  <div class="section" id="section_bom">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">🔩 조립 BOM 관리</div>
+          <div class="card-sub">완제품 → 부자재 구성 관리 (조립 작업일지에서 자동 참조)</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn-add" onclick="toggleForm('bom')">+ BOM 등록</button>
+        </div>
+      </div>
+      <div class="search-bar">
+        <input class="search-input" id="searchBom" placeholder="🔍 사번 또는 구분 검색" oninput="filterBom()" />
+      </div>
+      <div class="form-row" id="form_bom">
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr 3fr">
+          <div><span class="form-label">사번 (완제품)</span><input class="form-input" id="bom_sabun" placeholder="예: 502209" /></div>
+          <div><span class="form-label">구분</span>
+            <select class="form-input" id="bom_type"><option value="STRIKER">STRIKER</option><option value="ROD">ROD</option><option value="PAD">PAD</option><option value="INSERT STEEL">INSERT STEEL</option><option value="기타">기타</option></select>
+          </div>
+          <div><span class="form-label">작업방식</span>
+            <select class="form-input" id="bom_method"><option value="자동">자동</option><option value="수작업">수작업</option></select>
+          </div>
+          <div><span class="form-label">부자재 (유형:코드:수량, 여러개는 쉼표 구분)</span><input class="form-input" id="bom_parts" placeholder="예: STEEL:502209S:1, GUIDE:502209G:2" /></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+          <input class="form-input" id="bom_note" placeholder="비고 (선택)" style="max-width:300px" />
+          <button class="btn-save" id="bomSaveBtn" onclick="saveBom()">등록</button>
+          <button class="btn-cancel-form" id="bomCancelBtn" onclick="cancelEditBom()" style="display:none">수정 취소</button>
+        </div>
+      </div>
+      <div class="table-scroll-wrap">
+        <table>
+          <thead><tr>
+            <th class="sortable" data-table="bom" data-key="sabun" onclick="sortBy('bom','sabun')">사번<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="bom" data-key="product_name" onclick="sortBy('bom','product_name')">제품명<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="bom" data-key="assembly_type" onclick="sortBy('bom','assembly_type')">구분<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="bom" data-key="work_method" onclick="sortBy('bom','work_method')">작업방식<span class="sort-ind"></span></th>
+            <th>부자재 구성</th>
+            <th class="sortable" data-table="bom" data-key="note" onclick="sortBy('bom','note')">비고<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="bom" data-key="created_at" onclick="sortBy('bom','created_at')">등록일<span class="sort-ind"></span></th>
+            <th></th>
+          </tr></thead>
+          <tbody id="bomTableBody"></tbody>
+        </table>
+      </div>
+      <div class="show-more-row" id="bomMoreRow" style="display:none">
+        <button class="btn-show-more" id="bomMoreBtn" onclick="toggleShowAll('bom')"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FMB-BOM 섹션 -->
+  <div class="section" id="section_fmb">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">🧪 FMB-BOM 관리</div>
+          <div class="card-sub">FMB 배합 구성 관리 (CMB + 촉진제)</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn-add" onclick="toggleForm('fmb')">+ FMB 등록</button>
+        </div>
+      </div>
+      <div class="search-bar">
+        <input class="search-input" id="searchFmb" placeholder="🔍 FMB 코드 검색" oninput="filterFmb()" />
+      </div>
+      <div class="form-row" id="form_fmb">
+        <div class="form-grid" style="grid-template-columns: 1fr 1fr 3fr">
+          <div><span class="form-label">FMB 코드</span><input class="form-input" id="fmb_code" placeholder="예: C502-A0C" /></div>
+          <div><span class="form-label">FMB 명칭</span><input class="form-input" id="fmb_name" placeholder="예: C502-A0C(구)" /></div>
+          <div><span class="form-label">구성 (원재료명:중량g, 쉼표 구분)</span><input class="form-input" id="fmb_components" placeholder="예: C50PA-CMB:60000, ZNO:1648, NA22-75%:351" /></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+          <input class="form-input" id="fmb_note" placeholder="비고 (선택)" style="max-width:300px" />
+          <button class="btn-save" id="fmbSaveBtn" onclick="saveFmb()">등록</button>
+          <button class="btn-cancel-form" id="fmbCancelBtn" onclick="cancelEditFmb()" style="display:none">수정 취소</button>
+        </div>
+      </div>
+      <div class="table-scroll-wrap">
+        <table>
+          <thead><tr>
+            <th class="sortable" data-table="fmb" data-key="fmb_code" onclick="sortBy('fmb','fmb_code')">FMB 코드<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="fmb" data-key="fmb_name" onclick="sortBy('fmb','fmb_name')">명칭<span class="sort-ind"></span></th>
+            <th>구성 원재료</th>
+            <th class="sortable" data-table="fmb" data-key="total_weight" onclick="sortBy('fmb','total_weight')">총 중량(g)<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="fmb" data-key="note" onclick="sortBy('fmb','note')">비고<span class="sort-ind"></span></th>
+            <th class="sortable" data-table="fmb" data-key="created_at" onclick="sortBy('fmb','created_at')">등록일<span class="sort-ind"></span></th>
+            <th></th>
+          </tr></thead>
+          <tbody id="fmbTableBody"></tbody>
+        </table>
+      </div>
+      <div class="show-more-row" id="fmbMoreRow" style="display:none">
+        <button class="btn-show-more" id="fmbMoreBtn" onclick="toggleShowAll('fmb')"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 설비 관리 섹션 -->
+  <div class="section" id="section_equip">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">🏭 설비 관리</div>
+          <div class="card-sub">공정별 설비 마스터 데이터 관리 (작업일지, 설비점검에서 참조)</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn-add" onclick="toggleForm('equip')">+ 설비 추가</button>
+        </div>
+      </div>
+
+      <!-- 검색/필터 -->
+      <div class="search-bar">
+        <input class="search-input" id="searchEquip" placeholder="🔍 관리번호, 설비명, 호기 검색" oninput="filterEquip()" />
+        <select class="form-select" id="filterEquipProcess" onchange="filterEquip()" style="width:140px;">
+          <option value="">전체 공정</option>
+          <option value="성형">성형</option>
+          <option value="혼련(CMB)">혼련(CMB)</option>
+          <option value="재단">재단</option>
+          <option value="도포">도포</option>
+          <option value="2차가류">2차가류</option>
+          <option value="쇼트">쇼트</option>
+          <option value="조립">조립</option>
+        </select>
+      </div>
+
+      <!-- 추가 폼 -->
+      <div class="form-row" id="form_equip">
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
+          <div class="form-group">
+            <span class="form-label">관리번호 *</span>
+            <input class="form-input" id="eq_code" placeholder="예: 생-A-01" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">설비명 *</span>
+            <input class="form-input" id="eq_name" placeholder="예: 성형가류기(인젝션)" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">호기/표시명 *</span>
+            <input class="form-input" id="eq_no" placeholder="예: A반-03호기" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">공정 *</span>
+            <select class="form-select" id="eq_process">
+              <option value="성형">성형</option>
+              <option value="혼련(CMB)">혼련(CMB)</option>
+              <option value="재단">재단</option>
+              <option value="도포">도포</option>
+              <option value="2차가류">2차가류</option>
+              <option value="쇼트">쇼트</option>
+              <option value="조립">조립</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-top:8px">
+          <div class="form-group">
+            <span class="form-label">반(그룹) *</span>
+            <select class="form-select" id="eq_group">
+              <option value="A반">A반</option>
+              <option value="B반">B반</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <span class="form-label">설비 유형</span>
+            <input class="form-input" id="eq_type" placeholder="예: injection, vacuum" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">사양/규격</span>
+            <input class="form-input" id="eq_spec" placeholder="예: 350t 1U3P" />
+          </div>
+          <div class="form-group">
+            <span class="form-label">비고</span>
+            <input class="form-input" id="eq_note" placeholder="비고 (선택)" />
+          </div>
+        </div>
+        <div class="form-actions" style="margin-top:10px">
+          <button class="btn-cancel-form" onclick="toggleForm('equip')">취소</button>
+          <button class="btn-save" onclick="saveEquip()">저장</button>
+        </div>
+      </div>
+
+      <!-- 설비 목록 -->
+      <div class="table-scroll-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" data-table="equip" data-key="equipment_id" onclick="sortBy('equip','equipment_id')">관리번호<span class="sort-ind"></span></th>
+              <th class="sortable" data-table="equip" data-key="equipment_name" onclick="sortBy('equip','equipment_name')">설비명<span class="sort-ind"></span></th>
+              <th class="sortable" data-table="equip" data-key="equipment_no" onclick="sortBy('equip','equipment_no')">호기<span class="sort-ind"></span></th>
+              <th class="sortable" data-table="equip" data-key="group_name" onclick="sortBy('equip','group_name')">반<span class="sort-ind"></span></th>
+              <th class="sortable" data-table="equip" data-key="process" onclick="sortBy('equip','process')">공정<span class="sort-ind"></span></th>
+              <th class="sortable" data-table="equip" data-key="equip_type" onclick="sortBy('equip','equip_type')">유형<span class="sort-ind"></span></th>
+              <th class="sortable" data-table="equip" data-key="spec" onclick="sortBy('equip','spec')">사양<span class="sort-ind"></span></th>
+              <th class="sortable" data-table="equip" data-key="is_active" onclick="sortBy('equip','is_active')">상태<span class="sort-ind"></span></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="equipTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- container -->
+</div><!-- main -->
+
+<!-- 설비 수정 모달 -->
+<div class="modal-overlay" id="editEquipModal">
+  <div class="modal-box">
+    <div class="modal-title">✏️ 설비 수정</div>
+    <input type="hidden" id="eeq_id" />
+    <div class="modal-grid" style="grid-template-columns:1fr 1fr">
+      <div>
+        <div class="modal-label">관리번호</div>
+        <input class="modal-input" id="eeq_code" style="background:#f9f9f9;color:#888" disabled />
+      </div>
+      <div>
+        <div class="modal-label">설비명 *</div>
+        <input class="modal-input" id="eeq_name" />
+      </div>
+      <div>
+        <div class="modal-label">호기/표시명</div>
+        <input class="modal-input" id="eeq_no" />
+      </div>
+      <div>
+        <div class="modal-label">공정 *</div>
+        <select class="modal-select" id="eeq_process">
+          <option value="성형">성형</option>
+          <option value="혼련(CMB)">혼련(CMB)</option>
+          <option value="재단">재단</option>
+          <option value="도포">도포</option>
+          <option value="2차가류">2차가류</option>
+          <option value="쇼트">쇼트</option>
+          <option value="조립">조립</option>
+        </select>
+      </div>
+      <div>
+        <div class="modal-label">설비 유형</div>
+        <input class="modal-input" id="eeq_type" />
+      </div>
+      <div>
+        <div class="modal-label">사양/규격</div>
+        <input class="modal-input" id="eeq_spec" />
+      </div>
+      <div>
+        <div class="modal-label">설치 위치</div>
+        <input class="modal-input" id="eeq_location" />
+      </div>
+      <div>
+        <div class="modal-label">비고</div>
+        <input class="modal-input" id="eeq_note" />
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal('editEquipModal')">취소</button>
+      <button class="btn-modal-save" onclick="saveEditEquip()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 제품 수정 모달 -->
+<div class="modal-overlay" id="editProductModal">
+  <div class="modal-box">
+    <div class="modal-title">✏️ 제품 수정</div>
+    <input type="hidden" id="ep_id" />
+    <div class="modal-grid">
+      <div>
+        <div class="modal-label">사번</div>
+        <input class="modal-input" id="ep_sabun" />
+      </div>
+      <div>
+        <div class="modal-label">고객 품번</div>
+        <input class="modal-input" id="ep_partno" />
+      </div>
+      <div>
+        <div class="modal-label">품명</div>
+        <input class="modal-input" id="ep_partname" />
+      </div>
+      <div>
+        <div class="modal-label">재질명</div>
+        <input class="modal-input" id="ep_material" />
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal('editProductModal')">취소</button>
+      <button class="btn-modal-save" onclick="saveEditProduct()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// 권한 체크
+(async function() {
+  var user = await checkAuth();
+  if (!user) return;
+  document.getElementById('authCheckOverlay').style.display = 'none';
+
+  // worker는 기준정보 접근 불가 → 대시보드로
+  if (user.user_type === 'worker') {
+    location.href = 'mold_dashboard.html';
+    return;
+  }
+})();
+
+// Supabase
+var SU = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+var SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+var db = window.supabase.createClient(SU, SK);
+
+var allProducts = [], allWorkers = [], excelData = [];
+var showAllProduct = false, showAllWorker = false;
+var PAGE_SIZE = 30;
+
+function fmtDate(str) { return str ? str.slice(0,10) : '-'; }
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2500);
+}
+
+function switchTab(tab) {
+  var sections = document.querySelectorAll('.section');
+  for (var i = 0; i < sections.length; i++) sections[i].classList.remove('active');
+  var tabs = document.querySelectorAll('.main-tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  document.getElementById('section_' + tab).classList.add('active');
+  document.getElementById('tabBtn_' + tab).classList.add('active');
+}
+
+function toggleForm(type) {
+  var el = document.getElementById('form_' + type);
+  el.classList.toggle('open');
+}
+
+function toggleUpload(type) {
+  var el = document.getElementById('uploadSection_' + type);
+  el.classList.toggle('open');
+}
+
+function toggleShowAll(type) {
+  if (type === 'product') { showAllProduct = !showAllProduct; renderProducts(allProducts); }
+  else if (type === 'worker') { showAllWorker = !showAllWorker; renderWorkers(allWorkers); }
+  else if (type === 'bom') { bomShowAll = !bomShowAll; renderBom(); }
+  else if (type === 'fmb') { fmbShowAll = !fmbShowAll; renderFmb(); }
+}
+
+// ── 제품 ──
+async function loadProducts() {
+  var result = await db.from('products').select('*').order('sabun');
+  allProducts = result.data || [];
+  renderProducts(allProducts);
+}
+
+function filterProducts() {
+  var q = document.getElementById('searchProduct').value.trim().toLowerCase();
+  var filtered = q
+    ? allProducts.filter(function(r) {
+        return r.sabun.toLowerCase().indexOf(q) !== -1 ||
+          (r.part_name||'').toLowerCase().indexOf(q) !== -1 ||
+          (r.part_no||'').toLowerCase().indexOf(q) !== -1;
+      })
+    : allProducts;
+  renderProducts(filtered, true);
+}
+
+function renderProducts(data, isSearch) {
+  data = applySort('product', data);
+  var tbody = document.getElementById('productTable');
+  var moreRow = document.getElementById('productMoreRow');
+  var moreBtn = document.getElementById('productMoreBtn');
+
+  if (!data.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">등록된 제품이 없어요.</td></tr>';
+    moreRow.style.display = 'none';
+    return;
+  }
+
+  var showAll = isSearch || showAllProduct;
+  var displayed = showAll ? data : data.slice(0, PAGE_SIZE);
+  var html = '';
+  for (var i = 0; i < displayed.length; i++) {
+    var r = displayed[i];
+    html += '<tr>' +
+      '<td style="font-weight:500">' + r.sabun + '</td>' +
+      '<td style="color:#555">' + (r.part_no || '-') + '</td>' +
+      '<td>' + (r.part_name || '-') + '</td>' +
+      '<td style="color:#555">' + (r.material_name || '-') + '</td>' +
+      '<td style="color:#aaa;font-size:12px">' + fmtDate(r.created_at) + '</td>' +
+      '<td><div class="act-cell">' +
+        '<button class="icon-btn edit" title="수정" onclick="openEditProduct(' + r.id + ')">✏️</button>' +
+        '<button class="icon-btn del" title="삭제" onclick="deleteProduct(' + r.id + ')">🗑️</button>' +
+      '</div></td></tr>';
+  }
+  tbody.innerHTML = html;
+
+  if (!isSearch && data.length > PAGE_SIZE) {
+    moreRow.style.display = 'block';
+    moreBtn.textContent = showAllProduct
+      ? '▲ 접기'
+      : '▼ 더보기 (' + (data.length - PAGE_SIZE) + '건 더)';
+  } else {
+    moreRow.style.display = 'none';
+  }
+}
+
+function openEditProduct(id) {
+  var r = allProducts.find(function(p) { return p.id === id; });
+  if (!r) return;
+  document.getElementById('ep_id').value = r.id;
+  document.getElementById('ep_sabun').value = r.sabun;
+  document.getElementById('ep_partno').value = r.part_no || '';
+  document.getElementById('ep_partname').value = r.part_name || '';
+  document.getElementById('ep_material').value = r.material_name || '';
+  document.getElementById('editProductModal').classList.add('open');
+}
+
+async function saveProduct() {
+  var sabun = document.getElementById('p_sabun').value.trim();
+  var partNo = document.getElementById('p_partno').value.trim();
+  var partName = document.getElementById('p_partname').value.trim();
+  var material = document.getElementById('p_material').value.trim();
+  if (!sabun) { showToast('사번을 입력해주세요.'); return; }
+  var result = await db.from('products').upsert({ sabun: sabun, part_no: partNo, part_name: partName, material_name: material }, { onConflict: 'sabun' });
+  if (result.error) { showToast('저장 실패: ' + result.error.message); return; }
+  document.getElementById('p_sabun').value = '';
+  document.getElementById('p_partno').value = '';
+  document.getElementById('p_partname').value = '';
+  document.getElementById('p_material').value = '';
+  toggleForm('product');
+  showToast('제품이 추가됐어요 ✓');
+  loadProducts();
+}
+
+async function saveEditProduct() {
+  var id = document.getElementById('ep_id').value;
+  var sabun = document.getElementById('ep_sabun').value.trim();
+  var partNo = document.getElementById('ep_partno').value.trim();
+  var partName = document.getElementById('ep_partname').value.trim();
+  var material = document.getElementById('ep_material').value.trim();
+  var result = await db.from('products').update({ sabun: sabun, part_no: partNo, part_name: partName, material_name: material }).eq('id', id);
+  if (result.error) { showToast('수정 실패: ' + result.error.message); return; }
+  showToast('수정됐어요 ✓');
+  closeModal('editProductModal');
+  loadProducts();
+}
+
+async function deleteProduct(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  await db.from('products').delete().eq('id', id);
+  showToast('삭제됐어요.');
+  loadProducts();
+}
+
+// ── 작업자 ──
+async function loadWorkers() {
+  var result = await db.from('workers').select('*').order('process').order('name');
+  allWorkers = result.data || [];
+  renderWorkers(allWorkers);
+}
+
+function filterWorkers() {
+  var q = document.getElementById('searchWorker').value.trim().toLowerCase();
+  var filtered = q
+    ? allWorkers.filter(function(r) {
+        return r.name.toLowerCase().indexOf(q) !== -1 ||
+          (r.name_local || '').toLowerCase().indexOf(q) !== -1 ||
+          r.process.toLowerCase().indexOf(q) !== -1;
+      })
+    : allWorkers;
+  renderWorkers(filtered, true);
+}
+
+function renderWorkers(data, isSearch) {
+  data = applySort('worker', data);
+  var tbody = document.getElementById('workerTable');
+  var moreRow = document.getElementById('workerMoreRow');
+  var moreBtn = document.getElementById('workerMoreBtn');
+
+  if (!data.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">등록된 작업자가 없어요.</td></tr>';
+    moreRow.style.display = 'none';
+    return;
+  }
+
+  var showAll = isSearch || showAllWorker;
+  var displayed = showAll ? data : data.slice(0, PAGE_SIZE);
+  var html = '';
+  for (var i = 0; i < displayed.length; i++) {
+    var r = displayed[i];
+    html += '<tr>' +
+      '<td style="font-weight:500">' + r.name + '</td>' +
+      '<td style="font-size:12px;color:' + (r.name_local ? '#555' : '#ccc') + '">' + (r.name_local || '-') + '</td>' +
+      '<td>' + r.process + '</td>' +
+      '<td><span class="active-badge ' + (r.active ? 'active-y' : 'active-n') + '">' + (r.active ? '재직중' : '퇴직') + '</span></td>' +
+      '<td style="color:#aaa;font-size:12px">' + fmtDate(r.created_at) + '</td>' +
+      '<td><div class="act-cell">' +
+        '<button class="toggle-btn" title="재직/퇴직 상태 변경" onclick="toggleWorker(' + r.id + ', ' + r.active + ')">' + (r.active ? '비활성화' : '활성화') + '</button>' +
+        '<button class="icon-btn del" title="삭제" onclick="deleteWorker(' + r.id + ')">🗑️</button>' +
+      '</div></td></tr>';
+  }
+  tbody.innerHTML = html;
+
+  if (!isSearch && data.length > PAGE_SIZE) {
+    moreRow.style.display = 'block';
+    moreBtn.textContent = showAllWorker
+      ? '▲ 접기'
+      : '▼ 더보기 (' + (data.length - PAGE_SIZE) + '건 더)';
+  } else {
+    moreRow.style.display = 'none';
+  }
+}
+
+async function saveWorker() {
+  var name = document.getElementById('w_name').value.trim();
+  var nameLocal = document.getElementById('w_name_local').value.trim();
+  var process = document.getElementById('w_process').value;
+  if (!name) { showToast('이름을 입력해주세요.'); return; }
+  var payload = { name: name, process: process, active: true };
+  if (nameLocal) payload.name_local = nameLocal;
+  var result = await db.from('workers').insert(payload);
+  if (result.error) { showToast('저장 실패: ' + result.error.message); return; }
+  document.getElementById('w_name').value = '';
+  document.getElementById('w_name_local').value = '';
+  toggleForm('worker');
+  showToast('작업자가 추가됐어요 ✓');
+  loadWorkers();
+}
+
+async function toggleWorker(id, current) {
+  await db.from('workers').update({ active: !current }).eq('id', id);
+  showToast(current ? '비활성화됐어요.' : '활성화됐어요.');
+  loadWorkers();
+}
+
+async function deleteWorker(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  await db.from('workers').delete().eq('id', id);
+  showToast('삭제됐어요.');
+  loadWorkers();
+}
+
+// ── 엑셀 업로드 ──
+function onExcelDragOver(e) {
+  e.preventDefault(); e.stopPropagation();
+  document.getElementById('excelZone').classList.add('dragover');
+}
+function onExcelDragLeaveSection(e) {
+  if (!e.currentTarget.contains(e.relatedTarget))
+    document.getElementById('excelZone').classList.remove('dragover');
+}
+function onExcelDrop(e) {
+  e.preventDefault(); e.stopPropagation();
+  document.getElementById('excelZone').classList.remove('dragover');
+  var file = e.dataTransfer.files[0];
+  if (!file) return;
+  if (!file.name.match(/\.xlsx?$/i)) { showToast('엑셀 파일(.xlsx)만 가능해요.'); return; }
+  onExcelSelect({ target: { files: [file] } });
+}
+
+function onExcelSelect(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('excelSelected').textContent = '📊 ' + file.name;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var wb = XLSX.read(ev.target.result, { type: 'binary' });
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var raw = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+    var headerRow = -1;
+    var colIdx = { sabun: -1, part_no: -1, part_name: -1, active: -1, material: -1 };
+    for (var i = 0; i < Math.min(raw.length, 10); i++) {
+      var row = raw[i];
+      if (!row) continue;
+      var s = -1, p = -1, n = -1;
+      for (var j = 0; j < row.length; j++) {
+        var v = String(row[j]||'').trim();
+        if (v === '사번') s = j;
+        if (v === '품번') p = j;
+        if (v === '품목명' || v === '품명') n = j;
+      }
+      if (s >= 0 && p >= 0 && n >= 0) {
+        headerRow = i;
+        var aIdx = -1, mIdx = -1;
+        // '사용'(활성), '재질'(정확히 일치 → 도면재질 제외) 탐색: 헤더행 + 다음행(2단 헤더 대응)
+        var scanRows = [row, raw[i+1] || []];
+        for (var k = 0; k < scanRows.length; k++) {
+          var hr = scanRows[k];
+          for (var j = 0; j < hr.length; j++) {
+            var hv = String(hr[j]||'').trim();
+            if (hv === '사용' && aIdx < 0) aIdx = j;
+            if (hv === '재질' && mIdx < 0) mIdx = j;
+          }
+        }
+        colIdx = { sabun: s, part_no: p, part_name: n, active: aIdx, material: mIdx };
+        break;
+      }
+    }
+
+    if (headerRow < 0) { showToast('헤더를 찾을 수 없어요.'); return; }
+
+    excelData = [];
+    for (var i = headerRow + 1; i < raw.length; i++) {
+      var row = raw[i];
+      if (!row || !row[colIdx.sabun]) continue;
+      if (colIdx.active >= 0 && String(row[colIdx.active]||'').trim() !== 'YES') continue;
+      var mv = colIdx.material >= 0 ? String(row[colIdx.material] || '').trim() : '';
+      if (mv === '-' || mv === 'nan') mv = '';
+      excelData.push({
+        sabun: String(row[colIdx.sabun] || '').trim(),
+        part_no: String(row[colIdx.part_no] || '').trim(),
+        part_name: String(row[colIdx.part_name] || '').trim(),
+        material_name: mv
+      });
+    }
+
+    var seen = {};
+    excelData = excelData.filter(function(r) { if (seen[r.sabun]) return false; seen[r.sabun] = true; return true; });
+
+    document.getElementById('previewCount').innerHTML =
+      '총 <strong>' + excelData.length + '건</strong> 인식 완료 <span style="color:#aaa;font-size:11px">(사용중 + 중복제거 적용)</span>';
+    var previewHtml = '';
+    var limit = Math.min(excelData.length, 8);
+    for (var i = 0; i < limit; i++) {
+      previewHtml += '<tr><td>' + excelData[i].sabun + '</td><td>' + excelData[i].part_no + '</td><td>' + excelData[i].part_name + '</td><td>' + (excelData[i].material_name||'') + '</td></tr>';
+    }
+    if (excelData.length > 8) previewHtml += '<tr><td colspan="4" style="color:#aaa;text-align:center;padding:6px">... 외 ' + (excelData.length-8) + '건</td></tr>';
+    document.getElementById('previewBody').innerHTML = previewHtml;
+    document.getElementById('excelPreview').style.display = 'block';
+    document.getElementById('excelUploadBtn').disabled = false;
+  };
+  reader.readAsBinaryString(file);
+}
+
+async function uploadExcel() {
+  if (!excelData.length) return;
+  var btn = document.getElementById('excelUploadBtn');
+  btn.disabled = true; btn.textContent = '업로드 중...';
+  var done = 0, fail = 0;
+  var chunkSize = 100;
+  for (var i = 0; i < excelData.length; i += chunkSize) {
+    var chunk = excelData.slice(i, i + chunkSize);
+    var result = await db.from('products').upsert(chunk, { onConflict: 'sabun' });
+    if (result.error) fail += chunk.length; else done += chunk.length;
+  }
+  showToast(done + '건 업로드 완료' + (fail ? ', ' + fail + '건 실패' : '') + ' ✓');
+  btn.disabled = false; btn.textContent = '업로드';
+  toggleUpload('product');
+  document.getElementById('excelInput').value = '';
+  document.getElementById('excelSelected').textContent = '';
+  document.getElementById('excelPreview').style.display = 'none';
+  excelData = [];
+  loadProducts();
+}
+
+function downloadTemplate() {
+  var wb = XLSX.utils.book_new();
+  var ws = XLSX.utils.aoa_to_sheet([
+    ['사번', '품번', '품명', '재질'],
+    ['502284', '9556086', 'BUSH-MTG D/LATCH PWR ACTR', 'A701-A0C'],
+  ]);
+  ws['!cols'] = [{wch:12},{wch:20},{wch:30},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws, '제품기준정보');
+  XLSX.writeFile(wb, '제품기준정보_양식.xlsx');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ── 조립 BOM ──
+var bomData = [];
+var bomShowAll = false;
+
+async function loadBom() {
+  var result = await db.from('assembly_bom').select('*').order('sabun');
+  bomData = result.data || [];
+  renderBom();
+}
+
+function renderBom(filtered) {
+  var list = filtered || bomData;
+  list = applySort('bom', list);
+  var show = bomShowAll ? list : list.slice(0, 20);
+  var tbody = document.getElementById('bomTableBody');
+  var html = '';
+  for (var i = 0; i < show.length; i++) {
+    var r = show[i];
+    var parts = r.parts || {};
+    var partsHtml = '';
+    var keys = Object.keys(parts);
+    for (var k = 0; k < keys.length; k++) {
+      partsHtml += '<span style="display:inline-block;background:#f0f3f9;padding:1px 6px;border-radius:3px;margin:1px 2px;font-size:10px">' + keys[k] + ': ' + parts[keys[k]] + '</span> ';
+    }
+    var methodColor = r.work_method === '수작업' ? 'background:#fef3c7;color:#92400e' : 'background:#dbeafe;color:#1e40af';
+    html += '<tr>' +
+      '<td style="font-weight:600">' + r.sabun + '</td>' +
+      '<td style="font-size:12px">' + (r.product_name || '-') + '</td>' +
+      '<td><span style="font-size:11px;font-weight:600">' + (r.assembly_type || '-') + '</span></td>' +
+      '<td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;' + methodColor + '">' + r.work_method + '</span></td>' +
+      '<td style="font-size:11px">' + (partsHtml || '-') + '</td>' +
+      '<td style="font-size:11px">' + (r.note || '-') + '</td>' +
+      '<td style="font-size:11px;color:#999">' + (r.created_at ? new Date(r.created_at).toLocaleDateString('ko-KR') : '-') + '</td>' +
+      '<td><div class="act-cell">' +
+      '<button class="icon-btn edit" title="수정" onclick="editBom(\'' + r.id + '\')">✏️</button>' +
+      '<button class="icon-btn del" title="삭제" onclick="deleteBom(\'' + r.id + '\')">🗑️</button>' +
+      '</div></td></tr>';
+  }
+  tbody.innerHTML = html;
+  var moreRow = document.getElementById('bomMoreRow');
+  if (list.length > 20) {
+    moreRow.style.display = 'block';
+    document.getElementById('bomMoreBtn').textContent = bomShowAll ? '간략히 보기 (' + list.length + '건)' : '전체 ' + list.length + '건 보기';
+  } else { moreRow.style.display = 'none'; }
+}
+
+function filterBom() {
+  var q = document.getElementById('searchBom').value.toLowerCase();
+  if (!q) { renderBom(); return; }
+  renderBom(bomData.filter(function(r) { return (r.sabun||'').toLowerCase().indexOf(q) !== -1 || (r.assembly_type||'').toLowerCase().indexOf(q) !== -1 || (r.product_name||'').toLowerCase().indexOf(q) !== -1; }));
+}
+
+var editingBomId = null;
+
+async function saveBom() {
+  var sabun = document.getElementById('bom_sabun').value.trim();
+  var type = document.getElementById('bom_type').value;
+  var method = document.getElementById('bom_method').value;
+  var note = document.getElementById('bom_note').value.trim();
+  var partsStr = document.getElementById('bom_parts').value.trim();
+  if (!sabun) { showToast('사번을 입력하세요.'); return; }
+  var parts = {};
+  if (partsStr) {
+    var items = partsStr.split(',');
+    for (var i = 0; i < items.length; i++) {
+      var t = items[i].trim().split(':');
+      if (t.length >= 3) parts[t[0].trim()] = t[1].trim() + ':' + t[2].trim();
+      else if (t.length === 2) parts[t[0].trim()] = t[1].trim() + ':1';
+    }
+  }
+  var payload = { sabun: sabun, assembly_type: type, work_method: method, parts: parts, note: note || null, updated_at: new Date().toISOString() };
+  if (editingBomId) payload.id = editingBomId;
+  var result = await db.from('assembly_bom').upsert(payload, { onConflict: 'sabun' });
+  if (result.error) { showToast('등록 실패: ' + result.error.message); return; }
+  showToast(editingBomId ? '✓ BOM 수정 완료' : '✓ BOM 등록 완료');
+  cancelEditBom();
+  loadBom();
+}
+
+function editBom(id) {
+  var r = null;
+  for (var i = 0; i < bomData.length; i++) { if (bomData[i].id === id) { r = bomData[i]; break; } }
+  if (!r) return;
+  editingBomId = id;
+  document.getElementById('form_bom').classList.add('open');
+  document.getElementById('bom_sabun').value = r.sabun || '';
+  document.getElementById('bom_type').value = r.assembly_type || 'STRIKER';
+  document.getElementById('bom_method').value = r.work_method || '자동';
+  document.getElementById('bom_note').value = r.note || '';
+  var parts = r.parts || {};
+  var partsArr = [];
+  var keys = Object.keys(parts);
+  for (var i = 0; i < keys.length; i++) { partsArr.push(keys[i] + ':' + parts[keys[i]]); }
+  document.getElementById('bom_parts').value = partsArr.join(', ');
+  document.getElementById('bomSaveBtn').textContent = '수정 저장';
+  document.getElementById('bomSaveBtn').style.background = '#d97706';
+  document.getElementById('bomCancelBtn').style.display = 'inline-block';
+  window.scrollTo({ top: document.getElementById('form_bom').offsetTop - 100, behavior: 'smooth' });
+}
+
+function cancelEditBom() {
+  editingBomId = null;
+  document.getElementById('bom_sabun').value = '';
+  document.getElementById('bom_parts').value = '';
+  document.getElementById('bom_note').value = '';
+  document.getElementById('bomSaveBtn').textContent = '등록';
+  document.getElementById('bomSaveBtn').style.background = '';
+  document.getElementById('bomCancelBtn').style.display = 'none';
+}
+
+async function deleteBom(id) {
+  if (!confirm('이 BOM을 삭제할까요?')) return;
+  await db.from('assembly_bom').delete().eq('id', id);
+  showToast('✓ 삭제 완료');
+  loadBom();
+}
+
+// ── FMB-BOM ──
+var fmbData = [];
+var fmbShowAll = false;
+
+async function loadFmb() {
+  var result = await db.from('fmb_bom').select('*').order('fmb_code');
+  fmbData = result.data || [];
+  renderFmb();
+}
+
+function renderFmb(filtered) {
+  var list = filtered || fmbData;
+  list = applySort('fmb', list);
+  var show = fmbShowAll ? list : list.slice(0, 20);
+  var tbody = document.getElementById('fmbTableBody');
+  var html = '';
+  for (var i = 0; i < show.length; i++) {
+    var r = show[i];
+    var comps = r.components || [];
+    var compsHtml = '';
+    for (var j = 0; j < comps.length; j++) {
+      compsHtml += '<span style="display:inline-block;background:#f0fdf4;padding:1px 6px;border-radius:3px;margin:1px 2px;font-size:10px">' + comps[j].name + ': ' + Number(comps[j].weight).toLocaleString() + 'g</span> ';
+    }
+    html += '<tr>' +
+      '<td style="font-weight:600">' + r.fmb_code + '</td>' +
+      '<td style="font-size:12px">' + (r.fmb_name || '-') + '</td>' +
+      '<td style="font-size:11px">' + (compsHtml || '-') + '</td>' +
+      '<td style="font-weight:600;text-align:right">' + (r.total_weight ? Number(r.total_weight).toLocaleString() : '-') + '</td>' +
+      '<td style="font-size:11px">' + (r.note || '-') + '</td>' +
+      '<td style="font-size:11px;color:#999">' + (r.created_at ? new Date(r.created_at).toLocaleDateString('ko-KR') : '-') + '</td>' +
+      '<td><div class="act-cell">' +
+      '<button class="icon-btn edit" title="수정" onclick="editFmb(\'' + r.id + '\')">✏️</button>' +
+      '<button class="icon-btn del" title="삭제" onclick="deleteFmb(\'' + r.id + '\')">🗑️</button>' +
+      '</div></td></tr>';
+  }
+  tbody.innerHTML = html;
+  var moreRow = document.getElementById('fmbMoreRow');
+  if (list.length > 20) {
+    moreRow.style.display = 'block';
+    document.getElementById('fmbMoreBtn').textContent = fmbShowAll ? '간략히 보기 (' + list.length + '건)' : '전체 ' + list.length + '건 보기';
+  } else { moreRow.style.display = 'none'; }
+}
+
+function filterFmb() {
+  var q = document.getElementById('searchFmb').value.toLowerCase();
+  if (!q) { renderFmb(); return; }
+  renderFmb(fmbData.filter(function(r) { return (r.fmb_code||'').toLowerCase().indexOf(q) !== -1 || (r.fmb_name||'').toLowerCase().indexOf(q) !== -1; }));
+}
+
+var editingFmbId = null;
+
+async function saveFmb() {
+  var code = document.getElementById('fmb_code').value.trim();
+  var name = document.getElementById('fmb_name').value.trim();
+  var note = document.getElementById('fmb_note').value.trim();
+  var compStr = document.getElementById('fmb_components').value.trim();
+  if (!code) { showToast('FMB 코드를 입력하세요.'); return; }
+  var components = [];
+  var totalWeight = 0;
+  if (compStr) {
+    var items = compStr.split(',');
+    for (var i = 0; i < items.length; i++) {
+      var t = items[i].trim().split(':');
+      if (t.length >= 2) {
+        var w = parseFloat(t[1].trim()) || 0;
+        components.push({ name: t[0].trim(), weight: w });
+        totalWeight += w;
+      }
+    }
+  }
+  var payload = { fmb_code: code, fmb_name: name || null, components: components, total_weight: totalWeight, note: note || null, updated_at: new Date().toISOString() };
+  if (editingFmbId) payload.id = editingFmbId;
+  var result = await db.from('fmb_bom').upsert(payload, { onConflict: 'fmb_code' });
+  if (result.error) { showToast('등록 실패: ' + result.error.message); return; }
+  showToast(editingFmbId ? '✓ FMB-BOM 수정 완료' : '✓ FMB-BOM 등록 완료');
+  cancelEditFmb();
+  loadFmb();
+}
+
+function editFmb(id) {
+  var r = null;
+  for (var i = 0; i < fmbData.length; i++) { if (fmbData[i].id === id) { r = fmbData[i]; break; } }
+  if (!r) return;
+  editingFmbId = id;
+  document.getElementById('form_fmb').classList.add('open');
+  document.getElementById('fmb_code').value = r.fmb_code || '';
+  document.getElementById('fmb_name').value = r.fmb_name || '';
+  document.getElementById('fmb_note').value = r.note || '';
+  var compArr = [];
+  var comps = r.components || [];
+  for (var i = 0; i < comps.length; i++) { compArr.push(comps[i].name + ':' + comps[i].weight); }
+  document.getElementById('fmb_components').value = compArr.join(', ');
+  document.getElementById('fmbSaveBtn').textContent = '수정 저장';
+  document.getElementById('fmbSaveBtn').style.background = '#d97706';
+  document.getElementById('fmbCancelBtn').style.display = 'inline-block';
+  window.scrollTo({ top: document.getElementById('form_fmb').offsetTop - 100, behavior: 'smooth' });
+}
+
+function cancelEditFmb() {
+  editingFmbId = null;
+  document.getElementById('fmb_code').value = '';
+  document.getElementById('fmb_name').value = '';
+  document.getElementById('fmb_components').value = '';
+  document.getElementById('fmb_note').value = '';
+  document.getElementById('fmbSaveBtn').textContent = '등록';
+  document.getElementById('fmbSaveBtn').style.background = '';
+  document.getElementById('fmbCancelBtn').style.display = 'none';
+}
+
+async function deleteFmb(id) {
+  if (!confirm('이 FMB-BOM을 삭제할까요?')) return;
+  await db.from('fmb_bom').delete().eq('id', id);
+  showToast('✓ 삭제 완료');
+  loadFmb();
+}
+
+// ── 표 정렬 (▲ 오름차순 / ▼ 내림차순) ──
+var sortState = {
+  product: { key: null, dir: 1 },
+  worker:  { key: null, dir: 1 },
+  bom:     { key: null, dir: 1 },
+  fmb:     { key: null, dir: 1 },
+  equip:   { key: null, dir: 1 }
+};
+
+// 현재 정렬 상태대로 데이터 배열을 정렬해서 돌려줌 (원본은 건드리지 않음)
+function applySort(table, data) {
+  var st = sortState[table];
+  if (!st || !st.key || !data || !data.length) return data;
+  var key = st.key, dir = st.dir;
+  var sorted = data.slice();
+  sorted.sort(function(a, b) {
+    var va = a[key], vb = b[key];
+    va = (va === null || va === undefined) ? '' : va;
+    vb = (vb === null || vb === undefined) ? '' : vb;
+    if (typeof va === 'boolean') va = va ? 1 : 0;
+    if (typeof vb === 'boolean') vb = vb ? 1 : 0;
+    return String(va).localeCompare(String(vb), 'ko', { numeric: true, sensitivity: 'base' }) * dir;
+  });
+  return sorted;
+}
+
+// 제목 클릭 → 정렬 방향 결정 후 다시 그림
+function sortBy(table, key) {
+  var st = sortState[table];
+  if (st.key === key) { st.dir = -st.dir; }   // 같은 열 다시 클릭 → 방향 전환
+  else { st.key = key; st.dir = 1; }          // 다른 열 클릭 → 오름차순부터
+  updateSortIndicators(table);
+  rerender(table);
+}
+
+// 현재 검색 상태를 유지하며 해당 표만 다시 그림
+function rerender(table) {
+  if (table === 'product') {
+    document.getElementById('searchProduct').value.trim() ? filterProducts() : renderProducts(allProducts);
+  } else if (table === 'worker') {
+    document.getElementById('searchWorker').value.trim() ? filterWorkers() : renderWorkers(allWorkers);
+  } else if (table === 'bom')   { filterBom(); }
+  else if (table === 'fmb')     { filterFmb(); }
+  else if (table === 'equip')   { filterEquip(); }
+}
+
+// 제목줄의 ▲▼ 화살표 갱신
+function updateSortIndicators(table) {
+  var ths = document.querySelectorAll('th.sortable[data-table="' + table + '"]');
+  var st = sortState[table];
+  for (var i = 0; i < ths.length; i++) {
+    var ind = ths[i].querySelector('.sort-ind');
+    if (ths[i].getAttribute('data-key') === st.key) {
+      ind.textContent = st.dir === 1 ? '▲' : '▼';
+      ths[i].classList.add('sorted');
+    } else {
+      ind.textContent = '↕';          // 정렬 안 된 열엔 흐린 ↕ 로 "클릭 가능" 힌트
+      ths[i].classList.remove('sorted');
+    }
+  }
+}
+
+// 처음 화면에 흐린 ↕ 힌트 표시
+['product', 'worker', 'bom', 'fmb', 'equip'].forEach(function(t) { updateSortIndicators(t); });
+
+loadProducts();
+loadWorkers();
+loadBom();
+loadFmb();
+loadEquip();
+
+// ── 설비 관리 ──
+var equipData = [];
+
+async function loadEquip() {
+  try {
+    var result = await db.from('equipments').select('*').order('sort_order', { ascending: true });
+    console.log('loadEquip result:', result);
+    if (result.error) {
+      console.error('loadEquip error:', result.error);
+      document.getElementById('equipTable').innerHTML = '<tr class="empty-row"><td colspan="9">로드 실패: ' + result.error.message + '</td></tr>';
+      return;
+    }
+    equipData = result.data || [];
+    console.log('equipData count:', equipData.length);
+    renderEquip();
+  } catch(e) {
+    console.error('loadEquip catch:', e);
+    document.getElementById('equipTable').innerHTML = '<tr class="empty-row"><td colspan="9">로드 오류: ' + e.message + '</td></tr>';
+  }
+}
+
+function filterEquip() {
+  var q = document.getElementById('searchEquip').value.trim().toLowerCase();
+  var proc = document.getElementById('filterEquipProcess').value;
+  var filtered = equipData;
+  if (proc) {
+    filtered = filtered.filter(function(r) { return r.process === proc; });
+  }
+  if (q) {
+    filtered = filtered.filter(function(r) {
+      return (r.equipment_id || '').toLowerCase().indexOf(q) !== -1 ||
+        (r.equipment_name || '').toLowerCase().indexOf(q) !== -1 ||
+        (r.equipment_no || '').toLowerCase().indexOf(q) !== -1;
+    });
+  }
+  renderEquip(filtered);
+}
+
+function renderEquip(filtered) {
+  var list = filtered || equipData;
+  list = applySort('equip', list);
+  var tbody = document.getElementById('equipTable');
+  if (!list.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">등록된 설비가 없어요.</td></tr>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i];
+    var statusClass = r.is_active ? 'active-y' : 'active-n';
+    var statusText = r.is_active ? '사용중' : '미사용';
+    var dormantBadge = r.is_dormant ? ' <span style="font-size:10px;padding:1px 6px;border-radius:8px;background:#fef3c7;color:#92400e;">휴면</span>' : '';
+    html += '<tr>' +
+      '<td style="font-weight:600;font-size:12px">' + (r.equipment_id || '-') + '</td>' +
+      '<td>' + (r.equipment_name || '-') + '</td>' +
+      '<td style="font-weight:500">' + (r.equipment_no || '-') + '</td>' +
+      '<td style="color:#555;font-size:12px">' + (r.group_name || '-') + '</td>' +
+      '<td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:#eff6ff;color:#243bb2">' + r.process + '</span></td>' +
+      '<td style="font-size:11px;color:#888">' + (r.equip_type || '-') + '</td>' +
+      '<td style="font-size:11px;color:#888">' + (r.spec || '-') + '</td>' +
+      '<td><span class="active-badge ' + statusClass + '">' + statusText + '</span>' + dormantBadge + '</td>' +
+      '<td><div class="act-cell">' +
+        '<button class="icon-btn edit" title="수정" onclick="openEditEquip(' + r.id + ')">✏️</button>' +
+        '<button class="toggle-btn" title="사용/미사용 상태 변경" onclick="toggleEquipActive(' + r.id + ', ' + r.is_active + ')">' + (r.is_active ? '비활성' : '활성화') + '</button>' +
+        '<button class="icon-btn del" title="삭제" onclick="deleteEquip(' + r.id + ')">🗑️</button>' +
+      '</div></td></tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+async function saveEquip() {
+  var code = document.getElementById('eq_code').value.trim();
+  var name = document.getElementById('eq_name').value.trim();
+  var no = document.getElementById('eq_no').value.trim();
+  var process = document.getElementById('eq_process').value;
+  var group = document.getElementById('eq_group').value;
+  var type = document.getElementById('eq_type').value.trim();
+  var spec = document.getElementById('eq_spec').value.trim();
+  var note = document.getElementById('eq_note').value.trim();
+  if (!code) { showToast('관리번호를 입력해주세요.'); return; }
+  if (!name) { showToast('설비명을 입력해주세요.'); return; }
+  if (!no) { showToast('호기/표시명을 입력해주세요.'); return; }
+  var payload = {
+    equipment_id: code, equipment_name: name, equipment_no: no,
+    process: process, group_name: group, equip_type: type || null,
+    spec: spec || null, is_active: true, is_dormant: false,
+    sort_order: equipData.length + 1
+  };
+  var result = await db.from('equipments').insert(payload);
+  if (result.error) {
+    if (result.error.message.indexOf('duplicate') !== -1 || result.error.message.indexOf('unique') !== -1) {
+      showToast('이미 등록된 호기명입니다.');
+    } else {
+      showToast('저장 실패: ' + result.error.message);
+    }
+    return;
+  }
+  document.getElementById('eq_code').value = '';
+  document.getElementById('eq_name').value = '';
+  document.getElementById('eq_no').value = '';
+  document.getElementById('eq_type').value = '';
+  document.getElementById('eq_spec').value = '';
+  document.getElementById('eq_note').value = '';
+  toggleForm('equip');
+  showToast('설비가 추가됐어요 ✓');
+  loadEquip();
+}
+
+function openEditEquip(id) {
+  var r = null;
+  for (var i = 0; i < equipData.length; i++) { if (equipData[i].id === id) { r = equipData[i]; break; } }
+  if (!r) return;
+  document.getElementById('eeq_id').value = r.id;
+  document.getElementById('eeq_code').value = r.equipment_id || '';
+  document.getElementById('eeq_name').value = r.equipment_name || '';
+  document.getElementById('eeq_no').value = r.equipment_no || '';
+  document.getElementById('eeq_process').value = r.process || '성형';
+  document.getElementById('eeq_type').value = r.equip_type || '';
+  document.getElementById('eeq_spec').value = r.spec || '';
+  document.getElementById('eeq_location').value = r.group_name || 'A반';
+  document.getElementById('eeq_note').value = '';
+  document.getElementById('editEquipModal').classList.add('open');
+}
+
+async function saveEditEquip() {
+  var id = document.getElementById('eeq_id').value;
+  var name = document.getElementById('eeq_name').value.trim();
+  var no = document.getElementById('eeq_no').value.trim();
+  var process = document.getElementById('eeq_process').value;
+  var type = document.getElementById('eeq_type').value.trim();
+  var spec = document.getElementById('eeq_spec').value.trim();
+  var group = document.getElementById('eeq_location').value.trim();
+  if (!name) { showToast('설비명을 입력해주세요.'); return; }
+  var result = await db.from('equipments').update({
+    equipment_name: name, equipment_no: no || null, process: process,
+    equip_type: type || null, spec: spec || null,
+    group_name: group || null
+  }).eq('id', id);
+  if (result.error) { showToast('수정 실패: ' + result.error.message); return; }
+  showToast('설비 정보가 수정됐어요 ✓');
+  closeModal('editEquipModal');
+  loadEquip();
+}
+
+async function toggleEquipActive(id, current) {
+  await db.from('equipments').update({ is_active: !current }).eq('id', id);
+  showToast(current ? '비활성화됐어요.' : '활성화됐어요.');
+  loadEquip();
+}
+
+async function deleteEquip(id) {
+  if (!confirm('이 설비를 삭제하시겠습니까?')) return;
+  await db.from('equipments').delete().eq('id', id);
+  showToast('삭제됐어요.');
+  loadEquip();
+}
+</script>
+<script src="sidebar.js"></script>
+</body>
+</html>
