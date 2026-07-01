@@ -683,9 +683,9 @@ function showToast(msg) {
 }
 
 async function loadProducts() {
-  const { data } = await db.from('products').select('sabun, part_no, part_name');
+  const { data } = await db.from('products').select('sabun, part_no, part_name, material_name');
   if (data) {
-    data.forEach(r => { PRODUCTS[r.sabun] = { partNo: r.part_no || '', partName: r.part_name || '' }; });
+    data.forEach(r => { PRODUCTS[r.sabun] = { partNo: r.part_no || '', partName: r.part_name || '', materialName: r.material_name || '' }; });
   }
 }
 
@@ -2428,7 +2428,7 @@ function renderMoldingTable(data) {
   if (!currentSortCol) data = sortMoldingDefault(data);
   document.getElementById('resultArea').innerHTML = `
     <div class="card" style="padding:0"><div class="table-wrap"><table><thead><tr>
-      <th>NO</th>${makeSortTh('작업일','work_date')}${makeSortTh('근무','shift')}${makeSortTh('반','team')}${makeSortTh('설비','equipment_no')}${makeSortTh('유형','work_type')}${makeSortTh('사번','worker_id')}${makeSortTh('제품명','_partName')}
+      <th>NO</th>${makeSortTh('작업일','work_date')}${makeSortTh('근무','shift')}${makeSortTh('반','team')}${makeSortTh('설비','equipment_no')}${makeSortTh('유형','work_type')}${makeSortTh('사번','worker_id')}<th>재질명</th>
       ${makeSortTh('Batch','batch_no')}${makeSortTh('C/V','cavity')}${makeSortTh('Shot','shot_count')}${makeSortTh('생산','total_qty','style="text-align:right"')}${makeSortTh('불량','defect_qty','style="text-align:right"')}
       <th>비가동</th><th>비가동시간</th>${makeSortTh('작업자','worker_name')}<th>비고</th>${makeSortTh('제출일시','submitted_at')}<th>작업</th>
     </tr></thead><tbody>
@@ -2468,7 +2468,7 @@ function renderMoldingTable(data) {
         <td>${i+1}</td><td>${r.work_date||''}</td><td>${r.shift_type||''}</td>
         <td>${r.team||''}</td><td style="font-size:11px">${r.equipment_no||''}</td>
         <td><span style="background:${tc}15;color:${tc};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">${r.work_type||'표준'}</span></td>
-        <td>${r.sabun||''}</td><td style="font-size:11px">${r.product_name||''}</td>
+        <td>${r.sabun||''}</td><td style="font-size:11px">${(PRODUCTS[r.sabun]&&PRODUCTS[r.sabun].materialName)||'-'}</td>
         <td style="font-size:11px">${r.batch_no||''}</td><td>${r.cavity||''}</td><td>${r.shot_count||''}</td>
         <td style="text-align:right;font-weight:600">${(r.production_qty||0).toLocaleString()}</td>
         <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${r.defect_qty||0}</td>
@@ -2958,7 +2958,7 @@ function downloadExcel() {
       '설비': r.equipment_no || '',
       '관리번호': r.equipment_id || '',
       '사번': r.sabun || '',
-      '제품명': r.product_name || '',
+      '재질명': (PRODUCTS[r.sabun] && PRODUCTS[r.sabun].materialName) || '',
       'Batch No.': r.batch_no || '',
       'C/V': r.cavity || '',
       'Shot': r.shot_count || '',
