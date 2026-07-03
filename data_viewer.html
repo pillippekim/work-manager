@@ -2430,6 +2430,37 @@ function sortMoldingDefault(data){
   });
 }
 
+// 근무시간 표시 (예: 08:00~17:00)
+function moldingWorkHours(r){
+  if (!r.start_time || !r.end_time) return '-';
+  return (''+r.start_time).slice(0,5) + '~' + (''+r.end_time).slice(0,5);
+}
+// 이 사번의 비가동시간 합계(분)
+function moldingDowntimeMin(r){
+  var tot = 0;
+  try {
+    var n = JSON.parse(r.note);
+    (n.downtime||[]).filter(function(d){ return !d.sabun || d.sabun===r.sabun; }).forEach(function(d){
+      if (d.start && d.end){ var s=d.start.split(':'), e=d.end.split(':'); var m=(+e[0]*60+ +e[1])-(+s[0]*60+ +s[1]); if(m<0)m+=1440; tot+=m; }
+    });
+  } catch(e){}
+  return tot;
+}
+// 가동시간(분) = 근무시간 - 식사시간(점심 12~13시 60분, 저녁 17:00~17:30 30분) - 비가동시간
+function moldingOperatingMin(r){
+  if (!r.start_time || !r.end_time) return null;
+  var toMin = function(t){ var p=(''+t).split(':'); return (+p[0])*60 + (+p[1]); };
+  var s = toMin(r.start_time), e = toMin(r.end_time);
+  var total = e - s; if (total < 0) total += 1440;   // 야간 대응
+  var ws = s, we = s + total;
+  var ov = function(a1,a2,b1,b2){ var lo=Math.max(a1,b1), hi=Math.min(a2,b2); return hi>lo ? hi-lo : 0; };
+  var meal = function(m1,m2){ return ov(ws,we,m1,m2) + ov(ws,we,m1+1440,m2+1440); };
+  var lunch = meal(12*60, 13*60);       // 점심 12:00~13:00
+  var dinner = meal(17*60, 17*60+30);   // 저녁 17:00~17:30
+  var work = total - lunch - dinner - moldingDowntimeMin(r);
+  return work < 0 ? 0 : work;
+}
+
 function renderMoldingTable(data) {
   if (!data.length) { document.getElementById('resultArea').innerHTML = '<div class="card"><div style="padding:2rem;text-align:center;color:#aaa;font-size:13px">데이터가 없어요.</div></div>'; return; }
   data = applySortIfNeeded(data);
@@ -2438,7 +2469,7 @@ function renderMoldingTable(data) {
     <div class="card" style="padding:0"><div class="table-wrap"><table><thead><tr>
       <th>NO</th>${makeSortTh('작업일','work_date')}${makeSortTh('근무','shift')}${makeSortTh('반','team')}${makeSortTh('설비','equipment_no')}${makeSortTh('유형','work_type')}${makeSortTh('사번','worker_id')}<th>재질명</th>
       ${makeSortTh('Batch','batch_no')}${makeSortTh('C/V','cavity')}${makeSortTh('Shot','shot_count')}${makeSortTh('생산','total_qty','style="text-align:right"')}${makeSortTh('불량','defect_qty','style="text-align:right"')}
-      <th>비가동</th><th>비가동시간</th>${makeSortTh('작업자','worker_name')}<th>비고</th>${makeSortTh('제출일시','submitted_at')}<th>작업</th>
+      <th>비가동</th><th>비가동시간</th><th>근무시간</th><th>가동시간(분)</th>${makeSortTh('작업자','worker_name')}<th>비고</th>${makeSortTh('제출일시','submitted_at')}<th>작업</th>
     </tr></thead><tbody>
     ${data.map((r,i) => {
       const del = r.deleted_at;
@@ -2482,6 +2513,8 @@ function renderMoldingTable(data) {
         <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${r.defect_qty||0}</td>
         <td style="font-size:11px;color:#e67e22">${dtCode}</td>
         <td style="font-size:11px;color:#e67e22">${dtMin}</td>
+        <td style="font-size:11px;text-align:center">${moldingWorkHours(r)}</td>
+        <td style="font-size:11px;text-align:right;font-weight:600">${(function(){var _m=moldingOperatingMin(r);return _m==null?'-':_m+'분';})()}</td>
         <td style="min-width:80px">${r.worker_name||''}</td><td style="font-size:11px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${noteText}">${noteText||'-'}</td>
         <td style="font-size:11px;color:#999">${fmtDatetime(r.created_at)}</td>
         <td>${del ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : `<div class="row-actions"><button class="btn-row" style="background:#eef2ff;color:#243bb2" onclick="viewMoldingDay('${r.work_date}','${(r.sabun||'')}')">보기</button><button class="btn-row btn-row-edit" onclick='openEditMolding(${JSON.stringify(r).replace(/'/g, "&#39;")})'>수정</button><button class="btn-row btn-row-del" onclick="deleteMolding('${r.id}')">삭제</button></div>`}</td>
@@ -2978,6 +3011,8 @@ function downloadExcel() {
       '하판온도': r.lower_temp || '',
       '비가동코드': r.downtime_code || '',
       '비가동시간(분)': r.downtime_minutes || '',
+      '근무시간': moldingWorkHours(r) === '-' ? '' : moldingWorkHours(r),
+      '가동시간(분)': (function(){ var _m = moldingOperatingMin(r); return _m == null ? '' : _m; })(),
       '문제점': r.problem || '',
       '작업자': r.worker_name || '',
       '비고': (() => { try { return JSON.parse(r.note).text || ''; } catch(e) { return r.note || ''; } })(),
