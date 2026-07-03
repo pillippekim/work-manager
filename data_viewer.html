@@ -598,6 +598,16 @@ th.sortable.desc::after { content:'▼'; color:#243bb2; }
     </div>
     <div class="modal-grid modal-grid-3">
       <div class="modal-field">
+        <span class="modal-label">시작시간</span>
+        <input class="modal-input" type="time" id="emld_start_time" />
+      </div>
+      <div class="modal-field">
+        <span class="modal-label">종료시간</span>
+        <input class="modal-input" type="time" id="emld_end_time" />
+      </div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field">
         <span class="modal-label">생산수량</span>
         <input class="modal-input" type="number" id="emld_production_qty" />
       </div>
@@ -2543,6 +2553,8 @@ function openEditMolding(r) {
   document.getElementById('emld_batch_no').value = r.batch_no || '';
   document.getElementById('emld_cavity').value = r.cavity || '';
   document.getElementById('emld_shot_count').value = r.shot_count || '';
+  document.getElementById('emld_start_time').value = (r.start_time || '').slice(0,5);
+  document.getElementById('emld_end_time').value = (r.end_time || '').slice(0,5);
   document.getElementById('emld_production_qty').value = r.production_qty || 0;
   document.getElementById('emld_defect_qty').value = r.defect_qty || 0;
   document.getElementById('emld_work_type').value = r.work_type || '표준';
@@ -2578,6 +2590,8 @@ async function saveEditMolding() {
     batch_no: document.getElementById('emld_batch_no').value.trim() || null,
     cavity: parseInt(document.getElementById('emld_cavity').value) || null,
     shot_count: parseInt(document.getElementById('emld_shot_count').value) || null,
+    start_time: document.getElementById('emld_start_time').value || null,
+    end_time: document.getElementById('emld_end_time').value || null,
     production_qty: parseInt(document.getElementById('emld_production_qty').value) || 0,
     defect_qty: parseInt(document.getElementById('emld_defect_qty').value) || 0,
     work_type: document.getElementById('emld_work_type').value,
