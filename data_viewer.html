@@ -106,7 +106,7 @@ th.sortable.desc::after { content:'▼'; color:#243bb2; }
 <div class="page-header">
     <div class="header-row">
         <div>
-            <h1>📊 데이터 조회 및 추출 <span style="font-size:12px;color:#16a34a;background:#dcfce7;padding:2px 8px;border-radius:10px;vertical-align:middle;font-weight:700">v3 ✓</span></h1>
+            <h1>📊 데이터 조회 및 추출 <span style="font-size:12px;color:#16a34a;background:#dcfce7;padding:2px 8px;border-radius:10px;vertical-align:middle;font-weight:700">v5 ✓</span></h1>
             <div class="sub">기간별 작업일지 조회, 엑셀 다운로드</div>
         </div>
         <div class="header-actions">
@@ -589,11 +589,11 @@ th.sortable.desc::after { content:'▼'; color:#243bb2; }
       </div>
       <div class="modal-field">
         <span class="modal-label">C/V (캐비티)</span>
-        <input class="modal-input" type="number" id="emld_cavity" />
+        <input class="modal-input" type="number" id="emld_cavity" oninput="emldCalcProd()" />
       </div>
       <div class="modal-field">
         <span class="modal-label">Shot 수</span>
-        <input class="modal-input" type="number" id="emld_shot_count" />
+        <input class="modal-input" type="number" id="emld_shot_count" oninput="emldCalcProd()" />
       </div>
     </div>
     <div class="modal-grid modal-grid-3">
@@ -618,6 +618,13 @@ th.sortable.desc::after { content:'▼'; color:#243bb2; }
       <div class="modal-field">
         <span class="modal-label">작업유형 (면)</span>
         <select class="modal-input" id="emld_work_type"><option value="가면">가면</option><option value="나면">나면</option><option value="다면">다면</option><option value="표준">표준</option><option value="초품">초품</option><option value="중품">중품</option><option value="종품">종품</option></select>
+      </div>
+    </div>
+    <div class="modal-grid">
+      <div class="modal-field">
+        <span class="modal-label">⏸️ 비가동 (이 사번 · 코드 / 시작 / 종료 / 상세)</span>
+        <div id="emld_dtRows"></div>
+        <button type="button" id="emld_dtAddBtn" onclick="emldAddDtRow()" style="width:100%;padding:7px;border:1px dashed #c7ceff;background:#fafbfd;border-radius:6px;color:#243bb2;font-size:12px;font-weight:600;cursor:pointer;margin-top:4px">+ 비가동 추가</button>
       </div>
     </div>
     <div class="modal-grid">
@@ -2549,11 +2556,37 @@ async function deleteMolding(id) {
 }
 
 let editingMoldingBefore = null;
+// 수정 모달: 생산수량 자동 계산 (C/V × Shot)
+function emldCalcProd() {
+  var c = parseInt(document.getElementById('emld_cavity').value) || 0;
+  var s = parseInt(document.getElementById('emld_shot_count').value) || 0;
+  if (c > 0 && s > 0) document.getElementById('emld_production_qty').value = c * s;
+}
+
+// 수정 모달의 비가동 행 추가
+function emldAddDtRow(code, start, end, detail) {
+  var wrap = document.getElementById('emld_dtRows');
+  if (!wrap) return;
+  var codes = ['생지부족','금형교체','금형세척','설비이상','제품성형이상','금형수정','기타'];
+  var div = document.createElement('div');
+  div.className = 'emld-dt-row';
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 0.9fr 0.9fr 1fr 22px;gap:4px;align-items:center;margin-bottom:5px';
+  div.innerHTML =
+    '<select class="emld-dt-code modal-input" style="padding:6px;font-size:12px"><option value="">없음</option>' +
+    codes.map(function(c){ return '<option value="' + c + '"' + (c===code ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select>' +
+    '<input type="time" class="emld-dt-start modal-input" value="' + (start||'') + '" style="padding:6px;font-size:12px">' +
+    '<input type="time" class="emld-dt-end modal-input" value="' + (end||'') + '" style="padding:6px;font-size:12px">' +
+    '<input type="text" class="emld-dt-detail modal-input" value="' + (detail ? String(detail).replace(/"/g,'&quot;') : '') + '" placeholder="상세" style="padding:6px;font-size:12px">' +
+    '<button type="button" onclick="this.parentNode.remove()" style="background:#fef2f2;color:#dc2626;border:none;border-radius:5px;cursor:pointer;font-size:13px;padding:4px 0">×</button>';
+  wrap.appendChild(div);
+}
+
 // 보기: 수정 폼과 동일하지만 읽기 전용으로 표시
 function openViewMolding(r) {
   openEditMolding(r);
   var m = document.getElementById('editMoldingModal');
   m.querySelectorAll('input, select, textarea').forEach(function(el){ el.setAttribute('disabled', 'disabled'); });
+  m.querySelectorAll('#emld_dtRows button, #emld_dtAddBtn').forEach(function(b){ b.style.display = 'none'; });
   var t = m.querySelector('.modal-title'); if (t) t.textContent = '🏭 성형 작업일지 보기';
   var s = m.querySelector('.btn-modal-save'); if (s) s.style.display = 'none';
 }
@@ -2564,6 +2597,7 @@ function openEditMolding(r) {
   _m.querySelectorAll('input, select, textarea').forEach(function(el){ el.removeAttribute('disabled'); });
   var _t = _m.querySelector('.modal-title'); if (_t) _t.textContent = '🏭 성형 작업일지 수정';
   var _s = _m.querySelector('.btn-modal-save'); if (_s) _s.style.display = '';
+  var _ab = document.getElementById('emld_dtAddBtn'); if (_ab) _ab.style.display = '';
   editingMoldingBefore = JSON.parse(JSON.stringify(r));
   document.getElementById('emld_id').value = r.id;
   document.getElementById('emld_work_date').value = r.work_date || '';
@@ -2584,6 +2618,12 @@ function openEditMolding(r) {
   var noteText = '';
   try { noteText = JSON.parse(r.note).text || ''; } catch(e) { noteText = r.note || ''; }
   document.getElementById('emld_note_text').value = noteText;
+  // 이 사번의 기존 비가동 채우기
+  var _dtWrap = document.getElementById('emld_dtRows');
+  if (_dtWrap) _dtWrap.innerHTML = '';
+  var _myDt = [];
+  try { var _pn = JSON.parse(r.note); _myDt = (_pn.downtime || []).filter(function(d){ return d.sabun === r.sabun; }); } catch(e) {}
+  _myDt.forEach(function(d){ emldAddDtRow(d.code, d.start, d.end, d.detail); });
   document.getElementById('editMoldingMeta').textContent = '설비: ' + (r.equipment_no||'-') + ' · 반: ' + (r.team||'-') + ' · 입력자: ' + (r.created_by_name||'-');
   document.getElementById('editMoldingModal').classList.add('open');
 }
@@ -2592,14 +2632,31 @@ async function saveEditMolding() {
   var id = document.getElementById('emld_id').value;
   var before = editingMoldingBefore;
   var noteText = document.getElementById('emld_note_text').value.trim();
-  // 기존 note JSON 구조 유지하면서 text만 업데이트
-  var noteVal = noteText;
+  // 비가동(이 사번) 재구성
+  var _newSabun = document.getElementById('emld_sabun').value.trim() || (before ? before.sabun : '');
+  var _oldSabun = before ? before.sabun : _newSabun;
+  var _edited = [];
+  document.querySelectorAll('#emld_dtRows .emld-dt-row').forEach(function(row){
+    var code = row.querySelector('.emld-dt-code').value;
+    if (!code) return;
+    _edited.push({
+      face: document.getElementById('emld_work_type').value || '전체',
+      sabun: _newSabun, code: code,
+      start: row.querySelector('.emld-dt-start').value,
+      end: row.querySelector('.emld-dt-end').value,
+      detail: row.querySelector('.emld-dt-detail').value
+    });
+  });
+  // 기존 note JSON 구조 유지 + text + downtime 갱신
+  var noteVal;
   try {
-    var existingNote = JSON.parse(before.note);
+    var existingNote = JSON.parse(before.note) || {};
     existingNote.text = noteText;
+    var _others = (existingNote.downtime || []).filter(function(d){ return d.sabun !== _oldSabun; });
+    existingNote.downtime = _others.concat(_edited);
     noteVal = JSON.stringify(existingNote);
   } catch(e) {
-    noteVal = noteText;
+    noteVal = JSON.stringify({ text: noteText, downtime: _edited });
   }
 
   var after = {
