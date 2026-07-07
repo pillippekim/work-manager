@@ -173,7 +173,7 @@
         <table id="dataTable">
           <thead><tr>
             <th data-sort="inspect_date" onclick="sortTable('inspect_date')">검사일 <span class="sort-icon" id="si_inspect_date">&#9660;</span></th>
-            <th data-sort="inspector" onclick="sortTable('inspector')">작성자 <span class="sort-icon" id="si_inspector">&#9650;&#9660;</span></th>
+            <th data-sort="molding_worker" onclick="sortTable('molding_worker')">작업자 <span class="sort-icon" id="si_molding_worker">&#9650;&#9660;</span></th>
             <th data-sort="equipment" onclick="sortTable('equipment')">설비 <span class="sort-icon" id="si_equipment">&#9650;&#9660;</span></th>
             <th data-sort="equip_type" onclick="sortTable('equip_type')">타입 <span class="sort-icon" id="si_equip_type">&#9650;&#9660;</span></th>
             <th data-sort="face" onclick="sortTable('face')">면 <span class="sort-icon" id="si_face">&#9650;&#9660;</span></th>
@@ -371,7 +371,7 @@ function renderTable() {
 
         html += '<tr>'
             + '<td>'+d.inspect_date+'</td>'
-            + '<td>'+(d.inspector||'-')+'</td>'
+            + '<td>'+(d.molding_worker||'-')+'</td>'
             + '<td><strong>'+(d.equipment||'-')+'</strong></td>'
             + '<td>'+typeBadge+'</td>'
             + '<td>'+faceText+'</td>'
@@ -407,6 +407,7 @@ function viewDetail(id) {
     var html = '';
     html += '<div class="detail-row"><div class="detail-label">검사일</div><div class="detail-value">'+d.inspect_date+'</div></div>';
     html += '<div class="detail-row"><div class="detail-label">작성자</div><div class="detail-value">'+(d.inspector||'-')+'</div></div>';
+    html += '<div class="detail-row"><div class="detail-label">성형작업자</div><div class="detail-value">'+(d.molding_worker||'-')+'</div></div>';
     html += '<div class="detail-row"><div class="detail-label">설비</div><div class="detail-value">'+(d.equipment||'-')+' ('+d.equip_type+')</div></div>';
     html += '<div class="detail-row"><div class="detail-label">면</div><div class="detail-value">'+(faceMap[d.face]||d.face)+'</div></div>';
     html += '<div class="detail-row"><div class="detail-label">사번</div><div class="detail-value">'+(d.sabun||'-')+'</div></div>';
@@ -450,7 +451,7 @@ function downloadExcel() {
     if (!allData.length) { showToast('데이터가 없습니다','error'); return; }
 
     var headers = [
-        '검사일','작성자','설비','타입','면','비가동','사번','Cavity','재질','사상방법',
+        '검사일','작성자','성형작업자','설비','타입','면','비가동','사번','Cavity','재질','사상방법',
         '금형온도(상판)','금형온도(하판)','가류시간','성형압','진공압','외관불량',
         '경도(초)X1','경도(초)X2','경도(초)X3','경도(초)X4','경도(초)X5',
         '경도(중)X1','경도(중)X2','경도(중)X3','경도(중)X4','경도(중)X5',
@@ -488,6 +489,7 @@ function downloadExcel() {
         var row = {};
         row['검사일'] = d.inspect_date;
         row['작성자'] = d.inspector||'';
+        row['성형작업자'] = d.molding_worker||'';
         row['설비'] = d.equipment||'';
         row['타입'] = d.equip_type||'';
         row['면'] = faceMap[d.face]||d.face;
