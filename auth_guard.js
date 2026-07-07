@@ -9,7 +9,7 @@ var SUPABASE_KEY_AG = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 // =============================================
 window.MENU_STRUCTURE = {
     production: { name: '생산관리', pages: ['mold_dashboard.html', 'mold_layout.html', 'mold_detail.html', 'mold_admin.html'] },
-    quality:    { name: '품질관리', pages: ['inspection_round_viewer.html'] },
+    quality:    { name: '품질관리', pages: ['inspection_round_viewer.html', 'inspection_report.html'] },
     logistics:  { name: '물류관리', pages: ['inventory_layout.html', 'inventory_rack.html', 'inventory_zone.html', 'inventory_io.html', 'inventory_viewer.html'] },
     management: { name: '경영지원', pages: ['asset_manage.html'], sensitive: true },
     data:       { name: '데이터 관리', pages: ['data_viewer.html', 'safety_viewer.html', 'docs_manager.html'] },

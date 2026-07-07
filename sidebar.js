@@ -21,7 +21,7 @@ function initSidebar() {
     // ── 페이지별 active / 자동 펼침 ──
     var isMoldPage = ['mold_dashboard.html','mold_layout.html','mold_detail.html'].indexOf(page) !== -1;
     var isMesPage = ['mes_data.html'].indexOf(page) !== -1;
-    var isQualityPage = ['inspection_round_viewer.html'].indexOf(page) !== -1;
+    var isQualityPage = ['inspection_round_viewer.html', 'inspection_report.html'].indexOf(page) !== -1;
     var isDataPage = ['data_viewer.html','safety_viewer.html','docs_manager.html'].indexOf(page) !== -1;
     var isSystemPage = ['master_data.html','users.html'].indexOf(page) !== -1;
     var isInventoryPage = ['inventory_layout.html','inventory_rack.html','inventory_io.html','inventory_viewer.html','inventory_zone.html'].indexOf(page) !== -1;
@@ -35,6 +35,7 @@ function initSidebar() {
 
     // 품질관리 active
     var inspViewActive = (page === 'inspection_round_viewer.html') ? ' nav-active' : '';
+    var inspReportActive = (page === 'inspection_report.html') ? ' nav-active' : '';
 
     // 데이터관리 active
     var dataViewActive = (page === 'data_viewer.html') ? ' nav-active' : '';
@@ -164,6 +165,7 @@ function initSidebar() {
                         '<div class="sub-body">' +
                             '<a class="nav-link" href="' + PM + 'inspection_round.html"><span class="n-icon">📋</span>공정검사 작성</a>' +
                             '<a class="nav-link' + inspViewActive + '" href="inspection_round_viewer.html"><span class="n-icon">📂</span>공정검사 조회</a>' +
+                            '<a class="nav-link' + inspReportActive + '" href="inspection_report.html"><span class="n-icon">📑</span>공정검사 리포트</a>' +
                         '</div>' +
                     '</div>' +
                 '</div>' +

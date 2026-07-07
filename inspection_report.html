@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>공정 순회검사 리포트 - HKHT</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="auth_guard.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; font-family:'Noto Sans KR',sans-serif; }
+body { background:#eef0f4; color:#222; }
+
+/* ── 상단 컨트롤 (인쇄 시 숨김) ── */
+.controls { background:#1a2340; padding:14px 20px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.controls .title { color:#fff; font-weight:700; font-size:16px; margin-right:12px; }
+.controls input[type=date] { padding:7px 10px; border:none; border-radius:7px; font-size:13px; }
+.btn { padding:8px 14px; border:none; border-radius:7px; font-size:13px; font-weight:600; cursor:pointer; }
+.btn-quick { background:#2c3a63; color:#dfe5f5; }
+.btn-quick.active { background:#fff; color:#1a2340; }
+.btn-load { background:#3b82f6; color:#fff; }
+.btn-print { background:#16a34a; color:#fff; }
+.btn-back { background:#2c3a63; color:#dfe5f5; text-decoration:none; display:inline-block; }
+
+/* ── 리포트 용지 ── */
+.paper { max-width:900px; margin:24px auto; background:#fff; padding:36px 40px; box-shadow:0 2px 14px rgba(0,0,0,.08); }
+.rp-head { text-align:center; border-bottom:3px solid #1a2340; padding-bottom:14px; margin-bottom:6px; }
+.rp-head h1 { font-size:24px; letter-spacing:6px; color:#1a2340; }
+.rp-meta { display:flex; justify-content:space-between; font-size:12px; color:#555; margin:8px 0 18px; }
+
+/* 결재란 */
+.sign-table { border-collapse:collapse; margin-left:auto; margin-bottom:14px; }
+.sign-table th, .sign-table td { border:1px solid #999; font-size:11px; text-align:center; }
+.sign-table th { background:#f3f4f8; padding:4px 0; width:64px; }
+.sign-table td { height:46px; }
+
+/* 요약 카드 */
+.sum-grid { display:grid; grid-template-columns:repeat(8,1fr); gap:6px; margin-bottom:16px; }
+.sum-card { border:1px solid #dfe3ec; border-radius:6px; padding:6px 2px; text-align:center; }
+.sum-card .n { font-size:15px; font-weight:800; }
+.sum-card .l { font-size:9.5px; color:#777; margin-top:1px; letter-spacing:-0.3px; }
+
+h2.sec { font-size:14px; color:#1a2340; border-left:4px solid #1a2340; padding-left:8px; margin:22px 0 8px; }
+table.rp { width:100%; border-collapse:collapse; font-size:12px; }
+table.rp th, table.rp td { border:1px solid #c9cfdb; padding:5px 7px; text-align:center; }
+table.rp th { background:#f0f2f7; font-weight:700; }
+table.rp td.left { text-align:left; }
+.tag-def { background:#fef2f2; color:#dc2626; font-size:10px; padding:1px 6px; border-radius:3px; margin:0 1px; display:inline-block; }
+.tag-chg { background:#fff7e6; color:#b45309; font-size:10px; padding:1px 6px; border-radius:3px; margin:0 1px; display:inline-block; }
+.ok { color:#16a34a; font-weight:600; }
+.empty-msg { color:#999; font-size:12px; padding:10px; text-align:center; border:1px dashed #d5dae5; border-radius:6px; }
+.foot-note { font-size:11px; color:#888; margin-top:24px; border-top:1px solid #e5e8f0; padding-top:8px; }
+
+@media print {
+  body { background:#fff; }
+  .controls { display:none; }
+  .paper { box-shadow:none; margin:0; max-width:100%; padding:10mm 12mm; }
+  h2.sec { page-break-after:avoid; }
+  table.rp { page-break-inside:auto; }
+  tr { page-break-inside:avoid; }
+}
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <span class="title">📑 공정 순회검사 리포트</span>
+  <input type="date" id="sDate"> ~ <input type="date" id="eDate" style="color:#000">
+  <button class="btn btn-quick" onclick="quick('today')">당일</button>
+  <button class="btn btn-quick" onclick="quick('yesterday')">전일</button>
+  <button class="btn btn-quick" onclick="quick('month')">당월</button>
+  <button class="btn btn-load" onclick="loadReport()">🔍 조회</button>
+  <button class="btn btn-print" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>
+  <a class="btn btn-back" href="inspection_round_viewer.html">← 조회화면</a>
+</div>
+
+<div class="paper" id="paper">
+  <div class="rp-head"><h1>공정 순회검사 REPORT</h1></div>
+  <div class="rp-meta">
+    <div>기간: <b id="mPeriod">-</b></div>
+    <div>출력일: <b id="mPrinted">-</b> · 출력자: <b id="mUser">-</b></div>
+  </div>
+
+  <table class="sign-table">
+    <tr><th>작성</th><th>검토</th><th>승인</th></tr>
+    <tr><td></td><td></td><td></td></tr>
+  </table>
+
+  <div class="sum-grid" style="grid-template-columns:repeat(8,1fr)">
+    <div class="sum-card"><div class="n" id="cTotal">-</div><div class="l">총 검사</div></div>
+    <div class="sum-card"><div class="n" id="cPress">-</div><div class="l">Press</div></div>
+    <div class="sum-card"><div class="n" id="cInj">-</div><div class="l">Injection</div></div>
+    <div class="sum-card"><div class="n" id="cInactive" style="color:#888">-</div><div class="l">비가동</div></div>
+    <div class="sum-card"><div class="n" id="cDefect" style="color:#dc2626">-</div><div class="l">외관 불량</div></div>
+    <div class="sum-card"><div class="n" id="cChange" style="color:#b45309">-</div><div class="l">변동점(전체)</div></div>
+    <div class="sum-card"><div class="n" id="cMoldClean" style="color:#0369a1">-</div><div class="l">금형 세척</div></div>
+    <div class="sum-card"><div class="n" id="cMoldDamage" style="color:#dc2626">-</div><div class="l">금형 수정/파손</div></div>
+  </div>
+
+  <h2 class="sec">1. 설비별 검사 현황</h2>
+  <div id="secEquip"></div>
+
+  <h2 class="sec">2. 금형 관리 집계 (교체 · 세척 · 수정/파손)</h2>
+  <div id="secMold"></div>
+
+  <h2 class="sec">3. 외관 불량 발생 내역</h2>
+  <div id="secDefect"></div>
+
+  <h2 class="sec">4. 변동점 및 조치 내역</h2>
+  <div id="secChange"></div>
+
+  <h2 class="sec">5. 사용재질(재질명)별 경도 요약</h2>
+  <div id="secHardness"></div>
+
+  <h2 class="sec">6. 품목(사번)별 중요치수 요약</h2>
+  <div id="secDimension"></div>
+
+  <h2 class="sec">7. 검사 수행 현황 (성형작업자)</h2>
+  <div id="secWorker"></div>
+
+  <div class="foot-note">
+    ※ 본 리포트는 공정 순회검사 시스템의 Raw Data를 기간 기준으로 자동 집계한 자료입니다.
+    외관 불량은 초/중/종품 중 1건 이상 불량이 기록된 검사 기준입니다. 경도 요약은 일지에 기록된 사용재질(재질명)별, 치수 요약은 품목(사번)별로 집계하며 초·중·종품 측정값(각 최대 5점)의 평균입니다.
+  </div>
+</div>
+
+<script>
+var SU = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+var SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+var HR = {'apikey':SK,'Authorization':'Bearer '+SK};
+var myInfo = null;
+var faceMap = {A:'가',B:'나',C:'다'};
+
+function fmtLocal(d){ var y=d.getFullYear(),m=('0'+(d.getMonth()+1)).slice(-2),dd=('0'+d.getDate()).slice(-2); return y+'-'+m+'-'+dd; }
+
+function quick(t){
+  var now = new Date();
+  if (t==='today'){ document.getElementById('sDate').value=fmtLocal(now); document.getElementById('eDate').value=fmtLocal(now); }
+  if (t==='yesterday'){ var y=new Date(now); y.setDate(y.getDate()-1); document.getElementById('sDate').value=fmtLocal(y); document.getElementById('eDate').value=fmtLocal(y); }
+  if (t==='month'){ var f=new Date(now.getFullYear(),now.getMonth(),1); document.getElementById('sDate').value=fmtLocal(f); document.getElementById('eDate').value=fmtLocal(now); }
+  loadReport();
+}
+
+// 데이터 전체 로드 (1,000건 제한 우회 페이지네이션)
+async function fetchAll(s, e){
+  var all = [], offset = 0, limit = 1000;
+  while (true) {
+    var q = 'select=*&inspect_date=gte.'+s+'&inspect_date=lte.'+e+'&order=inspect_date.asc,equipment.asc&limit='+limit+'&offset='+offset;
+    var r = await fetch(SU+'/rest/v1/inspection_rounds?'+q, {headers:HR});
+    var data = await r.json();
+    if (!Array.isArray(data) || data.length === 0) break;
+    all = all.concat(data);
+    if (data.length < limit) break;
+    offset += limit;
+  }
+  return all;
+}
+
+function hasDefect(d){
+  var v = d.visual_data; if (!v) return false;
+  var ts = ['first','mid','last'];
+  for (var t=0;t<ts.length;t++){ if (v[ts[t]] && v[ts[t]].length>0) return true; }
+  return false;
+}
+function defectList(d){
+  var v = d.visual_data || {}; var out = [];
+  ['first','mid','last'].forEach(function(k){ (v[k]||[]).forEach(function(x){ if(out.indexOf(x)===-1) out.push(x); }); });
+  return out;
+}
+function changeList(d){ return (d.change_mold||[]).concat(d.change_equip||[]); }
+// 금형 항목 판별 (공백 유무 무시: '금형 세척'/'금형세척' 모두 인식)
+function moldFlag(d, kind){
+  return (d.change_mold||[]).some(function(x){
+    var t = String(x).replace(/\s/g,'');
+    if (kind==='clean')  return t.indexOf('금형세척') !== -1;
+    if (kind==='damage') return t.indexOf('금형수정') !== -1 || t.indexOf('파손') !== -1 || t.indexOf('금형손상') !== -1;
+    if (kind==='swap')   return t.indexOf('금형교체') !== -1;
+    return false;
+  });
+}
+function avg(arr){
+  var nums = arr.map(Number).filter(function(x){ return !isNaN(x) && x!==0; });
+  if (!nums.length) return null;
+  return nums.reduce(function(a,b){return a+b;},0)/nums.length;
+}
+
+async function loadReport(){
+  var s = document.getElementById('sDate').value, e = document.getElementById('eDate').value;
+  if (!s || !e) return;
+  document.getElementById('mPeriod').textContent = s + ' ~ ' + e;
+  document.getElementById('mPrinted').textContent = fmtLocal(new Date());
+  document.getElementById('mUser').textContent = (myInfo && myInfo.name) || '-';
+
+  var data = await fetchAll(s, e);
+
+  // ── 요약 ──
+  var press=0, inj=0, defect=0, change=0, inactive=0, moldClean=0, moldDamage=0, moldSwap=0;
+  data.forEach(function(d){
+    if ((d.equip_type||'').toLowerCase()==='press') press++;
+    if ((d.equip_type||'').toLowerCase()==='injection') inj++;
+    if (hasDefect(d)) defect++;
+    if (changeList(d).length>0) change++;
+    if (d.is_inactive) inactive++;
+    if (moldFlag(d,'clean')) moldClean++;
+    if (moldFlag(d,'damage')) moldDamage++;
+    if (moldFlag(d,'swap')) moldSwap++;
+  });
+  document.getElementById('cTotal').textContent = data.length;
+  document.getElementById('cPress').textContent = press;
+  document.getElementById('cInj').textContent = inj;
+  document.getElementById('cDefect').textContent = defect;
+  document.getElementById('cChange').textContent = change;
+  document.getElementById('cInactive').textContent = inactive;
+  document.getElementById('cMoldClean').textContent = moldClean;
+  document.getElementById('cMoldDamage').textContent = moldDamage;
+
+  // ── 1. 설비별 현황 ──
+  var eq = {};
+  data.forEach(function(d){
+    var k = d.equipment || '(미지정)';
+    if (!eq[k]) eq[k] = {cnt:0, def:0, chg:0, ina:0, mc:0, md:0, ms:0};
+    eq[k].cnt++;
+    if (hasDefect(d)) eq[k].def++;
+    if (changeList(d).length>0) eq[k].chg++;
+    if (d.is_inactive) eq[k].ina++;
+    if (moldFlag(d,'clean')) eq[k].mc++;
+    if (moldFlag(d,'damage')) eq[k].md++;
+    if (moldFlag(d,'swap')) eq[k].ms++;
+  });
+  var keys = Object.keys(eq).sort();
+  var h = '<table class="rp" style="table-layout:fixed"><tr><th>설비</th><th>검사건수</th><th>외관불량</th><th>금형세척</th><th>금형수정/파손</th><th>금형교체</th><th>비가동</th></tr>';
+  keys.forEach(function(k){
+    var r = eq[k];
+    h += '<tr><td>'+k+'</td><td>'+r.cnt+'</td><td>'+(r.def||'-')+'</td><td>'+(r.mc||'-')+'</td><td>'+(r.md||'-')+'</td><td>'+(r.ms||'-')+'</td><td>'+(r.ina||'-')+'</td></tr>';
+  });
+  h += '</table>';
+  document.getElementById('secEquip').innerHTML = keys.length ? h : '<div class="empty-msg">기간 내 검사 기록이 없습니다.</div>';
+
+  // ── 2. 금형 관리 집계 ──
+  var moldRows = data.filter(function(d){ return moldFlag(d,'clean') || moldFlag(d,'damage') || moldFlag(d,'swap'); });
+  var mkList = function(kind){
+    var set = {};
+    data.forEach(function(d){ if (moldFlag(d,kind)) { var e=(d.equipment||'-')+(d.sabun?(' ('+d.sabun+')'):''); set[e]=(set[e]||0)+1; } });
+    return Object.keys(set).sort().map(function(k){ return k + (set[k]>1?' ×'+set[k]:''); }).join(', ') || '-';
+  };
+  h = '<table class="rp"><tr><th style="width:130px">구분</th><th style="width:70px">건수</th><th>발생 설비 (사번)</th></tr>'
+    + '<tr><td>금형 세척</td><td><b style="color:#0369a1">'+moldClean+'</b></td><td class="left">'+mkList('clean')+'</td></tr>'
+    + '<tr><td>금형 수정/파손</td><td><b style="color:#dc2626">'+moldDamage+'</b></td><td class="left">'+mkList('damage')+'</td></tr>'
+    + '<tr><td>금형 교체</td><td><b>'+moldSwap+'</b></td><td class="left">'+mkList('swap')+'</td></tr>'
+    + '</table>';
+  if (!moldRows.length) h = '<div class="empty-msg ok">기간 내 금형 세척·수정/파손·교체 없음 ✓</div>';
+  document.getElementById('secMold').innerHTML = h;
+
+  // ── 2. 외관 불량 내역 ──
+  var defRows = data.filter(hasDefect);
+  if (defRows.length) {
+    h = '<table class="rp"><tr><th>검사일</th><th>설비</th><th>면</th><th>사번</th><th>재질</th><th>불량유형</th><th>성형작업자</th></tr>';
+    defRows.forEach(function(d){
+      h += '<tr><td>'+d.inspect_date+'</td><td>'+(d.equipment||'-')+'</td><td>'+(faceMap[d.face]||d.face||'-')+'</td><td>'+(d.sabun||'-')+'</td><td>'+(d.material||'-')+'</td>'
+        + '<td class="left">'+defectList(d).map(function(x){return '<span class="tag-def">'+x+'</span>';}).join('')+'</td>'
+        + '<td>'+(d.molding_worker||'-')+'</td></tr>';
+    });
+    h += '</table>';
+    document.getElementById('secDefect').innerHTML = h;
+  } else {
+    document.getElementById('secDefect').innerHTML = '<div class="empty-msg ok">기간 내 외관 불량 없음 ✓</div>';
+  }
+
+  // ── 3. 변동점·조치 내역 ──
+  var chgRows = data.filter(function(d){ return changeList(d).length>0; });
+  if (chgRows.length) {
+    h = '<table class="rp"><tr><th>검사일</th><th>설비</th><th>사번</th><th>변동점</th><th>원인 및 조치</th></tr>';
+    chgRows.forEach(function(d){
+      h += '<tr><td>'+d.inspect_date+'</td><td>'+(d.equipment||'-')+'</td><td>'+(d.sabun||'-')+'</td>'
+        + '<td class="left">'+changeList(d).map(function(x){return '<span class="tag-chg">'+x+'</span>';}).join('')+'</td>'
+        + '<td class="left">'+(d.action_detail||'-')+'</td></tr>';
+    });
+    h += '</table>';
+    document.getElementById('secChange').innerHTML = h;
+  } else {
+    document.getElementById('secChange').innerHTML = '<div class="empty-msg ok">기간 내 변동점 없음 ✓</div>';
+  }
+
+  // ── 4. 재질별 경도 요약 ──
+  var mat = {};
+  data.forEach(function(d){
+    // 일지에 실제 기록된 재질명 그대로 집계 (기준정보 재조회 없음)
+    var m = d.material || '(미지정)';
+    var hd = d.hardness_data || {};
+    var f = avg(hd.first||[]), mi = avg(hd.mid||[]), l = avg(hd.last||[]);
+    if (f==null && mi==null && l==null) return;
+    if (!mat[m]) mat[m] = {cnt:0, sabuns:{}, f:[], m:[], l:[]};
+    mat[m].cnt++;
+    if (d.sabun) mat[m].sabuns[d.sabun] = true;
+    if (f!=null) mat[m].f.push(f);
+    if (mi!=null) mat[m].m.push(mi);
+    if (l!=null) mat[m].l.push(l);
+  });
+  var mkeys = Object.keys(mat).sort();
+  if (mkeys.length) {
+    h = '<table class="rp"><tr><th>재질명</th><th>사용 품목(사번)</th><th>측정 건수</th><th>경도 평균(초품)</th><th>경도 평균(중품)</th><th>경도 평균(종품)</th></tr>';
+    mkeys.forEach(function(k){
+      var r = mat[k];
+      var fa = avg(r.f), ma = avg(r.m), la = avg(r.l);
+      h += '<tr><td>'+k+'</td><td style="font-size:11px">'+Object.keys(r.sabuns).sort().join(', ')+'</td><td>'+r.cnt+'</td><td>'+(fa!=null?fa.toFixed(1):'-')+'</td><td>'+(ma!=null?ma.toFixed(1):'-')+'</td><td>'+(la!=null?la.toFixed(1):'-')+'</td></tr>';
+    });
+    h += '</table>';
+    document.getElementById('secHardness').innerHTML = h;
+  } else {
+    document.getElementById('secHardness').innerHTML = '<div class="empty-msg">기간 내 경도 측정 데이터가 없습니다.</div>';
+  }
+
+  // ── 6. 품목(사번)별 중요치수 요약 ──
+  var dim = {};
+  data.forEach(function(d){
+    var k = d.sabun || '(미지정)';
+    var dd = d.dimension_data || {};
+    var f = avg(dd.first||[]), mi = avg(dd.mid||[]), l = avg(dd.last||[]);
+    if (f==null && mi==null && l==null) return;   // 치수 측정이 없는 검사는 제외
+    if (!dim[k]) dim[k] = {cnt:0, mat:(d.material||'-'), f:[], m:[], l:[]};
+    dim[k].cnt++;
+    if (f!=null) dim[k].f.push(f);
+    if (mi!=null) dim[k].m.push(mi);
+    if (l!=null) dim[k].l.push(l);
+  });
+  var dkeys = Object.keys(dim).sort();
+  if (dkeys.length) {
+    h = '<table class="rp"><tr><th>사번(품목)</th><th>재질</th><th>측정 건수</th><th>치수 평균(초품)</th><th>치수 평균(중품)</th><th>치수 평균(종품)</th></tr>';
+    dkeys.forEach(function(k){
+      var r = dim[k];
+      var fa = avg(r.f), ma = avg(r.m), la = avg(r.l);
+      h += '<tr><td>'+k+'</td><td>'+r.mat+'</td><td>'+r.cnt+'</td><td>'+(fa!=null?fa.toFixed(2):'-')+'</td><td>'+(ma!=null?ma.toFixed(2):'-')+'</td><td>'+(la!=null?la.toFixed(2):'-')+'</td></tr>';
+    });
+    h += '</table>';
+    document.getElementById('secDimension').innerHTML = h;
+  } else {
+    document.getElementById('secDimension').innerHTML = '<div class="empty-msg">기간 내 치수 측정 데이터가 없습니다.</div>';
+  }
+
+  // ── 7. 작성자/성형작업자별 건수 ──
+  var work = {};
+  data.forEach(function(d){
+    var w = d.molding_worker || '(미지정)'; work[w] = (work[w]||0)+1;
+  });
+  var mkRow = function(obj){
+    return Object.keys(obj).sort().map(function(k){ return '<tr><td>'+k+'</td><td>'+obj[k]+'</td></tr>'; }).join('');
+  };
+  h = '<table class="rp" style="table-layout:fixed;max-width:420px"><tr><th>성형작업자</th><th>검사 건수</th></tr>' + mkRow(work) + '</table>';
+  document.getElementById('secWorker').innerHTML = h;
+}
+
+document.addEventListener('DOMContentLoaded', async function(){
+  if (typeof checkPageAccess === 'function') {
+    myInfo = await checkPageAccess();
+    if (!myInfo) return;
+  }
+  quick('today');
+});
+</script>
+</body>
+</html>
