@@ -5,25 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>공정 순회검사 리포트 - HKHT</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="common.css">
 <script src="auth_guard.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; font-family:'Noto Sans KR',sans-serif; }
 body { background:#eef0f4; color:#222; }
 
-/* ── 상단 컨트롤 (인쇄 시 숨김) ── */
-.controls { background:#1a2340; padding:14px 20px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-.controls .title { color:#fff; font-weight:700; font-size:16px; margin-right:12px; }
-.controls input[type=date] { padding:7px 10px; border:none; border-radius:7px; font-size:13px; }
+/* ── 기간 필터 카드 (인쇄 시 숨김) ── */
+.rp-controls { background:#fff; border:1px solid #e5e8f0; border-radius:12px; padding:14px 16px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; max-width:900px; margin:0 auto 16px; }
+.rp-controls label { font-size:13px; color:#555; font-weight:600; }
+.rp-controls input[type=date] { padding:7px 10px; border:1px solid #dfe3ec; border-radius:7px; font-size:13px; }
 .btn { padding:8px 14px; border:none; border-radius:7px; font-size:13px; font-weight:600; cursor:pointer; }
-.btn-quick { background:#2c3a63; color:#dfe5f5; }
-.btn-quick.active { background:#fff; color:#1a2340; }
-.btn-load { background:#3b82f6; color:#fff; }
+.btn-quick { background:#f0f2f7; color:#444; }
+.btn-load { background:#243bb2; color:#fff; }
 .btn-print { background:#16a34a; color:#fff; }
-.btn-back { background:#2c3a63; color:#dfe5f5; text-decoration:none; display:inline-block; }
 
 /* ── 리포트 용지 ── */
-.paper { max-width:900px; margin:24px auto; background:#fff; padding:36px 40px; box-shadow:0 2px 14px rgba(0,0,0,.08); }
+.paper { max-width:900px; margin:0 auto; background:#fff; padding:36px 40px; box-shadow:0 2px 14px rgba(0,0,0,.08); border-radius:12px; }
 .rp-head { text-align:center; border-bottom:3px solid #1a2340; padding-bottom:14px; margin-bottom:6px; }
 .rp-head h1 { font-size:24px; letter-spacing:6px; color:#1a2340; }
 .rp-meta { display:flex; justify-content:space-between; font-size:12px; color:#555; margin:8px 0 18px; }
@@ -53,7 +53,8 @@ table.rp td.left { text-align:left; }
 
 @media print {
   body { background:#fff; }
-  .controls { display:none; }
+  .top-header, .sidebar, .page-header, .rp-controls { display:none !important; }
+  .main { margin:0 !important; padding:0 !important; }
   .paper { box-shadow:none; margin:0; max-width:100%; padding:10mm 12mm; }
   h2.sec { page-break-after:avoid; }
   table.rp { page-break-inside:auto; }
@@ -63,16 +64,30 @@ table.rp td.left { text-align:left; }
 </head>
 <body>
 
-<div class="controls">
-  <span class="title">📑 공정 순회검사 리포트</span>
-  <input type="date" id="sDate"> ~ <input type="date" id="eDate" style="color:#000">
-  <button class="btn btn-quick" onclick="quick('today')">당일</button>
-  <button class="btn btn-quick" onclick="quick('yesterday')">전일</button>
-  <button class="btn btn-quick" onclick="quick('month')">당월</button>
-  <button class="btn btn-load" onclick="loadReport()">🔍 조회</button>
-  <button class="btn btn-print" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>
-  <a class="btn btn-back" href="inspection_round_viewer.html">← 조회화면</a>
-</div>
+<div id="top-header" class="top-header"></div>
+<nav id="sidebar-nav" class="sidebar"></nav>
+
+<div class="main">
+  <div class="page-header">
+    <h1 class="page-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      공정검사 리포트
+      <span class="header-actions">
+        <button class="btn btn-print" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>
+      </span>
+    </h1>
+    <p class="page-desc">기간별 공정 순회검사 자동 집계 리포트</p>
+  </div>
+
+  <div style="padding:20px 20px 40px;">
+    <div class="rp-controls">
+      <label>기간</label>
+      <input type="date" id="sDate"> <span style="color:#aaa">~</span> <input type="date" id="eDate">
+      <button class="btn btn-quick" onclick="quick('today')">당일</button>
+      <button class="btn btn-quick" onclick="quick('yesterday')">전일</button>
+      <button class="btn btn-quick" onclick="quick('month')">당월</button>
+      <button class="btn btn-quick" onclick="quick('lastMonth')">전월</button>
+      <button class="btn btn-load" onclick="loadReport()">🔍 조회</button>
+    </div>
 
 <div class="paper" id="paper">
   <div class="rp-head"><h1>공정 순회검사 REPORT</h1></div>
@@ -123,6 +138,8 @@ table.rp td.left { text-align:left; }
     외관 불량은 초/중/종품 중 1건 이상 불량이 기록된 검사 기준입니다. 경도 요약은 일지에 기록된 사용재질(재질명)별, 치수 요약은 품목(사번)별로 집계하며 초·중·종품 측정값(각 최대 5점)의 평균입니다.
   </div>
 </div>
+  </div>
+</div>
 
 <script>
 var SU = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
@@ -138,6 +155,7 @@ function quick(t){
   if (t==='today'){ document.getElementById('sDate').value=fmtLocal(now); document.getElementById('eDate').value=fmtLocal(now); }
   if (t==='yesterday'){ var y=new Date(now); y.setDate(y.getDate()-1); document.getElementById('sDate').value=fmtLocal(y); document.getElementById('eDate').value=fmtLocal(y); }
   if (t==='month'){ var f=new Date(now.getFullYear(),now.getMonth(),1); document.getElementById('sDate').value=fmtLocal(f); document.getElementById('eDate').value=fmtLocal(now); }
+  if (t==='lastMonth'){ var f1=new Date(now.getFullYear(),now.getMonth()-1,1); var f2=new Date(now.getFullYear(),now.getMonth(),0); document.getElementById('sDate').value=fmtLocal(f1); document.getElementById('eDate').value=fmtLocal(f2); }
   loadReport();
 }
 
@@ -357,5 +375,6 @@ document.addEventListener('DOMContentLoaded', async function(){
   quick('today');
 });
 </script>
+<script src="sidebar.js"></script>
 </body>
 </html>
