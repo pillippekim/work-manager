@@ -195,6 +195,7 @@
     var allShipmentItems = [];
     var allRacks = [];
     var safetySettings = [];
+    var allZones = [];   // 대차 구역 (재고 집계에 대차분 포함용)
 
     document.addEventListener('DOMContentLoaded', function() {
       if (typeof checkAuth === 'function') { checkAuth(); }
@@ -208,12 +209,14 @@
         supabase.from('inventory_rack_slots').select('*, inventory_racks(rack_name, rack_code)').order('rack_id').order('row_no').order('col_no'),
         supabase.from('inventory_lots').select('*').order('created_at', { ascending: false }),
         supabase.from('inventory_racks').select('*').eq('active', true).order('sort_order'),
-        supabase.from('safety_stock_settings').select('*')
+        supabase.from('safety_stock_settings').select('*'),
+        supabase.from('inventory_zones').select('*')
       ]).then(function(res) {
         allSlots = res[0].data || [];
         allLots = res[1].data || [];
         allRacks = res[2].data || [];
         safetySettings = res[3].data || [];
+        allZones = res[4].data || [];
         hideLoading();
         renderStats();
         renderTab();
@@ -224,14 +227,21 @@
     function renderStats() {
       // 적재 슬롯 (수량 > 0)
       var usedSlots = allSlots.filter(function(s) { return s.product_code && s.quantity > 0; });
+      var zl = zoneStockLots();
       var totalSlots = allSlots.length;
       var totalQty = 0;
       for (var i = 0; i < usedSlots.length; i++) { totalQty += (usedSlots[i].quantity || 0); }
+      var zoneQty = 0;
+      for (var i = 0; i < zl.length; i++) { zoneQty += (zl[i].quantity || 0); }
+      totalQty += zoneQty;   // 대차 적재분 포함
 
-      // 제품 종류 (사번 기준)
+      // 제품 종류 (사번 기준, 대차 포함)
       var productSet = {};
       for (var i = 0; i < usedSlots.length; i++) {
         if (usedSlots[i].product_code) productSet[usedSlots[i].product_code] = true;
+      }
+      for (var i = 0; i < zl.length; i++) {
+        if (zl[i].product_code) productSet[zl[i].product_code] = true;
       }
       var productCount = Object.keys(productSet).length;
 
@@ -239,11 +249,24 @@
       var waitingCount = allLots.filter(function(l) { return l.status === 'waiting'; }).length;
 
       var h = '';
-      h += '<div class="iv-stat"><div class="is-label">총 재고 수량</div><div class="is-value">' + totalQty.toLocaleString() + '</div><div class="is-sub">EA</div></div>';
+      h += '<div class="iv-stat"><div class="is-label">총 재고 수량</div><div class="is-value">' + totalQty.toLocaleString() + '</div><div class="is-sub">EA · 대차 ' + zoneQty.toLocaleString() + ' 포함</div></div>';
       h += '<div class="iv-stat green"><div class="is-label">적재 슬롯</div><div class="is-value">' + usedSlots.length + '</div><div class="is-sub">/ ' + totalSlots + ' 슬롯</div></div>';
       h += '<div class="iv-stat purple"><div class="is-label">제품 종류</div><div class="is-value">' + productCount + '</div><div class="is-sub">사번 기준</div></div>';
       h += '<div class="iv-stat orange"><div class="is-label">입고대기</div><div class="is-value">' + waitingCount + '</div><div class="is-sub">건</div></div>';
       document.getElementById('statsArea').innerHTML = h;
+    }
+
+    // ── 대차(zone) 적재 LOT (재고 집계 포함용) ──
+    function zoneStockLots() {
+      return allLots.filter(function(l) {
+        return l.location_type === 'zone' && (l.status === 'stocked' || l.status === 'waiting') && (l.quantity || 0) > 0;
+      });
+    }
+    function zoneLabel(zid) {
+      for (var i = 0; i < allZones.length; i++) {
+        if (allZones[i].id === zid) return (allZones[i].zone_code || '') + '동 대차 ' + (allZones[i].lane_no || '') + '라인';
+      }
+      return '대차';
     }
 
     // ── 탭 전환 ──
@@ -283,6 +306,21 @@
         if (s.lot_no) productMap[pc].lots.push(s.lot_no);
       }
 
+      // 대차(zone) 적재분 합산
+      var zl = zoneStockLots();
+      for (var i = 0; i < zl.length; i++) {
+        var l = zl[i];
+        if (!l.product_code) continue;
+        var pc = l.product_code;
+        if (!productMap[pc]) {
+          productMap[pc] = { code: pc, totalQty: 0, slotCount: 0, zoneCount: 0, locations: [], lots: [] };
+        }
+        productMap[pc].totalQty += (l.quantity || 0);
+        productMap[pc].zoneCount = (productMap[pc].zoneCount || 0) + 1;
+        productMap[pc].locations.push(zoneLabel(l.zone_id) + '(' + (l.quantity || 0) + ')');
+        if (l.lot_no) productMap[pc].lots.push(l.lot_no);
+      }
+
       // 안전재고 매핑
       var safetyMap = {};
       for (var i = 0; i < safetySettings.length; i++) {
@@ -317,7 +355,7 @@
         h += '<tr class="' + (isAlert ? 'alert-row' : '') + '" data-code="' + p.code + '">';
         h += '<td><strong>' + p.code + '</strong></td>';
         h += '<td class="qty-cell">' + (isAlert ? '<span class="alert-icon">⚠️ </span>' : '') + p.totalQty.toLocaleString() + '</td>';
-        h += '<td>' + p.slotCount + '개</td>';
+        h += '<td>' + p.slotCount + '개' + ((p.zoneCount || 0) > 0 ? ' <span style="color:#7c3aed;font-size:11px">+대차' + p.zoneCount + '</span>' : '') + '</td>';
         h += '<td>' + (safety > 0 ? safety.toLocaleString() : '-') + '</td>';
         h += '<td style="font-size:12px;max-width:300px;word-break:break-all">' + p.locations.slice(0, 5).join(', ') + (p.locations.length > 5 ? ' 외 ' + (p.locations.length - 5) + '건' : '') + '</td>';
         h += '<td style="font-size:12px">' + (p.lots.length > 0 ? p.lots.slice(0, 3).join(', ') : '-') + '</td>';

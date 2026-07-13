@@ -224,6 +224,7 @@
     var currentLane = parseInt(params.get('lane')) || 1;
 
     var zoneLots = [];
+    var zoneSortDir = '';   // 사번 정렬: '' = 입고순(기본), 'asc' = 오름차순, 'desc' = 내림차순
     var allZonesAll = [];  // 전체 zone (A+B)
     var allZones = [];     // 현재 동의 zone
     var allLotsAll = [];   // 전체 LOT
@@ -360,6 +361,11 @@
       document.getElementById('zoneStats').innerHTML = h;
     }
 
+    function toggleZoneSort() {
+      zoneSortDir = zoneSortDir === '' ? 'asc' : (zoneSortDir === 'asc' ? 'desc' : '');
+      renderContent();
+    }
+
     function renderContent() {
       var h = '';
 
@@ -375,16 +381,25 @@
       h += '</div>';
       h += '<div style="height:8px;"></div>';
 
-      if (zoneLots.length === 0) {
+      var viewLots = zoneLots.slice();
+      if (zoneSortDir) {
+        viewLots.sort(function(a, b) {
+          var x = String(a.product_code || ''), y = String(b.product_code || '');
+          if (x === y) return 0;
+          return (zoneSortDir === 'asc' ? (x < y ? -1 : 1) : (x > y ? -1 : 1));
+        });
+      }
+      if (viewLots.length === 0) {
         h += '<div class="empty-msg">이 라인에 적재된 LOT이 없습니다</div>';
       } else {
         h += '<div class="data-table-wrap"><table class="data-table"><thead><tr>';
-        h += '<th>No</th><th>사번</th><th>제품명</th><th>LOT</th>';
+        var sArrow = zoneSortDir === 'asc' ? ' ▲' : (zoneSortDir === 'desc' ? ' ▼' : ' ▲▼');
+        h += '<th>No</th><th onclick="toggleZoneSort()" style="cursor:pointer;user-select:none;" title="클릭: 오름차순 → 내림차순 → 입고순">사번<span style="font-size:10px;color:' + (zoneSortDir ? '#4A90D9' : '#bbb') + '">' + sArrow + '</span></th><th>제품명</th><th>LOT</th>';
         h += '<th style="text-align:right;">수량</th><th>상태</th><th>입고일</th><th>처리</th>';
         h += '</tr></thead><tbody>';
 
-        for (var i = 0; i < zoneLots.length; i++) {
-          var lot = zoneLots[i];
+        for (var i = 0; i < viewLots.length; i++) {
+          var lot = viewLots[i];
           var statusText = lot.status === 'stocked' ? '적재' : '대기';
           var statusClass = lot.status === 'stocked' ? 'stocked' : 'waiting';
           h += '<tr data-code="' + (lot.product_code || '') + '">';
