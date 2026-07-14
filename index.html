@@ -581,7 +581,31 @@ var DEFAULT_FAVS=[
     {icon:'🔩',name:'조립 작업일지',url:'https://pillippekim.github.io/project-moon/assembly.html'},
 ];
 var favEditing=false;
-function loadFavs(){try{var s=localStorage.getItem('hkht_portal_favs');if(s)return JSON.parse(s);}catch(e){}return DEFAULT_FAVS.slice();}
+// 구버전 포털에서 저장된 즐겨찾기 명칭 별칭 (이름이 바뀐 메뉴 연결)
+var LEGACY_FAV_NAMES={'데이터 조회':'데이터 조회 및 추출','대시보드':'대시보드 / 이력'};
+function loadFavs(){
+    var favs=null;
+    try{var s=localStorage.getItem('hkht_portal_favs');if(s)favs=JSON.parse(s);}catch(e){}
+    if(!favs||!favs.length)favs=DEFAULT_FAVS.slice();
+    // 저장된 즐겨찾기를 '이름' 기준으로 현재 메뉴의 최신 주소로 자동 교정 (옛 주소 자가 치유)
+    var byName={};
+    for(var i=0;i<ALL_MENU.length;i++){byName[ALL_MENU[i].name]=ALL_MENU[i];}
+    var fixed=[],changed=false;
+    for(var i=0;i<favs.length;i++){
+        var nm=favs[i].name||'';
+        if(LEGACY_FAV_NAMES[nm])nm=LEGACY_FAV_NAMES[nm];
+        var cur=byName[nm];
+        if(cur){
+            if(favs[i].url!==cur.url||favs[i].name!==cur.name)changed=true;
+            fixed.push({icon:cur.icon,name:cur.name,url:cur.url});
+        }else{
+            changed=true;   // 현재 메뉴에 없는 옛 항목은 제거
+        }
+    }
+    if(!fixed.length){fixed=DEFAULT_FAVS.slice();changed=true;}
+    if(changed)saveFavs(fixed);
+    return fixed;
+}
 function saveFavs(f){try{localStorage.setItem('hkht_portal_favs',JSON.stringify(f));}catch(e){}}
 function renderFavs(){
     var favs=loadFavs(),grid=document.getElementById('favGrid'),h='';
