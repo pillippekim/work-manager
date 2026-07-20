@@ -899,45 +899,82 @@
       }).select().then(function(shipRes) {
         if (shipRes.error) { hideLoading(); showToast('오류: ' + shipRes.error.message); return; }
         var shipId = shipRes.data[0].id;
-        var promises = [];
+        // ── 작업 목록 구성 (요청 폭주 방지를 위해 소분 실행) ──
+        var tasks = [];           // {kind:'item'|'slot'|'move', run:fn}
+        var slotPlanCount = 0;    // 차감 예정 슬롯 수
         for (var i = 0; i < matchResults.length; i++) {
-          var mr = matchResults[i]; var row = mr.row;
-          promises.push(supabase.from('inventory_shipment_items').insert({
-            shipment_id: shipId, ship_date: row.ship_date, ship_no: row.ship_no,
-            customer: row.customer, destination: row.destination, product_code: row.product_code,
-            ecount_code: row.ecount_code, product_name: row.product_name, quantity: row.quantity,
-            unit_price: row.unit_price, supply_amount: row.supply_amount, vat: row.vat,
-            total_amount: row.total_amount, lot_no_record: row.lot_no_record,
-            remark1: row.remark1, remark2: row.remark2, match_status: mr.status
-          }));
-          for (var j = 0; j < mr.matched_slots.length; j++) {
-            var ms = mr.matched_slots[j];
-            var ud = { quantity: ms.after_qty };
-            if (ms.after_qty <= 0) { ud.quantity = 0; ud.status = 'empty'; }
-            if (j === mr.matched_slots.length - 1 && mr.remain_qty > 0) { ud.shortage_qty = mr.remain_qty; }
-            promises.push(supabase.from('inventory_rack_slots').update(ud).eq('id', ms.slot_id));
-            promises.push(supabase.from('inventory_movements').insert({
-              product_code: row.product_code, movement_type: 'outbound',
-              from_location: ms.rack_name + '-' + ms.slot_code, quantity: ms.deduct_qty,
-              lot_no: ms.lot_no, reason: '이카운트 출하 - ' + row.customer, moved_by: 'system'
-            }));
-          }
+          (function(mr) {
+            var row = mr.row;
+            tasks.push({ kind: 'item', label: row.product_code, run: function() {
+              return supabase.from('inventory_shipment_items').insert({
+                shipment_id: shipId, ship_date: row.ship_date, ship_no: row.ship_no,
+                customer: row.customer, destination: row.destination, product_code: row.product_code,
+                ecount_code: row.ecount_code, product_name: row.product_name, quantity: row.quantity,
+                unit_price: row.unit_price, supply_amount: row.supply_amount, vat: row.vat,
+                total_amount: row.total_amount, lot_no_record: row.lot_no_record,
+                remark1: row.remark1, remark2: row.remark2, match_status: mr.status
+              });
+            }});
+            for (var j = 0; j < mr.matched_slots.length; j++) {
+              (function(ms, isLast) {
+                var ud = { quantity: ms.after_qty };
+                if (ms.after_qty <= 0) { ud.quantity = 0; ud.status = 'empty'; }
+                if (isLast && mr.remain_qty > 0) { ud.shortage_qty = mr.remain_qty; }
+                slotPlanCount++;
+                tasks.push({ kind: 'slot', label: ms.rack_name + '-' + ms.slot_code, run: function() {
+                  // .select('id')로 실제 반영된 행을 응답에 포함 → 0건 반영을 성공으로 오인하지 않음
+                  return supabase.from('inventory_rack_slots').update(ud).eq('id', ms.slot_id).select('id');
+                }});
+                tasks.push({ kind: 'move', label: ms.rack_name + '-' + ms.slot_code, run: function() {
+                  return supabase.from('inventory_movements').insert({
+                    product_code: row.product_code, movement_type: 'outbound',
+                    from_location: ms.rack_name + '-' + ms.slot_code, quantity: ms.deduct_qty,
+                    lot_no: ms.lot_no, reason: '이카운트 출하 - ' + row.customer, moved_by: 'system'
+                  });
+                }});
+              })(mr.matched_slots[j], j === mr.matched_slots.length - 1);
+            }
+          })(matchResults[i]);
         }
-        Promise.all(promises).then(function(results) {
+
+        // ── 40건씩 소분 실행 (대량 동시요청 유실 방지) ──
+        var BATCH = 40, done = 0, errList = [], slotApplied = 0;
+        function runBatch(start) {
+          if (start >= tasks.length) { finish(); return; }
+          var chunk = tasks.slice(start, start + BATCH);
+          showLoading('출고 처리 중... (' + Math.min(start + BATCH, tasks.length) + '/' + tasks.length + ')');
+          Promise.all(chunk.map(function(t) {
+            return t.run().then(function(r) { return { t: t, r: r }; })
+              .catch(function(e) { return { t: t, r: { error: e } }; });
+          })).then(function(rs) {
+            for (var k = 0; k < rs.length; k++) {
+              var t = rs[k].t, r = rs[k].r;
+              if (r && r.error) { errList.push(t.kind + ' ' + t.label + ': ' + (r.error.message || r.error)); continue; }
+              if (t.kind === 'slot') {
+                if (r && r.data && r.data.length > 0) slotApplied++;
+                else errList.push('slot ' + t.label + ': 반영 0건(권한 또는 슬롯ID 불일치)');
+              }
+            }
+            done += chunk.length;
+            runBatch(start + BATCH);
+          });
+        }
+        function finish() {
           hideLoading();
-          var errs = (results || []).filter(function(r) { return r && r.error; });
-          if (errs.length) {
-            showToast('출고 처리 중 ' + errs.length + '건 저장 실패: ' + ((errs[0].error && errs[0].error.message) || '권한/네트워크 오류'));
-            return;
+          if (errList.length) {
+            showToast('출고 처리 중 ' + errList.length + '건 실패: ' + errList[0]);
+            console.error('출고 실패 상세:', errList);
           }
-          var h = '<div class="complete-area"><div class="complete-icon">&#10004;</div>';
-          h += '<div class="complete-title">출고 처리 완료!</div>';
-          h += '<div class="complete-sub">출하 ID: #' + shipId + '</div></div>';
+          var okAll = errList.length === 0 && slotApplied === slotPlanCount;
+          var h = '<div class="complete-area"><div class="complete-icon">' + (okAll ? '&#10004;' : '&#9888;') + '</div>';
+          h += '<div class="complete-title">' + (okAll ? '출고 처리 완료!' : '출고 처리 일부 실패') + '</div>';
+          h += '<div class="complete-sub">출하 ID: #' + shipId + ' · 슬롯 차감 ' + slotApplied + '/' + slotPlanCount + '건 반영' + (errList.length ? ' · 실패 ' + errList.length + '건(콘솔 확인)' : '') + '</div></div>';
           h += '<div class="action-bar"><button class="action-btn primary" onclick="renderOutbound()">새 출고</button>';
           h += '<button class="action-btn secondary" onclick="switchTab(\'history\')">처리이력</button></div>';
           document.getElementById('tabContent').innerHTML = h;
           loadInitialData();
-        });
+        }
+        runBatch(0);
       });
     }
 
