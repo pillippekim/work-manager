@@ -630,6 +630,14 @@
 
     function closeModal() { document.getElementById('slotModal').className = 'modal-overlay'; }
 
+    // 출고부족 상계: 입고량에서 부족분(shortage)을 먼저 차감
+    // 예) 부족 200 슬롯에 200 입고 → 재고 0 / 부족 200에 500 입고 → 재고 300
+    function applyShortage(slot, inQty) {
+      var short = (slot && slot.shortage_qty) || 0;
+      var offset = Math.min(short, inQty);
+      return { applied: inQty - offset, offset: offset, remainShort: short - offset };
+    }
+
     // ── 입고 (빈 슬롯) ──
     function doInbound(slotId) {
       var pc = document.getElementById('inProductCode').value.trim();
@@ -638,11 +646,14 @@
       if (!pc) { showToast('사번을 입력해주세요'); return; }
       if (qty <= 0) { showToast('수량을 입력해주세요'); return; }
 
-      supabase.from('inventory_rack_slots').update({ product_code: pc, lot_no: ln, quantity: qty, status: 'occupied', shortage_qty: 0 }).eq('id', slotId)
+      var slot = findSlotById(slotId);
+      var so = applyShortage(slot, qty);
+      supabase.from('inventory_rack_slots').update({ product_code: pc, lot_no: ln, quantity: so.applied, status: so.applied > 0 ? 'occupied' : 'empty', shortage_qty: so.remainShort }).eq('id', slotId)
         .then(function(res) {
           if (res.error) { showToast('오류: ' + res.error.message); return; }
-          logMovement(pc, 'inbound', null, currentRack.rack_name + '-' + findSlotById(slotId).slot_code, qty, ln, '슬롯 입고');
-          showToast('입고 완료!'); closeModal(); loadSlots();
+          logMovement(pc, 'inbound', null, currentRack.rack_name + '-' + slot.slot_code, qty, ln, '슬롯 입고' + (so.offset > 0 ? ' (출고부족 ' + so.offset + ' 상계)' : ''));
+          showToast(so.offset > 0 ? '입고 완료! 출고부족 ' + so.offset.toLocaleString() + ' 상계 → 재고 ' + so.applied.toLocaleString() : '입고 완료!');
+          closeModal(); loadSlots();
         });
     }
 
@@ -651,12 +662,13 @@
       var slot = findSlotById(slotId);
       var addQty = parseInt(document.getElementById('addQty').value) || 0;
       if (addQty <= 0) { showToast('추가 수량을 입력해주세요'); return; }
-      var newQty = slot.quantity + addQty;
+      var so = applyShortage(slot, addQty);
+      var newQty = slot.quantity + so.applied;
 
-      supabase.from('inventory_rack_slots').update({ quantity: newQty, shortage_qty: 0 }).eq('id', slotId)
+      supabase.from('inventory_rack_slots').update({ quantity: newQty, shortage_qty: so.remainShort, status: newQty > 0 ? 'occupied' : 'empty' }).eq('id', slotId)
         .then(function(res) {
           if (res.error) { showToast('오류: ' + res.error.message); return; }
-          logMovement(slot.product_code, 'inbound', null, currentRack.rack_name + '-' + slot.slot_code, addQty, slot.lot_no, '추가 입고 (' + slot.quantity + ' → ' + newQty + ')');
+          logMovement(slot.product_code, 'inbound', null, currentRack.rack_name + '-' + slot.slot_code, addQty, slot.lot_no, '추가 입고 (' + slot.quantity + ' → ' + newQty + ')' + (so.offset > 0 ? ' 출고부족 ' + so.offset + ' 상계' : ''));
           showToast('추가 입고 완료! (' + newQty.toLocaleString() + '개)'); closeModal(); loadSlots();
         });
     }
@@ -885,20 +897,23 @@
 
       var promises = [];
       for (var i = 0; i < batchSelectedIds.length; i++) {
-        var slotId = batchSelectedIds[i];
-        var slot = findSlotById(slotId);
-        // 슬롯별 LOT 가져오기
-        var lotInput = document.getElementById('batchLot_' + slotId);
-        var ln = lotInput ? lotInput.value.trim() : '';
+        (function(slotId) {
+          var slot = findSlotById(slotId);
+          // 슬롯별 LOT 가져오기
+          var lotInput = document.getElementById('batchLot_' + slotId);
+          var ln = lotInput ? lotInput.value.trim() : '';
+          var so = applyShortage(slot, qtyPerSlot);   // 출고부족 상계
 
-        promises.push(
-          supabase.from('inventory_rack_slots').update({
-            product_code: pc, lot_no: ln, quantity: qtyPerSlot, status: 'occupied'
-          }).eq('id', slotId)
-        );
-        if (slot) {
-          logMovement(pc, 'inbound', null, currentRack.rack_name + '-' + slot.slot_code, qtyPerSlot, ln, '일괄 입고 (' + batchSelectedIds.length + '슬롯)');
-        }
+          promises.push(
+            supabase.from('inventory_rack_slots').update({
+              product_code: pc, lot_no: ln, quantity: so.applied,
+              status: so.applied > 0 ? 'occupied' : 'empty', shortage_qty: so.remainShort
+            }).eq('id', slotId)
+          );
+          if (slot) {
+            logMovement(pc, 'inbound', null, currentRack.rack_name + '-' + slot.slot_code, qtyPerSlot, ln, '일괄 입고 (' + batchSelectedIds.length + '슬롯)' + (so.offset > 0 ? ' 출고부족 ' + so.offset + ' 상계' : ''));
+          }
+        })(batchSelectedIds[i]);
       }
 
       Promise.all(promises).then(function(results) {
