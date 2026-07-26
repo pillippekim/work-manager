@@ -424,7 +424,9 @@
 
       // 엑셀 일괄등록
       h += '<div class="section-box">';
-      h += '<div class="section-title"><span class="title-icon">&#128196;</span>엑셀 일괄 등록</div>';
+      h += '<div class="section-title" style="display:flex;justify-content:space-between;align-items:center;"><span><span class="title-icon">&#128196;</span>엑셀 일괄 등록</span>'
+        + '<a href="inbound_template.xlsx" download="입고_일괄등록_양식.xlsx" onclick="event.stopPropagation()" '
+        + 'style="font-size:12px;font-weight:600;color:#16a34a;background:#dcfce7;padding:6px 12px;border-radius:7px;text-decoration:none;">&#128229; 양식 다운로드</a></div>';
       h += '<div class="upload-area" id="regUploadArea" onclick="document.getElementById(\'regFileInput\').click()">';
       h += '<input type="file" id="regFileInput" accept=".xlsx,.xls,.csv" onchange="handleRegFile(event)">';
       h += '<div class="upload-icon">&#128203;</div>';
