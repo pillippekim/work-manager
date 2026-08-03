@@ -474,6 +474,9 @@
       h += '<div style="color:#888;margin-top:2px;">LOT: ' + (lot.lot_no || '-') + ' | 수량: ' + (lot.quantity || 0).toLocaleString() + '</div>';
       h += '</div>';
 
+      h += '<button type="button" class="action-btn" onclick="autoFindSlot(' + lotId + ')" style="width:100%;margin-bottom:10px;background:#eef2ff;color:#243bb2;font-weight:700;">&#127919; 빈 슬롯 자동 찾기 (동일 사번 · 오래된 순)</button>';
+      h += '<div id="autoFindInfo" style="display:none;font-size:12px;background:#f0fdf4;color:#166534;border-radius:6px;padding:8px 10px;margin-bottom:10px;"></div>';
+
       h += '<div class="form-row">';
       h += '<div class="form-group"><label>동 선택</label>';
       h += '<select id="modalRack" onchange="updateSlotOptions()">';
@@ -493,6 +496,49 @@
 
       document.getElementById('inboundModalBody').innerHTML = h;
       document.getElementById('inboundModal').className = 'modal-overlay show';
+    }
+
+    // 빈 슬롯 자동 찾기: ① 같은 사번이 있다가 비워진 슬롯 ② 비워진 지 오래된 순
+    function autoFindSlot(lotId) {
+      var lot = null;
+      for (var i = 0; i < waitingLots.length; i++) {
+        if (waitingLots[i].id === lotId) { lot = waitingLots[i]; break; }
+      }
+      if (!lot || !lot.product_code) { showToast('사번 정보가 없습니다'); return; }
+
+      // 같은 사번 흔적이 남은 빈 슬롯 후보
+      var cands = allSlots.filter(function(s) {
+        return s.status === 'empty' && String(s.product_code || '').trim() === String(lot.product_code).trim();
+      });
+      if (cands.length === 0) {
+        var info0 = document.getElementById('autoFindInfo');
+        info0.style.display = 'block';
+        info0.style.background = '#fef2f2'; info0.style.color = '#b91c1c';
+        info0.textContent = '동일 사번(' + lot.product_code + ')의 빈 슬롯이 없습니다 — 동/슬롯을 직접 선택해주세요.';
+        return;
+      }
+      // 비워진 지 오래된 순 (시각 없음 = 기능 도입 전부터 비어있던 것 → 가장 오래된 것으로 간주)
+      cands.sort(function(a, b) {
+        var ta = a.emptied_at ? new Date(a.emptied_at).getTime() : 0;
+        var tb = b.emptied_at ? new Date(b.emptied_at).getTime() : 0;
+        return ta - tb;
+      });
+      var pick = cands[0];
+
+      // 동/슬롯 자동 선택
+      document.getElementById('modalRack').value = pick.rack_id;
+      updateSlotOptions();
+      document.getElementById('modalSlot').value = pick.id;
+
+      var rackName = '';
+      for (var r = 0; r < allRacks.length; r++) { if (allRacks[r].id === pick.rack_id) { rackName = allRacks[r].rack_name; break; } }
+      var when = pick.emptied_at ? new Date(pick.emptied_at).toLocaleDateString('ko-KR') + ' 비워짐' : '이전부터 빈 슬롯';
+      var info = document.getElementById('autoFindInfo');
+      info.style.display = 'block';
+      info.style.background = '#f0fdf4'; info.style.color = '#166534';
+      info.innerHTML = '&#10004; 자동 선택: <b>' + rackName + '-' + pick.slot_code + '</b> (동일 사번 · ' + when + ')'
+        + (cands.length > 1 ? ' · 후보 ' + cands.length + '개 중 가장 오래된 슬롯' : '')
+        + ((pick.shortage_qty || 0) > 0 ? '<br>&#9888; 이 슬롯에 출고부족 ' + pick.shortage_qty.toLocaleString() + '이 있어 입고 시 상계됩니다.' : '');
     }
 
     function updateSlotOptions() {
@@ -540,12 +586,17 @@
         stocked_at: new Date().toISOString()
       }).eq('id', lotId);
 
+      // 출고부족 상계: 부족분을 먼저 갚고 남는 만큼만 재고로 반영
+      var _short = slot.shortage_qty || 0;
+      var _offset = Math.min(_short, lot.quantity || 0);
+      var _applied = (lot.quantity || 0) - _offset;
       var slotUpdate = supabase.from('inventory_rack_slots').update({
         product_code: lot.product_code,
         lot_no: lot.lot_no,
-        quantity: lot.quantity,
-        status: 'occupied',
-        shortage_qty: 0
+        quantity: _applied,
+        status: _applied > 0 ? 'occupied' : 'empty',
+        shortage_qty: _short - _offset,
+        emptied_at: _applied > 0 ? null : (slot.emptied_at || new Date().toISOString())
       }).eq('id', slotId);
 
       var rackName = '';
@@ -920,7 +971,7 @@
             for (var j = 0; j < mr.matched_slots.length; j++) {
               (function(ms, isLast) {
                 var ud = { quantity: ms.after_qty };
-                if (ms.after_qty <= 0) { ud.quantity = 0; ud.status = 'empty'; }
+                if (ms.after_qty <= 0) { ud.quantity = 0; ud.status = 'empty'; ud.emptied_at = new Date().toISOString(); }
                 if (isLast && mr.remain_qty > 0) { ud.shortage_qty = mr.remain_qty; }
                 slotPlanCount++;
                 tasks.push({ kind: 'slot', label: ms.rack_name + '-' + ms.slot_code, run: function() {
