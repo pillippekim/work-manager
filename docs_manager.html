@@ -559,11 +559,14 @@ function setTab(type) {
 function toggleOldDocs() {
   showOld = !showOld;
   document.getElementById('toggleOld').classList.toggle('active', showOld);
+  updateCounts();
   renderTable();
 }
-function updateCounts(data) {
-  document.getElementById('cnt_all').textContent = data.length;
-  TYPES.forEach(t => document.getElementById('cnt_'+t).textContent = data.filter(d=>d.doc_type===t).length);
+function updateCounts() {
+  // 토글 OFF: 적용중 문서만(실 건수) / 토글 ON: 구버전·비활성 포함 전체
+  const base = showOld ? allDocs : allDocs.filter(d => d.is_current);
+  document.getElementById('cnt_all').textContent = base.length;
+  TYPES.forEach(t => document.getElementById('cnt_'+t).textContent = base.filter(d=>d.doc_type===t).length);
 }
 function renderTable() {
   const sabun = document.getElementById('filterSabun').value.trim().toLowerCase();
@@ -611,7 +614,7 @@ function renderTable() {
 async function loadDocs() {
   const { data } = await db.from('documents').select('*').order('created_at', { ascending: false });
   allDocs = data || [];
-  updateCounts(allDocs);
+  updateCounts();
   renderTable();
 }
 
