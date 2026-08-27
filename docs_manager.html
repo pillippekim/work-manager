@@ -432,26 +432,63 @@ function removeFile(i) {
 async function uploadAll() {
   if (!parsedFiles.length) return;
 
-  // 업로드 전 중복 확인: 같은 사번+문서유형의 '활성' 문서가 이미 있으면 한 번 확인
-  const conflicts = [];
+  // 업로드 전 중복 확인: 같은 사번+문서유형의 '활성' 문서가 이미 있으면 선택창 표시
+  const conflictKeys = new Set();
+  const conflictLabels = [];
   for (const p of parsedFiles) {
     if (!p.sabun) continue;
     const { data } = await db.from('documents').select('id')
       .eq('sabun', p.sabun).eq('doc_type', p.docType).eq('is_current', true).limit(1);
-    if (data && data.length) conflicts.push(p.sabun + ' / ' + p.docType);
+    if (data && data.length) {
+      conflictKeys.add(p.sabun + '|' + p.docType);
+      conflictLabels.push(p.sabun + ' / ' + p.docType);
+    }
   }
-  if (conflicts.length) {
-    const msg = '동일한 사번 문서가 이미 등록돼 있어요:\n\n· ' + conflicts.join('\n· ')
-      + '\n\n계속 업로드하면 위 기존 문서는 비활성(구버전)으로 보관되고, 새 버전으로 등록됩니다.\n업로드하시겠습니까?';
-    if (!confirm(msg)) { showToast('업로드를 취소했어요.'); return; }
+  if (conflictKeys.size) {
+    const newFiles = parsedFiles.filter(p => !conflictKeys.has(p.sabun + '|' + p.docType));
+    showDupChoiceModal(conflictLabels, newFiles.length,
+      () => doUpload(parsedFiles.slice()),          // 전체 업로드 (중복은 새 버전으로)
+      () => {                                        // 중복 제외 업로드
+        if (!newFiles.length) { showToast('중복을 제외하면 업로드할 신규 문서가 없어요.'); return; }
+        doUpload(newFiles);
+      });
+    return;
   }
+  doUpload(parsedFiles.slice());
+}
 
+// 중복 처리 선택창: 전체 업로드 / 중복 제외 업로드 / 취소
+function showDupChoiceModal(labels, newCount, onAll, onSkip) {
+  const old = document.getElementById('dupChoiceOverlay'); if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'dupChoiceOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(20,25,45,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML =
+    '<div style="background:#fff;border-radius:14px;max-width:540px;width:100%;padding:22px 24px;box-shadow:0 10px 40px rgba(0,0,0,.2);">'
+    + '<div style="font-size:16px;font-weight:800;color:#1a2340;margin-bottom:10px;">동일한 사번 문서가 이미 등록돼 있어요 (' + labels.length + '건)</div>'
+    + '<div style="max-height:180px;overflow:auto;background:#f8f9fc;border:1px solid #e5e8f0;border-radius:8px;padding:10px 12px;font-size:12.5px;line-height:1.8;margin-bottom:12px;">'
+    + labels.map(l => '· ' + l).join('<br>') + '</div>'
+    + '<div style="font-size:12.5px;color:#555;line-height:1.7;margin-bottom:16px;">'
+    + '<b>전체 업로드</b> — 중복 문서는 기존본을 비활성(구버전)으로 보관하고 새 버전으로 등록<br>'
+    + '<b>중복 제외 업로드</b> — 이미 등록된 ' + labels.length + '건은 건너뛰고, 신규 ' + newCount + '건만 업로드</div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">'
+    + '<button id="dupBtnCancel" style="padding:9px 14px;border:1px solid #d8dee9;background:#fff;border-radius:8px;font-size:13px;cursor:pointer;">취소</button>'
+    + '<button id="dupBtnSkip" style="padding:9px 14px;border:none;background:#eef2ff;color:#243bb2;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">중복 제외 업로드 (신규 ' + newCount + '건)</button>'
+    + '<button id="dupBtnAll" style="padding:9px 14px;border:none;background:#243bb2;color:#fff;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">전체 업로드 (새 버전 등록)</button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+  document.getElementById('dupBtnCancel').onclick = () => { ov.remove(); showToast('업로드를 취소했어요.'); };
+  document.getElementById('dupBtnSkip').onclick = () => { ov.remove(); onSkip(); };
+  document.getElementById('dupBtnAll').onclick = () => { ov.remove(); onAll(); };
+}
+
+async function doUpload(files) {
   const btn = document.getElementById('uploadAllBtn');
   btn.disabled = true; btn.textContent = '업로드 중...';
   document.getElementById('progressBar').style.display = 'block';
 
   let done = 0;
-  for (const p of parsedFiles) {
+  for (const p of files) {
     if (!p.sabun) { showToast('사번을 입력해주세요.'); continue; }
 
     // 기존 문서 조회 (이력/비활성화 처리용)
@@ -493,14 +530,17 @@ async function uploadAll() {
       hadActive ? '리비전 등록' : '신규 등록', hadActive ? '리비전 업로드' : '최초 업로드');
 
     done++;
-    document.getElementById('progressFill').style.width = Math.round((done/parsedFiles.length)*100) + '%';
+    document.getElementById('progressFill').style.width = Math.round((done/files.length)*100) + '%';
   }
 
-  showToast(`${done}건 업로드 완료! ✓`);
-  parsedFiles = [];
+  // 업로드한 항목만 목록에서 제거 — '중복 제외'로 남긴 문서는 목록에 유지
+  parsedFiles = parsedFiles.filter(p => files.indexOf(p) === -1);
+  showToast(`${done}건 업로드 완료! ✓` + (parsedFiles.length ? ` (중복 ${parsedFiles.length}건은 목록에 남아있어요)` : ''));
   renderParsedList();
-  document.getElementById('fileInput').value = '';
-  document.getElementById('uploadArea').classList.remove('open');
+  if (!parsedFiles.length) {
+    document.getElementById('fileInput').value = '';
+    document.getElementById('uploadArea').classList.remove('open');
+  }
   setTimeout(() => {
     document.getElementById('progressBar').style.display = 'none';
     document.getElementById('progressFill').style.width = '0%';
