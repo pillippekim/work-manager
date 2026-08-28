@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="sidebar.css">
 <link rel="stylesheet" href="common.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="auth_guard.js"></script>
 <style>
 .sp-wrap { padding: 20px 20px 60px; max-width: 1180px; }
@@ -65,7 +66,10 @@ table.mon th { background:#f0f2f7; font-weight:700; color:#444; position:sticky;
 table.mon td.itc { position:sticky; left:0; background:#f8f9fc; font-weight:700; text-align:left; padding:4px 8px; min-width:130px; z-index:1; }
 table.mon td.day { cursor:pointer; } table.mon td.day:hover { background:#f0f6ff; }
 table.mon th.today, table.mon td.today { background:#fff7e6 !important; }
-.mn-act { color:#dc2626; font-weight:800; } .mn-plan { color:#b45309; font-weight:700; }
+.mn-act { color:#dc2626; font-weight:800; }
+.mn-plan { color:#2563eb; font-weight:800; background:#eff6ff; border-radius:4px; padding:0 3px; display:inline-block; }
+.tg-lack { color:#dc2626; font-weight:800; background:#fef2f2; }
+.tg-ok { color:#2563eb; font-weight:800; background:#eff6ff; }
 .mon-wrap { overflow:auto; max-height:70vh; border:1px solid #e5e8f0; border-radius:10px; }
 .mgr-tabs { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
 .mgr-tab { padding:7px 14px; border-radius:20px; font-size:12.5px; font-weight:700; cursor:pointer; border:1px solid #dfe3ec; background:#fff; color:#555; }
@@ -118,7 +122,8 @@ table.mon th.today, table.mon td.today { background:#fff7e6 !important; }
         <button class="btn-mini" style="background:#f0f2f7" onclick="shiftMonth(-1)">◀</button>
         <b id="curYmLabel" style="font-size:14px;color:#1a2340;"></b>
         <button class="btn-mini" style="background:#f0f2f7" onclick="shiftMonth(1)">▶</button>
-        <span style="font-size:11.5px;color:#999;margin-left:6px;">빈 칸 클릭 = 예상출하 등록 · <span style="color:#dc2626;font-weight:700">빨강</span>=실적 <span style="color:#b45309;font-weight:700">주황</span>=예정</span>
+        <button class="btn-mini" style="background:#16a34a;color:#fff;margin-left:6px;" onclick="exportMonthExcel()">⬇ 엑셀 다운로드</button>
+        <span style="font-size:11.5px;color:#999;margin-left:6px;">빈 칸 클릭 = 예상출하 등록 · <span style="color:#dc2626;font-weight:800">빨강=실적</span> <span class="mn-plan" style="font-size:11px;">파랑=예정</span></span>
       </span>
     </div>
 
@@ -166,6 +171,7 @@ async function loadAll(){
   plans = pr.data || [];
   await loadStock();
   await loadMoves();
+  await loadTargetSums();
   render();
 }
 
@@ -432,6 +438,46 @@ function showToast(msg){
   setTimeout(function(){ t.remove(); }, 2200);
 }
 
+// ═══════ 목표(타임라인) 관리 ═══════
+var targetCum = {};   // 사번 → 목표 시작일 이후 출하 누계
+
+async function loadTargetSums(){
+  targetCum = {};
+  var tItems = items.filter(function(i){ return i.target_start; });
+  if (!tItems.length) return;
+  var minStart = tItems.map(function(i){ return i.target_start; }).sort()[0];
+  var r = await db.from('inventory_movements').select('product_code, quantity, created_at')
+    .eq('movement_type', 'outbound')
+    .in('product_code', tItems.map(function(i){ return i.sabun; }))
+    .gte('created_at', minStart + 'T00:00:00').limit(10000);
+  (r.data || []).forEach(function(m){
+    var k = String(m.product_code || '').trim();
+    var it = tItems.find(function(i){ return i.sabun === k; });
+    if (!it) return;
+    if (m.created_at.slice(0, 10) >= it.target_start){
+      targetCum[k] = (targetCum[k] || 0) + (m.quantity || 0);
+    }
+  });
+}
+
+async function editTarget(id){
+  var it = items.find(function(i){ return i.id === id; });
+  if (!it) return;
+  var q = prompt('[' + it.sabun + '] 목표수량을 입력하세요 (예: 36000)\n비우고 확인 = 목표 해제', it.target_qty || '');
+  if (q === null) return;
+  var qty = parseInt(String(q).replace(/,/g, '')) || null;
+  var st = it.target_start || todayStr();
+  if (qty){
+    var d = prompt('출하 누계 계산 시작일 (YYYY-MM-DD)\n예: 100일작전 시작일', st);
+    if (d === null) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.trim())){ showToast('날짜 형식이 올바르지 않아요 (예: 2026-07-10)'); return; }
+    st = d.trim();
+  } else { st = null; }
+  await db.from('special_items').update({ target_qty: qty, target_start: st }).eq('id', id);
+  showToast(qty ? '목표 설정 완료 ✓ (' + fmt(qty) + ' · ' + st + '~)' : '목표 해제됨');
+  loadAll();
+}
+
 // ═══════ 보기 모드 (목록 / 월간 스케줄) ═══════
 var viewMode = 'list';
 var expandedSet = {};
@@ -553,6 +599,7 @@ function renderList(view){
       + '<td onclick="event.stopPropagation()">'
       + '<button class="btn-mini" style="background:#dcfce7;color:#166534" id="copyBtn_' + it.sabun + '" onclick="copyStatus(\'' + it.sabun + '\')">📋 복사</button> '
       + '<button class="btn-mini" style="background:#f0f2f7;color:#444" onclick="editManagers(' + it.id + ')">👤</button> '
+      + '<button class="btn-mini" style="background:#fff7e6;color:#b45309" onclick="editTarget(' + it.id + ')">🎯</button> '
       + '<button class="btn-mini" style="background:#fef2f2;color:#b91c1c" onclick="removeItem(' + it.id + ',\'' + it.sabun + '\')">해제</button>'
       + '</td></tr>';
     if (open){
@@ -573,7 +620,8 @@ function renderMonth(view){
     var tStr = todayStr(); var isThisMonth = tStr.slice(0, 7) === curYM;
     var todayD = isThisMonth ? parseInt(tStr.slice(8, 10)) : -1;
 
-    var h = '<div class="mon-wrap"><table class="mon"><tr><th style="min-width:130px;left:0;z-index:2;">사번 / 품명</th>';
+    var h = '<div class="mon-wrap"><table class="mon"><tr><th style="min-width:130px;left:0;z-index:2;">사번 / 품명</th>'
+      + '<th style="min-width:56px">목표</th><th style="min-width:56px">누계</th><th style="min-width:56px">잔여</th><th style="min-width:44px">달성</th><th style="min-width:56px">현재고<div style="font-size:9px;font-weight:500">(물류)</div></th>';
     for (var d = 1; d <= lastDay; d++){
       var wd = new Date(parseInt(pt[0]), parseInt(pt[1]) - 1, d).getDay();
       h += '<th class="' + (d === todayD ? 'today' : '') + '" style="' + (wd === 0 ? 'color:#dc2626;' : (wd === 6 ? 'color:#2563eb;' : '')) + '">' + d + '</th>';
@@ -590,7 +638,21 @@ function renderMonth(view){
         }
       });
       var sumA = 0, sumP = 0;
-      h += '<tr><td class="itc">' + it.sabun + '<div style="font-size:10px;color:#888;font-weight:500">' + (it.product_name || '') + '</div></td>';
+      var cinfo = calcItem(it.sabun);
+      var tq = it.target_qty || 0;
+      var cum = targetCum[it.sabun] || 0;
+      var remain = tq - cum;
+      var rate = tq > 0 ? Math.round(cum / tq * 100) : null;
+      h += '<tr><td class="itc" onclick="editTarget(' + it.id + ')" title="클릭: 목표 설정" style="cursor:pointer">' + it.sabun
+        + '<div style="font-size:10px;color:#888;font-weight:500">' + (it.product_name || '') + '</div>'
+        + '<div style="font-size:9.5px;color:#aaa;font-weight:500">' + [(it.customer||''),(it.car_model||'')].filter(function(x){return x;}).join(' · ') + '</div></td>'
+        + (tq > 0
+          ? '<td style="font-weight:700">' + fmt(tq) + '<div style="font-size:8.5px;color:#999">' + (it.target_start||'').slice(5).replace('-','/') + '~</div></td>'
+            + '<td style="font-weight:700">' + fmt(cum) + '</td>'
+            + '<td class="' + (remain > 0 ? 'tg-lack' : 'tg-ok') + '">' + (remain > 0 ? fmt(remain) : (remain < 0 ? '+' + fmt(-remain) : '달성')) + '</td>'
+            + '<td class="' + (rate >= 100 ? 'tg-ok' : '') + '" style="font-weight:700">' + rate + '%</td>'
+          : '<td colspan="4" style="color:#ccc;font-size:10px;cursor:pointer" onclick="editTarget(' + it.id + ')">🎯 목표 설정</td>')
+        + '<td style="font-weight:700;color:#243bb2">' + fmt(cinfo.cur) + '</td>';
       for (var d = 1; d <= lastDay; d++){
         var a = actual[d] || 0, pq = planByDay[d] || 0;
         sumA += a; sumP += pq;
@@ -606,6 +668,46 @@ function renderMonth(view){
     if (!view.length) h = '<div class="empty-s">표시할 품목이 없습니다.</div>';
     document.getElementById('itemList').innerHTML = h;
   });
+}
+
+// 월간 타임라인 엑셀 다운로드
+function exportMonthExcel(){
+  var view = activeMgr ? items.filter(function(it){ return getMgrs(it).indexOf(activeMgr) !== -1; }) : items;
+  var mm = monthCache[curYM] || {};
+  var pt = curYM.split('-'); var lastDay = new Date(parseInt(pt[0]), parseInt(pt[1]), 0).getDate();
+  var head = ['사번','품명','납품처','차종','담당','구분','목표수량','출하누계','필요잔여','현재고(물류)'];
+  for (var d = 1; d <= lastDay; d++) head.push(d + '일');
+  head.push('월 합계');
+  var rows = [head];
+  view.forEach(function(it){
+    var actual = mm[it.sabun] || {};
+    var planByDay = {};
+    plans.forEach(function(p){
+      if (p.sabun === it.sabun && !p.done && p.plan_date.slice(0, 7) === curYM){
+        var dd = parseInt(p.plan_date.slice(8, 10));
+        planByDay[dd] = (planByDay[dd] || 0) + (p.quantity || 0);
+      }
+    });
+    var c = calcItem(it.sabun);
+    var tq = it.target_qty || '';
+    var cum = targetCum[it.sabun] || 0;
+    var base = [it.sabun, it.product_name || '', it.customer || '', it.car_model || '', getMgrs(it).join(', ')];
+    var rowA = base.concat(['실적(출하)', tq, tq !== '' ? cum : '', tq !== '' ? (tq - cum) : '', c.cur]);
+    var rowP = base.concat(['예정(예상)', '', '', '', '']);
+    var sa = 0, sp = 0;
+    for (var d = 1; d <= lastDay; d++){
+      var a = actual[d] || '', pq = planByDay[d] || '';
+      rowA.push(a); rowP.push(pq);
+      sa += (a || 0); sp += (pq || 0);
+    }
+    rowA.push(sa); rowP.push(sp);
+    rows.push(rowA); rows.push(rowP);
+  });
+  var ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:9},{wch:20},{wch:12},{wch:7},{wch:12},{wch:10},{wch:9},{wch:9},{wch:9},{wch:10}];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, curYM + ' 타임라인');
+  XLSX.writeFile(wb, '특별관리_타임라인_' + curYM + (activeMgr ? '_' + activeMgr : '') + '.xlsx');
 }
 
 // 매트릭스 칸 클릭 → 예상출하 바로 등록
