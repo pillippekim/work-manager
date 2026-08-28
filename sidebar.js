@@ -24,7 +24,7 @@ function initSidebar() {
     var isQualityPage = ['inspection_round_viewer.html', 'inspection_report.html'].indexOf(page) !== -1;
     var isDataPage = ['data_viewer.html','safety_viewer.html','docs_manager.html'].indexOf(page) !== -1;
     var isSystemPage = ['master_data.html','users.html'].indexOf(page) !== -1;
-    var isInventoryPage = ['inventory_layout.html','inventory_rack.html','inventory_io.html','inventory_viewer.html','inventory_zone.html'].indexOf(page) !== -1;
+    var isInventoryPage = ['inventory_layout.html','inventory_rack.html','inventory_io.html','inventory_viewer.html','inventory_zone.html','inventory_special.html'].indexOf(page) !== -1;
     var isAssetPage = ['asset_manage.html'].indexOf(page) !== -1;
 
     // 금형관리 active
@@ -52,6 +52,7 @@ function initSidebar() {
     var invRackActive = (page === 'inventory_rack.html') ? ' nav-active' : '';
     var invOutboundActive = (page === 'inventory_io.html') ? ' nav-active' : '';
     var invViewerActive = (page === 'inventory_viewer.html') ? ' nav-active' : '';
+    var invSpecialActive = (page === 'inventory_special.html') ? ' nav-active' : '';
     var invZoneActive = (page === 'inventory_zone.html') ? ' nav-active' : '';
 
     // 경영지원 active
@@ -190,6 +191,7 @@ function initSidebar() {
                             '<a class="nav-link' + invZoneActive + '" href="inventory_zone.html"><span class="n-icon">🛒</span>대차 현황</a>' +
                             '<a class="nav-link' + invOutboundActive + '" href="inventory_io.html"><span class="n-icon">📤</span>입출고 관리</a>' +
                             '<a class="nav-link' + invViewerActive + '" href="inventory_viewer.html"><span class="n-icon">📊</span>재고 조회</a>' +
+                            '<a class="nav-link' + invSpecialActive + '" href="inventory_special.html"><span class="n-icon">⭐</span>특별관리 품목</a>' +
                         '</div>' +
                     '</div>' +
                 '</div>' +
