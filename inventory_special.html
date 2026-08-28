@@ -132,6 +132,12 @@ table.mon th.today, table.mon td.today { background:#fff7e6 !important; }
         <button class="btn-mini" style="background:#16a34a;color:#fff;margin-left:6px;" onclick="exportMonthExcel()">⬇ 엑셀 다운로드</button>
         <span style="font-size:11.5px;color:#999;margin-left:6px;">빈 칸 클릭 = 예상출하 등록 · <span style="color:#dc2626;font-weight:800">빨강=실적</span> <span class="mn-plan" style="font-size:11px;">파랑=예정</span></span>
       </span>
+      <span style="display:inline-flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap;">
+        <input id="fltSabun" placeholder="🔍 사번 검색" oninput="onFilterChange()" style="padding:7px 9px;border:1px solid #dfe3ec;border-radius:7px;font-size:12.5px;width:110px;">
+        <select id="fltCust" onchange="onFilterChange()" style="padding:7px 8px;border:1px solid #dfe3ec;border-radius:7px;font-size:12.5px;background:#fff;"><option value="">납품처 전체</option></select>
+        <select id="fltCar" onchange="onFilterChange()" style="padding:7px 8px;border:1px solid #dfe3ec;border-radius:7px;font-size:12.5px;background:#fff;"><option value="">차종 전체</option></select>
+        <button class="btn-mini" id="fltReset" onclick="resetFilters()" style="background:#fee2e2;color:#b91c1c;display:none;">↺ 초기화</button>
+      </span>
     </div>
 
     <div id="itemList"><div class="empty-s">불러오는 중...</div></div>
@@ -499,6 +505,66 @@ var curYM = todayStr().slice(0, 7);
 var monthCache = {};   // 'YYYY-MM' → { 사번: {일: 출고합} }
 
 function setView(m){ viewMode = m; render(); }
+
+// ═══════ 필터 (사번 / 납품처 / 차종) — 담당자 탭과 AND 조건 ═══════
+var fSabun = '', fCust = '', fCar = '';
+var _fltSig = '';   // 드롭다운 재생성 최소화용 서명(열려있는 셀렉트가 닫히는 것 방지)
+function splitVals(s){ return String(s || '').split(',').map(function(x){ return x.trim(); }).filter(function(x){ return x; }); }
+function filterView(list){
+  return list.filter(function(it){
+    if (fSabun && String(it.sabun || '').indexOf(fSabun) === -1) return false;                 // 부분일치
+    if (fCust && splitVals(it.customer).indexOf(fCust) === -1) return false;                   // 복수 납품처 중 하나라도 일치
+    if (fCar && splitVals(it.car_model).indexOf(fCar) === -1) return false;
+    return true;
+  });
+}
+function getView(){   // 담당자 탭 필터 → 검색 필터 순서로 AND 적용 (목록/월간/엑셀 공용)
+  var v = activeMgr ? items.filter(function(it){ return getMgrs(it).indexOf(activeMgr) !== -1; }) : items;
+  return filterView(v);
+}
+function filterTag(){   // 요약 카드 꼬리표: (김우현·YMP·JG·사번:5023)
+  var t = [];
+  if (activeMgr) t.push(activeMgr);
+  if (fCust) t.push(fCust);
+  if (fCar) t.push(fCar);
+  if (fSabun) t.push('사번:' + fSabun);
+  return t.length ? ' (' + t.join('·') + ')' : '';
+}
+function buildFilterOptions(){
+  var cs = {}, cars = {};
+  items.forEach(function(it){
+    splitVals(it.customer).forEach(function(v){ cs[v] = 1; });
+    splitVals(it.car_model).forEach(function(v){ cars[v] = 1; });
+  });
+  var l1 = Object.keys(cs).sort(), l2 = Object.keys(cars).sort();
+  var sig = l1.join('|') + '#' + l2.join('|');
+  if (sig === _fltSig) return;   // 값 구성이 그대로면 재생성 생략
+  _fltSig = sig;
+  fillSelect('fltCust', l1, '납품처 전체', fCust);
+  fillSelect('fltCar', l2, '차종 전체', fCar);
+}
+function fillSelect(id, vals, allLabel, cur){
+  var el = document.getElementById(id); if (!el) return;
+  if (cur && vals.indexOf(cur) === -1) vals = vals.concat([cur]);   // 선택 중인 값은 항상 유지
+  el.innerHTML = '<option value="">' + allLabel + '</option>' + vals.map(function(v){
+    return '<option value="' + String(v).replace(/"/g, '&quot;') + '"' + (v === cur ? ' selected' : '') + '>' + v + '</option>';
+  }).join('');
+}
+function onFilterChange(){
+  fSabun = document.getElementById('fltSabun').value.trim();
+  fCust = document.getElementById('fltCust').value;
+  fCar = document.getElementById('fltCar').value;
+  document.getElementById('fltReset').style.display = (fSabun || fCust || fCar) ? '' : 'none';
+  render();
+}
+function resetFilters(){
+  fSabun = ''; fCust = ''; fCar = '';
+  document.getElementById('fltSabun').value = '';
+  document.getElementById('fltCust').value = '';
+  document.getElementById('fltCar').value = '';
+  document.getElementById('fltReset').style.display = 'none';
+  render();
+}
 function shiftMonth(d){
   var pt = curYM.split('-'); var dt = new Date(parseInt(pt[0]), parseInt(pt[1]) - 1 + d, 1);
   curYM = dt.getFullYear() + '-' + ('0' + (dt.getMonth() + 1)).slice(-2);
@@ -573,9 +639,10 @@ function render(){
   document.getElementById('monthNav').style.display = viewMode === 'month' ? 'inline-flex' : 'none';
   document.querySelector('.sp-wrap').classList.toggle('wide', viewMode === 'month');   // 월간은 전체 폭 사용
 
-  var view = activeMgr ? items.filter(function(it){ return getMgrs(it).indexOf(activeMgr) !== -1; }) : items;
+  buildFilterOptions();          // 납품처/차종 드롭다운 자동 수집
+  var view = getView();          // 담당자 탭 + 사번/납품처/차종 필터 AND 적용
 
-  document.getElementById('sumItems').textContent = view.length + '개' + (activeMgr ? ' (' + activeMgr + ')' : '');
+  document.getElementById('sumItems').textContent = view.length + '개' + filterTag();
   var totOut = 0, plan7 = 0;
   var lim = new Date(); lim.setDate(lim.getDate() + 7);
   var viewSabuns = view.map(function(i){ return i.sabun; });
@@ -593,7 +660,7 @@ function render(){
 // ── 목록 보기: 한 줄 요약 + 클릭 펼침 (품목 20~30개 대응) ──
 function renderList(view){
   if (!view.length){
-    document.getElementById('itemList').innerHTML = '<div class="empty-s">' + (activeMgr ? '[' + activeMgr + '] 담당 품목이 없습니다.' : '등록된 특별관리 품목이 없습니다.') + '</div>';
+    document.getElementById('itemList').innerHTML = '<div class="empty-s">' + ((fSabun || fCust || fCar) ? '검색/필터 조건에 맞는 품목이 없습니다. 우측 상단 ↺ 초기화를 눌러보세요.' : (activeMgr ? '[' + activeMgr + '] 담당 품목이 없습니다.' : '등록된 특별관리 품목이 없습니다.')) + '</div>';
     return;
   }
   var h = '<table class="lst"><tr><th style="width:26px"></th><th>사번</th><th>품명</th><th>담당</th><th>전일재고</th><th>금일입고</th><th>금일출고</th><th>현재고</th><th>다음 예정</th><th style="width:200px">작업</th></tr>';
@@ -709,7 +776,7 @@ window.addEventListener('resize', function(){ alignMonSticky(); });
 
 // 월간 타임라인 엑셀 다운로드
 function exportMonthExcel(){
-  var view = activeMgr ? items.filter(function(it){ return getMgrs(it).indexOf(activeMgr) !== -1; }) : items;
+  var view = getView();   // 담당자 탭 + 필터 동일 적용
   var mm = monthCache[curYM] || {};
   var pt = curYM.split('-'); var lastDay = new Date(parseInt(pt[0]), parseInt(pt[1]), 0).getDate();
   var head = ['사번','품명','납품처','차종','담당','구분','목표수량','출하누계','필요잔여','현재고(물류)'];
