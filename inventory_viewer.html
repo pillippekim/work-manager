@@ -186,6 +186,15 @@
     var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
     var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
     var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // UTC 저장값 → 한국시간 표시 변환 (일시 혼동 방지)
+    function fmtKst(iso, withTime) {
+      if (!iso) return '-';
+      var d = new Date(iso);
+      var p = function(n){ return ('0' + n).slice(-2); };
+      var s = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+      return withTime ? s + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) : s;
+    }
+
 
     var currentTab = 'product';
     var allSlots = [];
@@ -501,7 +510,7 @@
         h += '<td class="qty-cell">' + (l.quantity || 0).toLocaleString() + '</td>';
         h += '<td>' + (l.slot_code || '-') + '</td>';
         h += '<td>' + (l.source_type || '-') + '</td>';
-        h += '<td>' + (l.created_at ? l.created_at.slice(0, 10) : '-') + '</td>';
+        h += '<td>' + fmtKst(l.created_at) + '</td>';
         h += '</tr>';
       }
       h += '</tbody></table></div>';
@@ -574,7 +583,7 @@
         var m = allMovements[i];
         var typeText = m.movement_type === 'inbound' ? '입고' : (m.movement_type === 'outbound' ? '출고' : (m.movement_type === 'adjustment' ? '조정' : (m.movement_type === 'transfer' ? '이동' : m.movement_type)));
         var typeClass = m.movement_type || 'inbound';
-        var movedDate = m.moved_at ? m.moved_at.slice(0, 16).replace('T', ' ') : '-';
+        var movedDate = fmtKst(m.moved_at, true);
 
         h += '<tr data-type="' + m.movement_type + '" data-date="' + (m.moved_at || '') + '" data-code="' + (m.product_code || '') + '">';
         h += '<td style="white-space:nowrap">' + movedDate + '</td>';
@@ -677,7 +686,7 @@
             var s = allShipments[i];
             h += '<tr>';
             h += '<td><strong>#' + s.id + '</strong></td>';
-            h += '<td>' + (s.created_at ? s.created_at.slice(0, 16).replace('T', ' ') : '-') + '</td>';
+            h += '<td>' + fmtKst(s.created_at, true) + '</td>';
             h += '<td>' + (s.file_name || '-') + '</td>';
             h += '<td class="qty-cell">' + (s.total_items || 0) + '</td>';
             h += '<td class="qty-cell">' + (s.total_quantity || 0).toLocaleString() + '</td>';

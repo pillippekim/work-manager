@@ -303,6 +303,15 @@
     var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
     var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
     var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // UTC 저장값 → 한국시간 표시 변환 (일시 혼동 방지)
+    function fmtKst(iso, withTime) {
+      if (!iso) return '-';
+      var d = new Date(iso);
+      var p = function(n){ return ('0' + n).slice(-2); };
+      var s = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+      return withTime ? s + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) : s;
+    }
+
 
     var currentTab = 'inbound';
     var waitingLots = [];
@@ -391,7 +400,7 @@
           h += '<td>' + (lot.product_name || '-') + '</td>';
           h += '<td>' + (lot.lot_no || '-') + '</td>';
           h += '<td class="qty-cell">' + (lot.quantity || 0).toLocaleString() + '</td>';
-          h += '<td>' + (lot.created_at ? lot.created_at.slice(0, 10) : '-') + '</td>';
+          h += '<td>' + fmtKst(lot.created_at) + '</td>';
           h += '<td>' + (lot.source_type || '-') + '</td>';
           h += '<td><button class="row-btn inbound" onclick="openInboundModal(' + lot.id + ')">입고처리</button></td>';
           h += '</tr>';
@@ -1372,8 +1381,8 @@
       document.getElementById('histTableArea').innerHTML = '<div class="empty-msg">조회 중...</div>';
 
       var q = supabase.from('inventory_movements').select('*').order('moved_at', { ascending: false });
-      if (start) q = q.gte('moved_at', start + 'T00:00:00');
-      if (end) q = q.lte('moved_at', end + 'T23:59:59');
+      if (start) q = q.gte('moved_at', new Date(start + 'T00:00:00').toISOString());   // 한국시간 0시 기준
+      if (end) q = q.lte('moved_at', new Date(end + 'T23:59:59').toISOString());
       if (type) q = q.eq('movement_type', type);
       if (sabun) q = q.ilike('product_code', '%' + sabun + '%');
       q = q.limit(1000);
@@ -1396,7 +1405,7 @@
           var typeBadge = m.movement_type === 'inbound' ? 'stocked' : (m.movement_type === 'outbound' ? 'shipped' : 'waiting');
           var loc = m.movement_type === 'inbound' ? (m.to_location || '-') : (m.from_location || '-');
           h2 += '<tr>';
-          h2 += '<td>' + (m.moved_at ? m.moved_at.slice(0, 16).replace('T', ' ') : '-') + '</td>';
+          h2 += '<td>' + fmtKst(m.moved_at, true) + '</td>';
           h2 += '<td><span class="status-badge ' + typeBadge + '">' + typeText + '</span></td>';
           h2 += '<td><strong>' + (m.product_code || '-') + '</strong></td>';
           h2 += '<td>' + (m.lot_no || '-') + '</td>';

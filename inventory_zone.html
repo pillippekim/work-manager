@@ -217,6 +217,15 @@
     var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
     var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
     var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // UTC 저장값 → 한국시간 표시 변환 (일시 혼동 방지)
+    function fmtKst(iso, withTime) {
+      if (!iso) return '-';
+      var d = new Date(iso);
+      var p = function(n){ return ('0' + n).slice(-2); };
+      var s = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+      return withTime ? s + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) : s;
+    }
+
 
     // URL 파라미터 파싱
     var params = new URLSearchParams(window.location.search);
@@ -409,7 +418,7 @@
           h += '<td>' + (lot.lot_no || '-') + '</td>';
           h += '<td class="qty-cell">' + (lot.quantity || 0).toLocaleString() + '</td>';
           h += '<td><span class="status-badge ' + statusClass + '">' + statusText + '</span></td>';
-          h += '<td>' + (lot.stocked_at ? lot.stocked_at.slice(0, 10) : (lot.created_at ? lot.created_at.slice(0, 10) : '-')) + '</td>';
+          h += '<td>' + fmtKst(lot.stocked_at || lot.created_at) + '</td>';
           h += '<td>';
           h += '<button class="row-btn edit" onclick="openEditModal(' + lot.id + ')" style="margin-right:4px;">수정</button>';
           h += '<button class="row-btn outbound" onclick="openOutModal(' + lot.id + ')">출고</button>';

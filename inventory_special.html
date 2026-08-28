@@ -152,6 +152,13 @@ function getMgrs(it){
 }
 
 function fmt(n){ return (n||0).toLocaleString(); }
+function fmtKst(iso, withTime) {
+  if (!iso) return '-';
+  var d = new Date(iso);
+  var p = function(n){ return ('0' + n).slice(-2); };
+  var s = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  return withTime ? s + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) : s;
+}
 function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
 
 // ── 기준정보(품명 자동) ──
@@ -237,7 +244,7 @@ function calcItem(sabun){
       if (m.movement_type==='outbound') tOut+=q;
     }
     if (m.movement_type==='outbound'){
-      var key = m.created_at.slice(0,10);
+      var key = fmtKst(m.created_at);   // 한국시간 기준 일자
       daily[key] = (daily[key]||0) + q;
     }
   });
@@ -461,7 +468,7 @@ async function loadTargetSums(){
     var k = String(m.product_code || '').trim();
     var it = tItems.find(function(i){ return i.sabun === k; });
     if (!it) return;
-    if (m.created_at.slice(0, 10) >= it.target_start){
+    if (fmtKst(m.created_at) >= it.target_start){
       targetCum[k] = (targetCum[k] || 0) + (m.quantity || 0);
     }
   });
@@ -505,15 +512,15 @@ async function ensureMonth(ym){
   var map = {};
   if (items.length){
     var sabuns = items.map(function(i){ return i.sabun; });
-    var start = ym + '-01T00:00:00';
-    var pt = ym.split('-'); var last = new Date(parseInt(pt[0]), parseInt(pt[1]), 0).getDate();
-    var end = ym + '-' + ('0' + last).slice(-2) + 'T23:59:59';
+    var pt = ym.split('-');
+    var start = new Date(parseInt(pt[0]), parseInt(pt[1]) - 1, 1).toISOString();          // 한국시간 월초
+    var end = new Date(parseInt(pt[0]), parseInt(pt[1]), 1).toISOString();                 // 다음달 0시(미포함)
     var r = await db.from('inventory_movements').select('product_code, movement_type, quantity, created_at')
       .in('product_code', sabuns).eq('movement_type', 'outbound')
-      .gte('created_at', start).lte('created_at', end).limit(5000);
+      .gte('created_at', start).lt('created_at', end).limit(5000);
     (r.data || []).forEach(function(m){
       var k = String(m.product_code || '').trim();
-      var day = parseInt(m.created_at.slice(8, 10));
+      var day = new Date(m.created_at).getDate();   // 한국시간 기준 일
       if (!map[k]) map[k] = {};
       map[k][day] = (map[k][day] || 0) + (m.quantity || 0);
     });
