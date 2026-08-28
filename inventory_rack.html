@@ -648,7 +648,7 @@
 
       var slot = findSlotById(slotId);
       var so = applyShortage(slot, qty);
-      supabase.from('inventory_rack_slots').update({ product_code: pc, lot_no: ln, quantity: so.applied, status: so.applied > 0 ? 'occupied' : 'empty', shortage_qty: so.remainShort, emptied_at: so.applied > 0 ? null : ((slot && slot.emptied_at) || new Date().toISOString()) }).eq('id', slotId)
+      supabase.from('inventory_rack_slots').update({ product_code: pc, lot_no: ln, quantity: so.applied, status: so.applied > 0 ? 'occupied' : 'empty', shortage_qty: so.remainShort, emptied_at: so.applied > 0 ? null : ((slot && slot.emptied_at) || new Date().toISOString()), stocked_at: so.applied > 0 ? new Date().toISOString() : ((slot && slot.stocked_at) || null) }).eq('id', slotId)
         .then(function(res) {
           if (res.error) { showToast('오류: ' + res.error.message); return; }
           logMovement(pc, 'inbound', null, currentRack.rack_name + '-' + slot.slot_code, qty, ln, '슬롯 입고' + (so.offset > 0 ? ' (출고부족 ' + so.offset + ' 상계)' : ''));
@@ -665,12 +665,55 @@
       var so = applyShortage(slot, addQty);
       var newQty = slot.quantity + so.applied;
 
-      supabase.from('inventory_rack_slots').update({ quantity: newQty, shortage_qty: so.remainShort, status: newQty > 0 ? 'occupied' : 'empty', emptied_at: newQty > 0 ? null : ((slot && slot.emptied_at) || new Date().toISOString()) }).eq('id', slotId)
+      supabase.from('inventory_rack_slots').update({ quantity: newQty, shortage_qty: so.remainShort, status: newQty > 0 ? 'occupied' : 'empty', emptied_at: newQty > 0 ? null : ((slot && slot.emptied_at) || new Date().toISOString()), stocked_at: ((slot.quantity || 0) === 0 && newQty > 0) ? new Date().toISOString() : (slot.stocked_at || null) }).eq('id', slotId)
         .then(function(res) {
           if (res.error) { showToast('오류: ' + res.error.message); return; }
           logMovement(slot.product_code, 'inbound', null, currentRack.rack_name + '-' + slot.slot_code, addQty, slot.lot_no, '추가 입고 (' + slot.quantity + ' → ' + newQty + ')' + (so.offset > 0 ? ' 출고부족 ' + so.offset + ' 상계' : ''));
           showToast('추가 입고 완료! (' + newQty.toLocaleString() + '개)'); closeModal(); loadSlots();
         });
+    }
+
+    // ── 연쇄 출고: 선택 슬롯 → 부족분은 같은 사번 다른 슬롯에서 선입고(FIFO) 순 차감 (동 무관) ──
+    async function cascadeOutbound(slot, outQty) {
+      var r = await supabase.from('inventory_rack_slots')
+        .select('*, inventory_racks(rack_name)')
+        .eq('product_code', slot.product_code).gt('quantity', 0).neq('id', slot.id);
+      var others = r.data || [];
+      // 선입고 순 정렬 (입고시각 없음 = 기존 적재분 = 가장 오래된 것으로 간주)
+      others.sort(function(a, b) {
+        var ta = a.stocked_at ? new Date(a.stocked_at).getTime() : 0;
+        var tb = b.stocked_at ? new Date(b.stocked_at).getTime() : 0;
+        if (ta !== tb) return ta - tb;
+        return (a.rack_id - b.rack_id) || String(a.slot_code).localeCompare(String(b.slot_code));
+      });
+
+      // 차감 계획 수립
+      var chain = [{ s: slot, rack: currentRack.rack_name, take: Math.min(slot.quantity, outQty) }];
+      var remain = outQty - chain[0].take;
+      for (var i = 0; i < others.length && remain > 0; i++) {
+        var take = Math.min(others[i].quantity, remain);
+        chain.push({ s: others[i], rack: (others[i].inventory_racks && others[i].inventory_racks.rack_name) || '', take: take });
+        remain -= take;
+      }
+      var msg = '요청 ' + outQty.toLocaleString() + '개 > 이 슬롯 재고 ' + slot.quantity.toLocaleString() + '개\n\n선입고 순으로 아래와 같이 차감합니다:\n'
+        + chain.map(function(c) { return ' · ' + c.rack + '-' + c.s.slot_code + ' : ' + c.take.toLocaleString() + '개'; }).join('\n')
+        + (remain > 0 ? '\n\n⚠ 전체 재고로도 ' + remain.toLocaleString() + '개 부족 → 마지막 슬롯에 출고부족 표시' : '')
+        + '\n\n진행할까요?';
+      if (!confirm(msg)) return;
+
+      for (var i = 0; i < chain.length; i++) {
+        var c = chain[i];
+        var newQty = c.s.quantity - c.take;
+        var isLast = (i === chain.length - 1);
+        var ud = { quantity: newQty };
+        if (newQty <= 0) { ud.quantity = 0; ud.status = 'empty'; ud.emptied_at = new Date().toISOString(); }
+        if (isLast && remain > 0) ud.shortage_qty = remain;
+        var ur = await supabase.from('inventory_rack_slots').update(ud).eq('id', c.s.id).select('id');
+        if (ur.error || !ur.data || !ur.data.length) { showToast('차감 실패: ' + c.rack + '-' + c.s.slot_code); return; }
+        logMovement(slot.product_code, 'outbound', c.rack + '-' + c.s.slot_code, null, c.take, c.s.lot_no, '출고(연쇄 FIFO ' + (i + 1) + '/' + chain.length + ')' + (isLast && remain > 0 ? ' 출고부족 ' + remain.toLocaleString() : ''));
+      }
+      showToast('출고 완료! ' + chain.length + '개 슬롯에서 ' + (outQty - remain).toLocaleString() + '개 차감' + (remain > 0 ? ' · 부족 ' + remain.toLocaleString() : ''));
+      closeModal(); loadSlots();
     }
 
     // ── 일부 출고 ──
@@ -680,17 +723,9 @@
       if (outQty <= 0) { showToast('출고 수량을 입력해주세요'); return; }
       if (outQty === slot.quantity) { doFullOut(slotId); return; }
 
-      // 재고보다 많이 출고 → 전량 출고 + 부족분을 '출고부족'으로 표시 (사번 유지)
+      // 재고 초과 출고 → 같은 사번의 다른 슬롯(동 무관)에서 선입고 순으로 연쇄 차감 (FIFO)
       if (outQty > slot.quantity) {
-        var shortage = outQty - slot.quantity;
-        if (!confirm('현재 재고(' + slot.quantity.toLocaleString() + '개)보다 ' + shortage.toLocaleString() + '개 많습니다.\n재고 전량을 출고하고 부족분 ' + shortage.toLocaleString() + '개를 "출고부족"으로 표시할까요?')) return;
-        var shipped = slot.quantity;
-        supabase.from('inventory_rack_slots').update({ quantity: 0, status: 'empty', shortage_qty: shortage, emptied_at: new Date().toISOString() }).eq('id', slotId)
-          .then(function(res) {
-            if (res.error) { showToast('오류: ' + res.error.message); return; }
-            logMovement(slot.product_code, 'outbound', currentRack.rack_name + '-' + slot.slot_code, null, shipped, slot.lot_no, '출고 (출고부족 ' + shortage.toLocaleString() + ')');
-            showToast('출고 완료 · 출고부족 ' + shortage.toLocaleString() + '개 표시됨'); closeModal(); loadSlots();
-          });
+        cascadeOutbound(slot, outQty);
         return;
       }
 
@@ -908,7 +943,8 @@
             supabase.from('inventory_rack_slots').update({
               product_code: pc, lot_no: ln, quantity: so.applied,
               status: so.applied > 0 ? 'occupied' : 'empty', shortage_qty: so.remainShort,
-              emptied_at: so.applied > 0 ? null : ((slot && slot.emptied_at) || new Date().toISOString())
+              emptied_at: so.applied > 0 ? null : ((slot && slot.emptied_at) || new Date().toISOString()),
+              stocked_at: so.applied > 0 ? new Date().toISOString() : ((slot && slot.stocked_at) || null)
             }).eq('id', slotId)
           );
           if (slot) {

@@ -596,7 +596,8 @@
         quantity: _applied,
         status: _applied > 0 ? 'occupied' : 'empty',
         shortage_qty: _short - _offset,
-        emptied_at: _applied > 0 ? null : (slot.emptied_at || new Date().toISOString())
+        emptied_at: _applied > 0 ? null : (slot.emptied_at || new Date().toISOString()),
+        stocked_at: _applied > 0 ? new Date().toISOString() : (slot.stocked_at || null)
       }).eq('id', slotId);
 
       var rackName = '';
@@ -862,7 +863,11 @@
               var pcSlot = String(slots[s].product_code == null ? '' : slots[s].product_code).trim().toUpperCase().replace(/\s+/g, '');
               if (pcSlot === pcRow && pcRow !== '' && slots[s].quantity > 0) candidates.push(slots[s]);
             }
+            // 선입고(FIFO) 순 정렬: 입고시각 오래된 슬롯부터 (동 무관 · 시각 없음=기존 적재분=최우선)
             candidates.sort(function(a, b) {
+              var ta = a.stocked_at ? new Date(a.stocked_at).getTime() : 0;
+              var tb = b.stocked_at ? new Date(b.stocked_at).getTime() : 0;
+              if (ta !== tb) return ta - tb;
               var la = a.lot_no || '999999', lb = b.lot_no || '999999';
               return la < lb ? -1 : (la > lb ? 1 : 0);
             });

@@ -12,6 +12,13 @@
 <script src="auth_guard.js"></script>
 <style>
 .sp-wrap { padding: 20px 20px 60px; max-width: 1180px; }
+.sp-wrap.wide { max-width: none; }
+.fxc { position: sticky; z-index: 1; }
+th.fxc { z-index: 3 !important; background:#f0f2f7; }
+td.fxc { background:#fff; }
+.fx2 { left:130px; min-width:64px; width:64px; } .fx3 { left:194px; min-width:64px; width:64px; }
+.fx4 { left:258px; min-width:64px; width:64px; } .fx5 { left:322px; min-width:44px; width:44px; }
+.fx6 { left:366px; min-width:60px; width:60px; }
 .sum-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
 .sum-card { background:#fff; border:1px solid #e5e8f0; border-radius:12px; padding:14px 16px; }
 .sum-card .l { font-size:12px; color:#888; } .sum-card .n { font-size:22px; font-weight:800; color:#1a2340; margin-top:3px; }
@@ -557,6 +564,7 @@ function render(){
   document.getElementById('vmList').classList.toggle('vm-on', viewMode === 'list');
   document.getElementById('vmMonth').classList.toggle('vm-on', viewMode === 'month');
   document.getElementById('monthNav').style.display = viewMode === 'month' ? 'inline-flex' : 'none';
+  document.querySelector('.sp-wrap').classList.toggle('wide', viewMode === 'month');   // 월간은 전체 폭 사용
 
   var view = activeMgr ? items.filter(function(it){ return getMgrs(it).indexOf(activeMgr) !== -1; }) : items;
 
@@ -621,7 +629,7 @@ function renderMonth(view){
     var todayD = isThisMonth ? parseInt(tStr.slice(8, 10)) : -1;
 
     var h = '<div class="mon-wrap"><table class="mon"><tr><th style="min-width:130px;left:0;z-index:2;">사번 / 품명</th>'
-      + '<th style="min-width:56px">목표</th><th style="min-width:56px">누계</th><th style="min-width:56px">잔여</th><th style="min-width:44px">달성</th><th style="min-width:56px">현재고<div style="font-size:9px;font-weight:500">(물류)</div></th>';
+      + '<th class="fxc fx2">목표</th><th class="fxc fx3">누계</th><th class="fxc fx4">잔여</th><th class="fxc fx5">달성</th><th class="fxc fx6">현재고<div style="font-size:9px;font-weight:500">(물류)</div></th>';
     for (var d = 1; d <= lastDay; d++){
       var wd = new Date(parseInt(pt[0]), parseInt(pt[1]) - 1, d).getDay();
       h += '<th class="' + (d === todayD ? 'today' : '') + '" style="' + (wd === 0 ? 'color:#dc2626;' : (wd === 6 ? 'color:#2563eb;' : '')) + '">' + d + '</th>';
@@ -647,12 +655,12 @@ function renderMonth(view){
         + '<div style="font-size:10px;color:#888;font-weight:500">' + (it.product_name || '') + '</div>'
         + '<div style="font-size:9.5px;color:#aaa;font-weight:500">' + [(it.customer||''),(it.car_model||'')].filter(function(x){return x;}).join(' · ') + '</div></td>'
         + (tq > 0
-          ? '<td style="font-weight:700">' + fmt(tq) + '<div style="font-size:8.5px;color:#999">' + (it.target_start||'').slice(5).replace('-','/') + '~</div></td>'
-            + '<td style="font-weight:700">' + fmt(cum) + '</td>'
-            + '<td class="' + (remain > 0 ? 'tg-lack' : 'tg-ok') + '">' + (remain > 0 ? fmt(remain) : (remain < 0 ? '+' + fmt(-remain) : '달성')) + '</td>'
-            + '<td class="' + (rate >= 100 ? 'tg-ok' : '') + '" style="font-weight:700">' + rate + '%</td>'
-          : '<td colspan="4" style="color:#ccc;font-size:10px;cursor:pointer" onclick="editTarget(' + it.id + ')">🎯 목표 설정</td>')
-        + '<td style="font-weight:700;color:#243bb2">' + fmt(cinfo.cur) + '</td>';
+          ? '<td class="fxc fx2" style="font-weight:700">' + fmt(tq) + '<div style="font-size:8.5px;color:#999">' + (it.target_start||'').slice(5).replace('-','/') + '~</div></td>'
+            + '<td class="fxc fx3" style="font-weight:700">' + fmt(cum) + '</td>'
+            + '<td class="fxc fx4 ' + (remain > 0 ? 'tg-lack' : 'tg-ok') + '">' + (remain > 0 ? fmt(remain) : (remain < 0 ? '+' + fmt(-remain) : '달성')) + '</td>'
+            + '<td class="fxc fx5 ' + (rate >= 100 ? 'tg-ok' : '') + '" style="font-weight:700">' + rate + '%</td>'
+          : '<td class="fxc fx2" style="color:#ccc;font-size:10px;cursor:pointer" onclick="editTarget(' + it.id + ')">🎯 목표<br>설정</td><td class="fxc fx3" style="color:#ddd">-</td><td class="fxc fx4" style="color:#ddd">-</td><td class="fxc fx5" style="color:#ddd">-</td>')
+        + '<td class="fxc fx6" style="font-weight:700;color:#243bb2">' + fmt(cinfo.cur) + '</td>';
       for (var d = 1; d <= lastDay; d++){
         var a = actual[d] || 0, pq = planByDay[d] || 0;
         sumA += a; sumP += pq;
