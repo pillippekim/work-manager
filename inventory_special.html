@@ -64,6 +64,8 @@ table.sp td { padding:5px 8px; border:1px solid #eceef5; text-align:center; }
 .vm-on { background:#243bb2 !important; color:#fff !important; }
 table.lst { width:100%; border-collapse:collapse; font-size:12.5px; background:#fff; }
 table.lst th { background:#1a2340; color:#fff; padding:8px 6px; font-weight:600; font-size:12px; }
+table.lst tr.flt th { background:#eef1f7; padding:5px 6px; border-bottom:2px solid #dfe3ec; }
+.hf-in { padding:4px 7px; border:1px solid #cfd5e2; border-radius:6px; font-size:11.5px; background:#fff; color:#333; }
 table.lst td { padding:7px 6px; border-bottom:1px solid #eef0f5; text-align:center; background:#fff; }
 table.lst tr.sumrow { cursor:pointer; } table.lst tr.sumrow:hover td { background:#f5f8ff; }
 table.lst td.detail-cell { background:#fafbfd; padding:0 10px 12px; }
@@ -132,10 +134,10 @@ table.mon th.today, table.mon td.today { background:#fff7e6 !important; }
         <button class="btn-mini" style="background:#16a34a;color:#fff;margin-left:6px;" onclick="exportMonthExcel()">⬇ 엑셀 다운로드</button>
         <span style="font-size:11.5px;color:#999;margin-left:6px;">빈 칸 클릭 = 예상출하 등록 · <span style="color:#dc2626;font-weight:800">빨강=실적</span> <span class="mn-plan" style="font-size:11px;">파랑=예정</span></span>
       </span>
-      <span style="display:inline-flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap;">
-        <input id="fltSabun" placeholder="🔍 사번 검색" oninput="onFilterChange()" style="padding:7px 9px;border:1px solid #dfe3ec;border-radius:7px;font-size:12.5px;width:110px;">
-        <select id="fltCust" onchange="onFilterChange()" style="padding:7px 8px;border:1px solid #dfe3ec;border-radius:7px;font-size:12.5px;background:#fff;"><option value="">납품처 전체</option></select>
-        <select id="fltCar" onchange="onFilterChange()" style="padding:7px 8px;border:1px solid #dfe3ec;border-radius:7px;font-size:12.5px;background:#fff;"><option value="">차종 전체</option></select>
+      <span id="fltBar" style="display:none;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap;">
+        <input id="fltSabun" placeholder="🔍 사번 검색" oninput="setFilter('sabun', this.value, 'fltSabun')" style="padding:7px 9px;border:1px solid #dfe3ec;border-radius:7px;font-size:12.5px;width:110px;">
+        <select id="fltCust" onchange="setFilter('cust', this.value, 'fltCust')" style="padding:7px 8px;border:1px solid #dfe3ec;border-radius:7px;font-size:12.5px;background:#fff;"><option value="">납품처 전체</option></select>
+        <select id="fltCar" onchange="setFilter('car', this.value, 'fltCar')" style="padding:7px 8px;border:1px solid #dfe3ec;border-radius:7px;font-size:12.5px;background:#fff;"><option value="">차종 전체</option></select>
         <button class="btn-mini" id="fltReset" onclick="resetFilters()" style="background:#fee2e2;color:#b91c1c;display:none;">↺ 초기화</button>
       </span>
     </div>
@@ -530,39 +532,67 @@ function filterTag(){   // 요약 카드 꼬리표: (김우현·YMP·JG·사번:
   if (fSabun) t.push('사번:' + fSabun);
   return t.length ? ' (' + t.join('·') + ')' : '';
 }
+var custOpts = [], carOpts = [];   // 드롭다운 옵션(헤더/툴바 공용)
+function escAttr(s){ return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
 function buildFilterOptions(){
   var cs = {}, cars = {};
   items.forEach(function(it){
     splitVals(it.customer).forEach(function(v){ cs[v] = 1; });
     splitVals(it.car_model).forEach(function(v){ cars[v] = 1; });
   });
-  var l1 = Object.keys(cs).sort(), l2 = Object.keys(cars).sort();
-  var sig = l1.join('|') + '#' + l2.join('|');
-  if (sig === _fltSig) return;   // 값 구성이 그대로면 재생성 생략
+  custOpts = Object.keys(cs).sort();
+  carOpts = Object.keys(cars).sort();
+  var sig = custOpts.join('|') + '#' + carOpts.join('|');
+  if (sig === _fltSig) return;   // 값 구성이 그대로면 툴바 재생성 생략
   _fltSig = sig;
-  fillSelect('fltCust', l1, '납품처 전체', fCust);
-  fillSelect('fltCar', l2, '차종 전체', fCar);
+  fillSelect('fltCust', custOpts, '납품처 전체', fCust);
+  fillSelect('fltCar', carOpts, '차종 전체', fCar);
 }
 function fillSelect(id, vals, allLabel, cur){
   var el = document.getElementById(id); if (!el) return;
   if (cur && vals.indexOf(cur) === -1) vals = vals.concat([cur]);   // 선택 중인 값은 항상 유지
   el.innerHTML = '<option value="">' + allLabel + '</option>' + vals.map(function(v){
-    return '<option value="' + String(v).replace(/"/g, '&quot;') + '"' + (v === cur ? ' selected' : '') + '>' + v + '</option>';
+    return '<option value="' + escAttr(v) + '"' + (v === cur ? ' selected' : '') + '>' + v + '</option>';
   }).join('');
 }
-function onFilterChange(){
-  fSabun = document.getElementById('fltSabun').value.trim();
-  fCust = document.getElementById('fltCust').value;
-  fCar = document.getElementById('fltCar').value;
-  document.getElementById('fltReset').style.display = (fSabun || fCust || fCar) ? '' : 'none';
+// 헤더 필터용 select HTML 생성 (renderList가 매번 다시 그림)
+function hfSelect(id, vals, allLabel, cur, key){
+  var list = vals.slice();
+  if (cur && list.indexOf(cur) === -1) list.push(cur);
+  var o = '<option value="">' + allLabel + '</option>' + list.map(function(v){
+    return '<option value="' + escAttr(v) + '"' + (v === cur ? ' selected' : '') + '>' + v + '</option>';
+  }).join('');
+  return '<select class="hf-in" id="' + id + '" onchange="setFilter(\'' + key + '\', this.value, \'' + id + '\')">' + o + '</select>';
+}
+// 모든 필터 변경의 단일 진입점. 목록 표가 통째로 다시 그려져도 입력 포커스·커서 위치를 복원한다.
+function setFilter(k, v, srcId){
+  if (k === 'sabun') fSabun = v.trim();
+  else if (k === 'cust') fCust = v;
+  else if (k === 'car') fCar = v;
+  var ae = document.activeElement;
+  var keepFocus = ae && ae.id === srcId;
+  var pos = (keepFocus && ae.tagName === 'INPUT') ? ae.selectionStart : null;
+  syncToolbarFilters();
   render();
+  if (keepFocus){
+    var el = document.getElementById(srcId);
+    if (el){
+      el.focus();
+      if (pos !== null && el.setSelectionRange){ try { el.setSelectionRange(pos, pos); } catch (e) {} }
+    }
+  }
+}
+function syncToolbarFilters(){   // 월간용 툴바 컨트롤을 상태값과 일치시킴
+  var a = document.getElementById('fltSabun'), b = document.getElementById('fltCust'), c = document.getElementById('fltCar');
+  if (a) a.value = fSabun;
+  if (b) b.value = fCust;
+  if (c) c.value = fCar;
+  var r = document.getElementById('fltReset');
+  if (r) r.style.display = (fSabun || fCust || fCar) ? '' : 'none';
 }
 function resetFilters(){
   fSabun = ''; fCust = ''; fCar = '';
-  document.getElementById('fltSabun').value = '';
-  document.getElementById('fltCust').value = '';
-  document.getElementById('fltCar').value = '';
-  document.getElementById('fltReset').style.display = 'none';
+  syncToolbarFilters();
   render();
 }
 function shiftMonth(d){
@@ -637,6 +667,7 @@ function render(){
   document.getElementById('vmList').classList.toggle('vm-on', viewMode === 'list');
   document.getElementById('vmMonth').classList.toggle('vm-on', viewMode === 'month');
   document.getElementById('monthNav').style.display = viewMode === 'month' ? 'inline-flex' : 'none';
+  document.getElementById('fltBar').style.display = viewMode === 'month' ? 'inline-flex' : 'none';   // 목록은 헤더 필터 사용
   document.querySelector('.sp-wrap').classList.toggle('wide', viewMode === 'month');   // 월간은 전체 폭 사용
 
   buildFilterOptions();          // 납품처/차종 드롭다운 자동 수집
@@ -659,11 +690,21 @@ function render(){
 
 // ── 목록 보기: 한 줄 요약 + 클릭 펼침 (품목 20~30개 대응) ──
 function renderList(view){
-  if (!view.length){
-    document.getElementById('itemList').innerHTML = '<div class="empty-s">' + ((fSabun || fCust || fCar) ? '검색/필터 조건에 맞는 품목이 없습니다. 우측 상단 ↺ 초기화를 눌러보세요.' : (activeMgr ? '[' + activeMgr + '] 담당 품목이 없습니다.' : '등록된 특별관리 품목이 없습니다.')) + '</div>';
+  var hasFlt = !!(fSabun || fCust || fCar);
+  if (!view.length && !hasFlt){
+    document.getElementById('itemList').innerHTML = '<div class="empty-s">' + (activeMgr ? '[' + activeMgr + '] 담당 품목이 없습니다.' : '등록된 특별관리 품목이 없습니다.') + '</div>';
     return;
   }
-  var h = '<table class="lst"><tr><th style="width:26px"></th><th>사번</th><th>품명</th><th>담당</th><th>전일재고</th><th>금일입고</th><th>금일출고</th><th>현재고</th><th>다음 예정</th><th style="width:200px">작업</th></tr>';
+  var h = '<table class="lst"><tr><th style="width:26px"></th><th>사번</th><th>품명</th><th>담당</th><th>전일재고</th><th>금일입고</th><th>금일출고</th><th>현재고</th><th>다음 예정</th><th style="width:200px">작업</th></tr>'
+    // ── 헤더 필터 줄 (엑셀식 상시 검색칸) ──
+    + '<tr class="flt"><th></th>'
+    + '<th><input class="hf-in" id="hfSabun" style="width:74px" placeholder="🔍 검색" value="' + escAttr(fSabun) + '" oninput="setFilter(\'sabun\', this.value, \'hfSabun\')"></th>'
+    + '<th style="text-align:left">' + hfSelect('hfCust', custOpts, '납품처 전체', fCust, 'cust') + ' ' + hfSelect('hfCar', carOpts, '차종 전체', fCar, 'car') + '</th>'
+    + '<th></th><th></th><th></th><th></th><th></th><th></th>'
+    + '<th>' + (hasFlt ? '<button class="btn-mini" style="background:#fee2e2;color:#b91c1c" onclick="resetFilters()">↺ 초기화</button>' : '') + '</th></tr>';
+  if (!view.length){
+    h += '<tr><td colspan="10" style="padding:16px;color:#aaa;font-size:12.5px">검색/필터 조건에 맞는 품목이 없습니다. ↺ 초기화로 전체를 다시 볼 수 있습니다.</td></tr>';
+  }
   view.forEach(function(it){
     var c = calcItem(it.sabun);
     var next = plans.filter(function(p){ return p.sabun === it.sabun && !p.done; })[0];
