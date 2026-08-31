@@ -230,11 +230,11 @@ function initSidebar() {
                     '<span class="c-badge on">운영</span><span class="c-arrow">▼</span>' +
                 '</button>' +
                 '<div class="cat-body">' +
+                    '<a class="nav-link' + procRptActive + '" href="process_report.html"><span class="n-icon">📈</span>공정별 생산보고서</a>' +
                     '<a class="nav-link' + dataViewActive + '" href="data_viewer.html"><span class="n-icon">📊</span>데이터 조회 및 추출</a>' +
                     '<a class="nav-link' + safetyViewActive + '" href="safety_viewer.html"><span class="n-icon">🔍</span>설비 점검 조회</a>' +
                     '<a class="nav-link' + docsActive + '" href="docs_manager.html"><span class="n-icon">📄</span>문서 관리</a>' +
                     '<a class="nav-link' + mesActive + '" href="mes_data.html"><span class="n-icon">📥</span>MES 자료 (재단·혼련·평량)</a>' +
-                    '<a class="nav-link' + procRptActive + '" href="process_report.html"><span class="n-icon">📈</span>공정별 생산보고서</a>' +
                 '</div>' +
             '</div>' +
         '</div>' +
