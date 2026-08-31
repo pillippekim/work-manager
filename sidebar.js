@@ -22,7 +22,7 @@ function initSidebar() {
     var isMoldPage = ['mold_dashboard.html','mold_layout.html','mold_detail.html'].indexOf(page) !== -1;
     var isMesPage = ['mes_data.html'].indexOf(page) !== -1;
     var isQualityPage = ['inspection_round_viewer.html', 'inspection_report.html'].indexOf(page) !== -1;
-    var isDataPage = ['data_viewer.html','safety_viewer.html','docs_manager.html'].indexOf(page) !== -1;
+    var isDataPage = ['data_viewer.html','safety_viewer.html','docs_manager.html','process_report.html'].indexOf(page) !== -1;
     var isSystemPage = ['master_data.html','users.html'].indexOf(page) !== -1;
     var isInventoryPage = ['inventory_layout.html','inventory_rack.html','inventory_io.html','inventory_viewer.html','inventory_zone.html','inventory_special.html'].indexOf(page) !== -1;
     var isAssetPage = ['asset_manage.html'].indexOf(page) !== -1;
@@ -62,7 +62,7 @@ function initSidebar() {
     var assetActive = (page === 'asset_manage.html') ? ' nav-active' : '';
 
     // 자동 펼침
-    var prodOpen = (isMoldPage || page === 'process_report.html') ? ' open' : '';
+    var prodOpen = isMoldPage ? ' open' : '';
     var mesOpen = isMesPage ? ' open' : '';
     var moldOpen = isMoldPage ? ' open' : '';
     var qualityOpen = isQualityPage ? ' open' : '';
@@ -151,7 +151,6 @@ function initSidebar() {
                             '<a class="nav-link' + detailActive + '" href="mold_detail.html"><span class="n-icon">📋</span>금형 상세관리</a>' +
                         '</div>' +
                     '</div>' +
-                    '<a class="nav-link' + procRptActive + '" href="process_report.html"><span class="n-icon">📈</span>공정별 생산보고서</a>' +
             '</div>' +
 
             /* 품질관리 */
@@ -235,6 +234,7 @@ function initSidebar() {
                     '<a class="nav-link' + safetyViewActive + '" href="safety_viewer.html"><span class="n-icon">🔍</span>설비 점검 조회</a>' +
                     '<a class="nav-link' + docsActive + '" href="docs_manager.html"><span class="n-icon">📄</span>문서 관리</a>' +
                     '<a class="nav-link' + mesActive + '" href="mes_data.html"><span class="n-icon">📥</span>MES 자료 (재단·혼련·평량)</a>' +
+                    '<a class="nav-link' + procRptActive + '" href="process_report.html"><span class="n-icon">📈</span>공정별 생산보고서</a>' +
                 '</div>' +
             '</div>' +
         '</div>' +

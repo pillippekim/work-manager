@@ -8,11 +8,11 @@ var SUPABASE_KEY_AG = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 // 메뉴 구조 정의 (대분류 → 페이지 매핑)
 // =============================================
 window.MENU_STRUCTURE = {
-    production: { name: '생산관리', pages: ['mold_dashboard.html', 'mold_layout.html', 'mold_detail.html', 'mold_admin.html', 'process_report.html'] },
+    production: { name: '생산관리', pages: ['mold_dashboard.html', 'mold_layout.html', 'mold_detail.html', 'mold_admin.html'] },
     quality:    { name: '품질관리', pages: ['inspection_round_viewer.html', 'inspection_report.html'] },
     logistics:  { name: '물류관리', pages: ['inventory_layout.html', 'inventory_rack.html', 'inventory_zone.html', 'inventory_io.html', 'inventory_viewer.html', 'inventory_special.html'] },
     management: { name: '경영지원', pages: ['asset_manage.html'], sensitive: true },
-    data:       { name: '데이터 관리', pages: ['data_viewer.html', 'safety_viewer.html', 'docs_manager.html'] },
+    data:       { name: '데이터 관리', pages: ['data_viewer.html', 'safety_viewer.html', 'docs_manager.html', 'process_report.html'] },
     system:     { name: '시스템 관리', pages: ['master_data.html', 'users.html', 'permissions.html'] }
 };
 
