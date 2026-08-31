@@ -37,6 +37,9 @@ function initSidebar() {
     var inspViewActive = (page === 'inspection_round_viewer.html') ? ' nav-active' : '';
     var inspReportActive = (page === 'inspection_report.html') ? ' nav-active' : '';
 
+    // 공정별 생산보고서 active
+    var procRptActive = (page === 'process_report.html') ? ' nav-active' : '';
+
     // 데이터관리 active
     var dataViewActive = (page === 'data_viewer.html') ? ' nav-active' : '';
     var safetyViewActive = (page === 'safety_viewer.html') ? ' nav-active' : '';
@@ -59,7 +62,7 @@ function initSidebar() {
     var assetActive = (page === 'asset_manage.html') ? ' nav-active' : '';
 
     // 자동 펼침
-    var prodOpen = isMoldPage ? ' open' : '';
+    var prodOpen = (isMoldPage || page === 'process_report.html') ? ' open' : '';
     var mesOpen = isMesPage ? ' open' : '';
     var moldOpen = isMoldPage ? ' open' : '';
     var qualityOpen = isQualityPage ? ' open' : '';
@@ -148,6 +151,7 @@ function initSidebar() {
                             '<a class="nav-link' + detailActive + '" href="mold_detail.html"><span class="n-icon">📋</span>금형 상세관리</a>' +
                         '</div>' +
                     '</div>' +
+                    '<a class="nav-link' + procRptActive + '" href="process_report.html"><span class="n-icon">📈</span>공정별 생산보고서</a>' +
             '</div>' +
 
             /* 품질관리 */

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>공정별 생산보고서 - HKHT</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="common.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="auth_guard.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; font-family:'Noto Sans KR',sans-serif; }
+body { background:#eef0f4; color:#222; }
+
+/* ── 공정 탭바 ── */
+.proc-tabs { max-width:900px; margin:0 auto 12px; background:#fff; border:1px solid #e5e8f0; border-radius:12px; padding:10px 12px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.pt-btn { padding:7px 13px; border:1px solid #dfe3ec; border-radius:20px; background:#fff; font-size:13px; font-weight:600; color:#555; cursor:pointer; }
+.pt-btn:hover { background:#f0f2f7; }
+.pt-btn.active { background:#243bb2; border-color:#243bb2; color:#fff; }
+.pt-btn.na { color:#b6bcc9; cursor:pointer; }
+.pt-sep { width:1px; height:20px; background:#d5dae5; margin:0 4px; }
+.pt-grp { font-size:10.5px; color:#98a0b0; font-weight:700; letter-spacing:1px; margin-right:2px; }
+
+/* ── 기간/옵션 컨트롤 (인쇄 시 숨김) ── */
+.rp-controls { background:#fff; border:1px solid #e5e8f0; border-radius:12px; padding:14px 16px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; max-width:900px; margin:0 auto 16px; }
+.rp-controls label { font-size:13px; color:#555; font-weight:600; }
+.rp-controls input[type=date] { padding:7px 10px; border:1px solid #dfe3ec; border-radius:7px; font-size:13px; }
+.btn { padding:8px 14px; border:none; border-radius:7px; font-size:13px; font-weight:600; cursor:pointer; }
+.btn-quick { background:#f0f2f7; color:#444; }
+.btn-load { background:#243bb2; color:#fff; }
+.btn-print { background:#16a34a; color:#fff; }
+.btn-xlsx { background:#0f766e; color:#fff; }
+.btn-ghost { background:#fff; color:#555; border:1px solid #dfe3ec; }
+.chk-line { display:flex; align-items:center; gap:5px; font-size:13px; color:#555; font-weight:600; cursor:pointer; user-select:none; }
+
+/* ── 리포트 용지 ── */
+.paper { max-width:900px; margin:0 auto; background:#fff; padding:36px 40px; box-shadow:0 2px 14px rgba(0,0,0,.08); border-radius:12px; position:relative; }
+.rp-head { text-align:center; border-bottom:3px solid #1a2340; padding-bottom:14px; margin-bottom:6px; }
+.rp-head h1 { font-size:23px; letter-spacing:5px; color:#1a2340; }
+.rp-meta { display:flex; justify-content:space-between; font-size:12px; color:#555; margin:8px 0 18px; flex-wrap:wrap; gap:4px; }
+
+/* ── 결재란: 컴팩트 · 우측상단 고정(absolute → 본문 밀지 않음) ── */
+.sign-box { position:absolute; top:12px; right:16px; }
+.sign-box table { border-collapse:collapse; }
+.sign-box th, .sign-box td { border:1px solid #999; font-size:10px; text-align:center; }
+.sign-box th { background:#f3f4f8; padding:2px 0; width:46px; font-weight:600; }
+.sign-box td { height:28px; }
+body.no-sign .sign-box { display:none; }
+
+/* 요약 카드 */
+.sum-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:16px; }
+.sum-card { border:1px solid #dfe3ec; border-radius:6px; padding:7px 2px; text-align:center; }
+.sum-card .n { font-size:15px; font-weight:800; }
+.sum-card .l { font-size:9.5px; color:#777; margin-top:1px; letter-spacing:-0.3px; }
+
+h2.sec { font-size:14px; color:#1a2340; border-left:4px solid #1a2340; padding-left:8px; margin:22px 0 8px; }
+table.rp { width:100%; border-collapse:collapse; font-size:12px; }
+table.rp th, table.rp td { border:1px solid #c9cfdb; padding:5px 7px; text-align:center; }
+table.rp th { background:#f0f2f7; font-weight:700; }
+table.rp td.left { text-align:left; }
+table.rp td.right { text-align:right; }
+tr.grp-row { cursor:pointer; }
+tr.grp-row:hover td { background:#f7f8fc; }
+tr.det-row { display:none; }
+tr.det-row.open { display:table-row; }
+tr.det-row > td { background:#fafbfe; padding:8px; }
+table.det { width:100%; border-collapse:collapse; font-size:11px; }
+table.det th, table.det td { border:1px solid #dde2ec; padding:3px 6px; text-align:center; }
+table.det th { background:#eef1f8; font-weight:600; }
+table.det td.left { text-align:left; }
+.arrow { font-size:10px; color:#98a0b0; }
+.empty-msg { color:#999; font-size:12px; padding:14px; text-align:center; border:1px dashed #d5dae5; border-radius:6px; }
+.foot-note { font-size:11px; color:#888; margin-top:24px; border-top:1px solid #e5e8f0; padding-top:8px; }
+.na-msg { text-align:center; padding:60px 10px; color:#98a0b0; font-size:14px; }
+
+@media print {
+  body { background:#fff; }
+  .top-header, .sidebar, .page-header, .rp-controls, .proc-tabs { display:none !important; }
+  .main { margin:0 !important; padding:0 !important; }
+  .paper { box-shadow:none; margin:0; max-width:100%; padding:10mm 12mm; border-radius:0; }
+  .sign-box { top:6mm; right:8mm; }
+  h2.sec { page-break-after:avoid; }
+  table.rp { page-break-inside:auto; }
+  tr { page-break-inside:avoid; }
+}
+</style>
+</head>
+<body>
+
+<div id="top-header" class="top-header"></div>
+<nav id="sidebar-nav" class="sidebar"></nav>
+
+<div class="main">
+  <div class="page-header">
+    <h1 class="page-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      공정별 생산보고서
+      <span class="header-actions">
+        <button class="btn btn-xlsx" onclick="downloadXlsx()">⬇ 엑셀</button>
+        <button class="btn btn-print" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button>
+      </span>
+    </h1>
+    <p class="page-desc">작업일지 데이터를 공정별·기간별로 자동 집계한 생산 리포트</p>
+  </div>
+
+  <div style="padding:20px 20px 40px;">
+
+    <div class="proc-tabs" id="procTabs"></div>
+
+    <div class="rp-controls">
+      <label>기간</label>
+      <input type="date" id="sDate"> <span style="color:#aaa">~</span> <input type="date" id="eDate">
+      <button class="btn btn-quick" onclick="quick('today')">당일</button>
+      <button class="btn btn-quick" onclick="quick('yesterday')">전일</button>
+      <button class="btn btn-quick" onclick="quick('month')">당월</button>
+      <button class="btn btn-quick" onclick="quick('lastMonth')">전월</button>
+      <button class="btn btn-load" onclick="loadReport(true)">🔍 조회</button>
+      <span style="flex:1"></span>
+      <label class="chk-line"><input type="checkbox" id="chkSign" checked onchange="toggleSign()"> 결재란</label>
+      <button class="btn btn-ghost" id="btnExpand" onclick="toggleAllDetails()">전체 펼치기</button>
+    </div>
+
+    <div class="paper" id="paper">
+      <div class="sign-box">
+        <table>
+          <tr><th>작성</th><th>검토</th><th>승인</th></tr>
+          <tr><td></td><td></td><td></td></tr>
+        </table>
+      </div>
+      <div class="rp-head"><h1 id="rpTitle">생산보고서</h1></div>
+      <div class="rp-meta">
+        <div>기간: <b id="mPeriod">-</b></div>
+        <div>출력일: <b id="mPrinted">-</b> · 출력자: <b id="mUser">-</b></div>
+      </div>
+      <div id="rpBody"><div class="empty-msg">기간을 선택하고 조회해주세요.</div></div>
+      <div class="foot-note" id="rpFoot">
+        ※ 본 리포트는 현장 작업일지 Raw Data를 기간 기준으로 자동 집계한 자료입니다. 삭제 처리된 작업일지는 집계에서 제외됩니다.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+var SU = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+var SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+var db = window.supabase.createClient(SU, SK);
+var myInfo = null;
+
+/* ── 공정 탭 정의 (공정 흐름 순서 / impl=true 만 구현됨) ── */
+var PROCS = [
+  { k:'cmb',       label:'배합',   grp:'전공정', table:'cmb_reports',       impl:false, na:'현재 미사용 공정입니다.' },
+  { k:'cutting',   label:'재단',   grp:'전공정', table:'cutting_reports',   impl:false },
+  { k:'molding',   label:'성형',   grp:'성형',   table:'molding_reports',   impl:false },
+  { k:'postcure',  label:'후가황', grp:'후공정', table:'postcure_reports',  impl:false },
+  { k:'shot',      label:'쇼트',   grp:'후공정', table:'shot_reports',      impl:false },
+  { k:'sasang',    label:'사상',   grp:'후공정', table:'sasang_reports',    impl:false },
+  { k:'coating',   label:'도포',   grp:'후공정', table:'coating_reports',   impl:false },
+  { k:'assembly',  label:'조립',   grp:'후공정', table:'assembly_reports',  impl:false },
+  { k:'inspection',label:'검사',   grp:'후공정', table:'inspection_reports',impl:false },
+  { k:'packaging', label:'포장',   grp:'후공정', table:'packaging_reports', impl:true  }
+];
+var curProc = 'packaging';
+var dataCache = {};   /* key: proc|sdate|edate → rows */
+var PRODUCTS = null;  /* 사번 → {partNo, partName} */
+var lastXlsx = null;  /* 현재 화면 기준 엑셀 시트 데이터 */
+
+/* ── 유틸 ── */
+function fmtLocal(d){ var y=d.getFullYear(),m=('0'+(d.getMonth()+1)).slice(-2),dd=('0'+d.getDate()).slice(-2); return y+'-'+m+'-'+dd; }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function num(n){ return (n||0).toLocaleString('ko-KR'); }
+function procOf(k){ for (var i=0;i<PROCS.length;i++){ if (PROCS[i].k===k) return PROCS[i]; } return null; }
+
+/* ── 탭바 렌더 ── */
+function renderTabs(){
+  var h='', prevGrp=null;
+  PROCS.forEach(function(p){
+    if (prevGrp!==null && p.grp!==prevGrp) h += '<span class="pt-sep"></span>';
+    if (p.grp!==prevGrp) h += '<span class="pt-grp">'+p.grp+'</span>';
+    prevGrp = p.grp;
+    var cls = 'pt-btn' + (p.k===curProc?' active':'') + (p.impl?'':' na');
+    h += '<button class="'+cls+'" onclick="setProc(\''+p.k+'\')">'+p.label+'</button>';
+  });
+  document.getElementById('procTabs').innerHTML = h;
+}
+
+function setProc(k){
+  curProc = k;
+  try { history.replaceState(null,'', location.pathname + '?proc=' + k); } catch(e){}
+  renderTabs();
+  loadReport(false);
+}
+
+/* ── 기간 ── */
+function quick(t){
+  var now = new Date();
+  var s=document.getElementById('sDate'), e=document.getElementById('eDate');
+  if (t==='today'){ s.value=fmtLocal(now); e.value=fmtLocal(now); }
+  if (t==='yesterday'){ var y=new Date(now); y.setDate(y.getDate()-1); s.value=fmtLocal(y); e.value=fmtLocal(y); }
+  if (t==='month'){ s.value=fmtLocal(new Date(now.getFullYear(),now.getMonth(),1)); e.value=fmtLocal(now); }
+  if (t==='lastMonth'){ s.value=fmtLocal(new Date(now.getFullYear(),now.getMonth()-1,1)); e.value=fmtLocal(new Date(now.getFullYear(),now.getMonth(),0)); }
+  loadReport(true);
+}
+
+/* ── 데이터 조회 (1,000행 제한 대응 페이지네이션 / 삭제건 제외) ── */
+async function fetchAllRows(table, s, e){
+  var all=[], from=0, step=1000;
+  while (true){
+    var res = await db.from(table).select('*')
+      .is('deleted_at', null)
+      .gte('work_date', s).lte('work_date', e)
+      .order('work_date', {ascending:true})
+      .order('created_at', {ascending:true})
+      .range(from, from+step-1);
+    if (res.error) throw res.error;
+    all = all.concat(res.data||[]);
+    if (!res.data || res.data.length < step) break;
+    from += step;
+  }
+  return all;
+}
+
+async function loadProducts(){
+  if (PRODUCTS) return PRODUCTS;
+  PRODUCTS = {};
+  var from=0, step=1000;
+  while (true){
+    var res = await db.from('products').select('sabun, part_no, part_name').range(from, from+step-1);
+    if (res.error) break;
+    (res.data||[]).forEach(function(r){ PRODUCTS[r.sabun] = { partNo:r.part_no||'', partName:r.part_name||'' }; });
+    if (!res.data || res.data.length < step) break;
+    from += step;
+  }
+  return PRODUCTS;
+}
+
+/* ── 메인 로드 ── */
+async function loadReport(force){
+  var s = document.getElementById('sDate').value, e = document.getElementById('eDate').value;
+  if (!s || !e) return;
+  if (s > e){ var t=s; s=e; e=t; document.getElementById('sDate').value=s; document.getElementById('eDate').value=e; }
+  var p = procOf(curProc);
+  document.getElementById('rpTitle').textContent = p.label + ' 생산 REPORT';
+  document.getElementById('mPeriod').textContent = s + ' ~ ' + e;
+  document.getElementById('mPrinted').textContent = fmtLocal(new Date());
+  document.getElementById('mUser').textContent = (myInfo && myInfo.name) || '-';
+  var body = document.getElementById('rpBody');
+  lastXlsx = null;
+  resetExpandBtn();
+
+  if (!p.impl){
+    body.innerHTML = '<div class="na-msg">'+ esc(p.na || p.label + ' 보고서는 준비 중입니다.') +'</div>';
+    return;
+  }
+
+  var key = curProc + '|' + s + '|' + e;
+  var rows;
+  if (!force && dataCache[key]){
+    rows = dataCache[key];
+  } else {
+    body.innerHTML = '<div class="empty-msg">데이터를 불러오는 중...</div>';
+    try {
+      rows = await fetchAllRows(p.table, s, e);
+      dataCache[key] = rows;
+    } catch(err){
+      body.innerHTML = '<div class="empty-msg">조회 실패: '+ esc(err.message||err) +'</div>';
+      return;
+    }
+  }
+  if (curProc === 'packaging') await renderPackaging(rows);
+}
+
+/* ════════════════════ 포장 (packaging) ════════════════════ */
+async function renderPackaging(rows){
+  var body = document.getElementById('rpBody');
+  if (!rows.length){ body.innerHTML = '<div class="empty-msg">해당 기간에 제출된 포장 작업일지가 없습니다.</div>'; return; }
+  await loadProducts();
+
+  /* 집계: 사번(품목)별 */
+  var bySabun = {}, byWorker = {}, lotSet = {}, totalQty = 0;
+  rows.forEach(function(r){
+    var sb = r.worker_id || '(사번미입력)';
+    if (!bySabun[sb]) bySabun[sb] = { qty:0, cnt:0, lots:{}, rows:[] };
+    var g = bySabun[sb];
+    g.qty += (r.quantity||0); g.cnt++; g.rows.push(r);
+    (r.lot_nos||[]).forEach(function(l){ if(l){ g.lots[l]=1; lotSet[l]=1; } });
+    var w = r.worker_name || '(미지정)';
+    if (!byWorker[w]) byWorker[w] = { qty:0, cnt:0 };
+    byWorker[w].qty += (r.quantity||0); byWorker[w].cnt++;
+    totalQty += (r.quantity||0);
+  });
+  var sabuns = Object.keys(bySabun).sort(function(a,b){ return bySabun[b].qty - bySabun[a].qty; });
+  var workers = Object.keys(byWorker).sort(function(a,b){ return byWorker[b].qty - byWorker[a].qty; });
+
+  var h = '';
+  /* 요약 카드 */
+  h += '<div class="sum-grid">'
+    + '<div class="sum-card"><div class="n">'+num(totalQty)+'</div><div class="l">총 포장수량</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(sabuns.length)+'</div><div class="l">품목(사번) 수</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(Object.keys(lotSet).length)+'</div><div class="l">LOT 수</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(rows.length)+'</div><div class="l">작업 건수</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(workers.length)+'</div><div class="l">투입 작업자</div></div>'
+    + '</div>';
+
+  /* 1. 품목별 포장 실적 (클릭 → 상세) */
+  h += '<h2 class="sec">1. 품목(사번)별 포장 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 상세</span></h2>';
+  h += '<table class="rp"><tr><th style="width:90px">사번</th><th style="width:130px">품번</th><th>품명</th><th style="width:90px">포장수량</th><th style="width:64px">LOT 수</th><th style="width:56px">건수</th><th style="width:30px"></th></tr>';
+  sabuns.forEach(function(sb, i){
+    var g = bySabun[sb];
+    var prod = PRODUCTS[sb] || { partNo:'-', partName:'-' };
+    h += '<tr class="grp-row" onclick="toggleDet(\'pk'+i+'\')">'
+      + '<td>'+esc(sb)+'</td><td>'+esc(prod.partNo||'-')+'</td><td class="left">'+esc(prod.partName||'-')+'</td>'
+      + '<td class="right" style="font-weight:700">'+num(g.qty)+'</td>'
+      + '<td>'+num(Object.keys(g.lots).length)+'</td><td>'+num(g.cnt)+'</td>'
+      + '<td class="arrow" id="ar-pk'+i+'">▼</td></tr>';
+    h += '<tr class="det-row" id="det-pk'+i+'"><td colspan="7">'
+      + '<table class="det"><tr><th style="width:80px">일자</th><th>LOT</th><th style="width:80px">수량</th><th style="width:80px">작업자</th><th>비고</th></tr>';
+    g.rows.forEach(function(r){
+      var lotsRaw = (r.lot_nos||[]).filter(function(l){return l;}).join(', ');
+      var badges = (r.badge_nos||[]).filter(function(b){return b;}).join(', ');
+      var lotHtml = lotsRaw ? esc(lotsRaw) : '-';
+      if (badges) lotHtml += ' <span style="color:#0369a1">/ 배지: ' + esc(badges) + '</span>';
+      h += '<tr><td>'+esc(r.work_date)+'</td><td class="left">'+ lotHtml +'</td>'
+        + '<td style="text-align:right">'+num(r.quantity)+'</td><td>'+esc(r.worker_name||'-')+'</td><td class="left">'+esc(r.note||'')+'</td></tr>';
+    });
+    h += '</table></td></tr>';
+  });
+  h += '</table>';
+
+  /* 2. 작업자별 실적 */
+  h += '<h2 class="sec">2. 작업자별 포장 실적</h2>';
+  h += '<table class="rp" style="max-width:420px"><tr><th>작업자</th><th style="width:100px">포장수량</th><th style="width:70px">건수</th></tr>';
+  workers.forEach(function(w){
+    h += '<tr><td>'+esc(w)+'</td><td class="right">'+num(byWorker[w].qty)+'</td><td>'+num(byWorker[w].cnt)+'</td></tr>';
+  });
+  h += '</table>';
+
+  /* 3. 특이사항 (제출 단위 remarks 중복 제거) */
+  var remSeen = {}, rems = [];
+  rows.forEach(function(r){
+    var t = (r.remarks||'').trim();
+    if (!t) return;
+    var k = r.work_date + '|' + t;
+    if (remSeen[k]) return; remSeen[k]=1;
+    rems.push({ d:r.work_date, by:r.created_by_name||r.worker_name||'-', t:t });
+  });
+  if (rems.length){
+    h += '<h2 class="sec">3. 특이사항 / 전달사항</h2>';
+    h += '<table class="rp"><tr><th style="width:90px">일자</th><th style="width:90px">작성자</th><th>내용</th></tr>';
+    rems.forEach(function(r){ h += '<tr><td>'+esc(r.d)+'</td><td>'+esc(r.by)+'</td><td class="left">'+esc(r.t)+'</td></tr>'; });
+    h += '</table>';
+  }
+
+  body.innerHTML = h;
+
+  /* 엑셀 데이터 준비 */
+  var sh1 = [['사번','품번','품명','포장수량','LOT 수','건수']];
+  sabuns.forEach(function(sb){
+    var g=bySabun[sb], prod=PRODUCTS[sb]||{partNo:'',partName:''};
+    sh1.push([sb, prod.partNo, prod.partName, g.qty, Object.keys(g.lots).length, g.cnt]);
+  });
+  var sh2 = [['일자','사번','품번','품명','LOT','배지','수량','작업자','비고']];
+  rows.forEach(function(r){
+    var prod = PRODUCTS[r.worker_id]||{partNo:'',partName:''};
+    sh2.push([r.work_date, r.worker_id||'', prod.partNo, prod.partName,
+      (r.lot_nos||[]).join(', '), (r.badge_nos||[]).join(', '), r.quantity||0, r.worker_name||'', r.note||'']);
+  });
+  var sh3 = [['작업자','포장수량','건수']];
+  workers.forEach(function(w){ sh3.push([w, byWorker[w].qty, byWorker[w].cnt]); });
+  lastXlsx = { name:'packaging', sheets:[ {n:'품목별요약',d:sh1}, {n:'상세내역',d:sh2}, {n:'작업자별',d:sh3} ] };
+  if (rems.length){
+    var sh4 = [['일자','작성자','내용']];
+    rems.forEach(function(r){ sh4.push([r.d, r.by, r.t]); });
+    lastXlsx.sheets.push({ n:'특이사항', d:sh4 });
+  }
+}
+
+/* ── 상세 펼침 ── */
+function toggleDet(id){
+  var el = document.getElementById('det-'+id);
+  if (!el) return;
+  el.classList.toggle('open');
+  var ar = document.getElementById('ar-'+id);
+  if (ar) ar.textContent = el.classList.contains('open') ? '▲' : '▼';
+}
+var allOpen = false;
+function toggleAllDetails(){
+  allOpen = !allOpen;
+  document.querySelectorAll('tr.det-row').forEach(function(el){ el.classList.toggle('open', allOpen); });
+  document.querySelectorAll('[id^="ar-"]').forEach(function(el){ el.textContent = allOpen ? '▲' : '▼'; });
+  document.getElementById('btnExpand').textContent = allOpen ? '전체 접기' : '전체 펼치기';
+}
+function resetExpandBtn(){ allOpen = false; document.getElementById('btnExpand').textContent = '전체 펼치기'; }
+
+/* ── 결재란 토글 ── */
+function toggleSign(){
+  document.body.classList.toggle('no-sign', !document.getElementById('chkSign').checked);
+}
+
+/* ── 엑셀 다운로드 ── */
+function downloadXlsx(){
+  if (!lastXlsx){ alert('먼저 조회 후 다운로드해주세요.'); return; }
+  var wb = XLSX.utils.book_new();
+  lastXlsx.sheets.forEach(function(sh){
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sh.d), sh.n);
+  });
+  var s = document.getElementById('sDate').value.replace(/-/g,'');
+  var e = document.getElementById('eDate').value.replace(/-/g,'');
+  XLSX.writeFile(wb, 'report_' + lastXlsx.name + '_' + s + '_' + e + '.xlsx');
+}
+
+/* ── 초기화 ── */
+document.addEventListener('DOMContentLoaded', async function(){
+  try {
+    var params = new URLSearchParams(location.search);
+    var q = params.get('proc');
+    if (q && procOf(q)) curProc = q;
+  } catch(e){}
+  renderTabs();
+  if (typeof checkAuth === 'function') {
+    myInfo = await checkAuth();
+    if (!myInfo) return;
+  }
+  quick('today');
+});
+</script>
+<script src="sidebar.js"></script>
+</body>
+</html>
