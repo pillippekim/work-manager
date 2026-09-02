@@ -2460,19 +2460,30 @@ function moldingWorkHours(r){
   if (!r.start_time || !r.end_time) return '-';
   return (''+r.start_time).slice(0,5) + '~' + (''+r.end_time).slice(0,5);
 }
-// 이 사번의 비가동시간 합계(분)
+// 비가동 구간의 순수 분 = 구간 길이 - 점심(12:00~13:00)·저녁(17:00~17:30) 겹침 제외
+function moldingDtNetMin(start, end){
+  var s = (''+start).split(':'), e = (''+end).split(':');
+  var a1 = (+s[0])*60 + (+s[1]);
+  var len = ((+e[0])*60 + (+e[1])) - a1; if (len < 0) len += 1440;   // 자정 걸침 대응
+  var a2 = a1 + len;
+  var ov = function(b1,b2){ var lo=Math.max(a1,b1), hi=Math.min(a2,b2); return hi>lo ? hi-lo : 0; };
+  var meal = function(m1,m2){ return ov(m1,m2) + ov(m1+1440,m2+1440); };
+  var net = len - meal(12*60, 13*60) - meal(17*60, 17*60+30);
+  return net < 0 ? 0 : net;
+}
+// 이 사번의 비가동시간 합계(분) — 식사시간 겹침 제외
 function moldingDowntimeMin(r){
   var tot = 0;
   try {
     var n = JSON.parse(r.note);
     (n.downtime||[]).filter(function(d){ return !d.sabun || d.sabun===r.sabun; }).forEach(function(d){
-      if (d.start && d.end){ var s=d.start.split(':'), e=d.end.split(':'); var m=(+e[0]*60+ +e[1])-(+s[0]*60+ +s[1]); if(m<0)m+=1440; tot+=m; }
+      if (d.start && d.end){ tot += moldingDtNetMin(d.start, d.end); }
     });
   } catch(e){}
   return tot;
 }
-// 가동시간(분) = 근무시간 - 식사시간(점심 12~13시 60분, 저녁 17:00~17:30 30분) - 비가동시간
-function moldingOperatingMin(r){
+// 가동가능시간(분) = 근무시간 - 식사시간(점심 12~13시, 저녁 17:00~17:30)
+function moldingAvailableMin(r){
   if (!r.start_time || !r.end_time) return null;
   var toMin = function(t){ var p=(''+t).split(':'); return (+p[0])*60 + (+p[1]); };
   var s = toMin(r.start_time), e = toMin(r.end_time);
@@ -2480,9 +2491,13 @@ function moldingOperatingMin(r){
   var ws = s, we = s + total;
   var ov = function(a1,a2,b1,b2){ var lo=Math.max(a1,b1), hi=Math.min(a2,b2); return hi>lo ? hi-lo : 0; };
   var meal = function(m1,m2){ return ov(ws,we,m1,m2) + ov(ws,we,m1+1440,m2+1440); };
-  var lunch = meal(12*60, 13*60);       // 점심 12:00~13:00
-  var dinner = meal(17*60, 17*60+30);   // 저녁 17:00~17:30
-  var work = total - lunch - dinner - moldingDowntimeMin(r);
+  return total - meal(12*60, 13*60) - meal(17*60, 17*60+30);
+}
+// 실생산시간(분) = 가동가능시간 - 비가동시간(식사 제외분)
+function moldingOperatingMin(r){
+  var avail = moldingAvailableMin(r);
+  if (avail == null) return null;
+  var work = avail - moldingDowntimeMin(r);
   return work < 0 ? 0 : work;
 }
 
@@ -2494,7 +2509,7 @@ function renderMoldingTable(data) {
     <div class="card" style="padding:0"><div class="table-wrap"><table><thead><tr>
       <th>NO</th>${makeSortTh('작업일','work_date')}${makeSortTh('근무','shift')}${makeSortTh('반','team')}${makeSortTh('설비','equipment_no')}${makeSortTh('유형','work_type')}${makeSortTh('사번','worker_id')}<th>재질명</th>
       ${makeSortTh('Batch','batch_no')}${makeSortTh('C/V','cavity')}${makeSortTh('Shot','shot_count')}${makeSortTh('생산','total_qty','style="text-align:right"')}${makeSortTh('불량','defect_qty','style="text-align:right"')}
-      <th>비가동</th><th>비가동시간</th><th>근무시간</th><th>가동시간(분)</th>${makeSortTh('작업자','worker_name')}<th>비고</th>${makeSortTh('제출일시','submitted_at')}<th>작업</th>
+      <th>온도/압력</th><th>비가동</th><th>비가동시간</th><th>근무시간</th><th>실생산시간(분)</th>${makeSortTh('작업자','worker_name')}<th>비고</th>${makeSortTh('제출일시','submitted_at')}<th>작업</th>
     </tr></thead><tbody>
     ${data.map((r,i) => {
       const del = r.deleted_at;
@@ -2519,10 +2534,7 @@ function renderMoldingTable(data) {
           dtCode = matched.map(d => d.code).filter(Boolean).join(', ');
           dtMin = matched.map(d => {
             if (d.start && d.end) {
-              const [sh,sm] = d.start.split(':').map(Number);
-              const [eh,em] = d.end.split(':').map(Number);
-              let m = (eh*60+em) - (sh*60+sm); if (m < 0) m += 1440;
-              return d.start + '~' + d.end + '(' + m + '분)';
+              return d.start + '~' + d.end + '(' + moldingDtNetMin(d.start, d.end) + '분)';
             }
             return '';
           }).filter(Boolean).join(', ');
@@ -2536,6 +2548,12 @@ function renderMoldingTable(data) {
         <td style="font-size:11px">${r.batch_no||''}</td><td>${r.cavity||''}</td><td>${r.shot_count||''}</td>
         <td style="text-align:right;font-weight:600">${(r.production_qty||0).toLocaleString()}</td>
         <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${r.defect_qty||0}</td>
+        <td style="font-size:11px;white-space:nowrap">${(function(){
+          var u=r.upper_temp, l=r.lower_temp, p=r.molding_pressure;
+          if(u==null&&l==null&&(p==null||p==='')) return '-';
+          var t=(u!=null?u:'-')+'/'+(l!=null?l:'-')+'℃';
+          return t + (p!=null&&p!==''?' · '+p:'');
+        })()}</td>
         <td style="font-size:11px;color:#e67e22">${dtCode}</td>
         <td style="font-size:11px;color:#e67e22">${dtMin}</td>
         <td style="font-size:11px;text-align:center">${moldingWorkHours(r)}</td>
@@ -3101,9 +3119,10 @@ function downloadExcel() {
       '상판온도': r.upper_temp || '',
       '하판온도': r.lower_temp || '',
       '비가동코드': r.downtime_code || '',
-      '비가동시간(분)': r.downtime_minutes || '',
+      '비가동시간(분)': (function(){ var _d = moldingDowntimeMin(r); return _d > 0 ? _d : ''; })(),
       '근무시간': moldingWorkHours(r) === '-' ? '' : moldingWorkHours(r),
-      '가동시간(분)': (function(){ var _m = moldingOperatingMin(r); return _m == null ? '' : _m; })(),
+      '가동가능시간(분)': (function(){ var _a = moldingAvailableMin(r); return _a == null ? '' : _a; })(),
+      '실생산시간(분)': (function(){ var _m = moldingOperatingMin(r); return _m == null ? '' : _m; })(),
       '문제점': r.problem || '',
       '작업자': r.worker_name || '',
       '비고': (() => { try { return JSON.parse(r.note).text || ''; } catch(e) { return r.note || ''; } })(),
