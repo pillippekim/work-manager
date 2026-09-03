@@ -2440,8 +2440,9 @@ function viewMoldingDay(date, sabun) {
   window.open(url, '_blank');
 }
 
-// 성형 기본 정렬: 작업일 desc → 가나다 면 → 같은 면 내 비가동 행 하단 (제출순 유지)
+// 성형 기본 정렬: 작업일 desc → 반 → 설비 → 가나다 면 → 근무(주간→잔업→야간) → 비가동 행 하단
 function moldingFaceRank(wt){ var m={'가면':0,'나면':1,'다면':2}; return (wt in m) ? m[wt] : 3; }
+function moldingShiftRank(st){ var m={'주간':0,'잔업':1,'야간':2}; return (st in m) ? m[st] : 9; }
 function moldingRecHasDt(r){
   try { var n = JSON.parse(r.note); return (n.downtime||[]).some(function(d){ return (!d.sabun || d.sabun===r.sabun) && d.code; }) ? 1 : 0; } catch(e) { return 0; }
 }
@@ -2451,6 +2452,7 @@ function sortMoldingDefault(data){
     var ta=(a.team||''), tb=(b.team||''); if (ta!==tb) return ta<tb ? -1 : 1;              // 반
     var ea=(a.equipment_no||''), eb=(b.equipment_no||''); if (ea!==eb) return ea<eb ? -1 : 1; // 설비(호기)
     var fr = moldingFaceRank(a.work_type) - moldingFaceRank(b.work_type); if (fr!==0) return fr; // 유형(면)
+    var sr = moldingShiftRank(a.shift_type) - moldingShiftRank(b.shift_type); if (sr!==0) return sr; // 근무
     return moldingRecHasDt(a) - moldingRecHasDt(b);                                        // 비가동여부
   });
 }
