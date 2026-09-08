@@ -153,12 +153,12 @@ var PROCS = [
   { k:'cmb',       label:'배합',   grp:'전공정', table:'cmb_reports',       impl:false, na:'현재 미사용 공정입니다.' },
   { k:'cutting',   label:'재단',   grp:'전공정', table:'cutting_reports',   impl:false },
   { k:'molding',   label:'성형',   grp:'성형',   table:'molding_reports',   impl:false },
-  { k:'postcure',  label:'후가황', grp:'후공정', table:'postcure_reports',  impl:false },
+  { k:'postcure',  label:'2차가류', grp:'후공정', table:'postcure_reports',  impl:false },
   { k:'shot',      label:'쇼트',   grp:'후공정', table:'shot_reports',      impl:false },
   { k:'sasang',    label:'사상',   grp:'후공정', table:'sasang_reports',    impl:false },
   { k:'coating',   label:'도포',   grp:'후공정', table:'coating_reports',   impl:false },
   { k:'assembly',  label:'조립',   grp:'후공정', table:'assembly_reports',  impl:true  },
-  { k:'inspection',label:'검사',   grp:'후공정', table:'inspection_reports',impl:false },
+  { k:'inspection',label:'검사',   grp:'후공정', table:'inspection_reports',impl:true  },
   { k:'packaging', label:'포장',   grp:'후공정', table:'packaging_reports', impl:true  }
 ];
 var curProc = 'packaging';
@@ -270,6 +270,7 @@ async function loadReport(force){
   }
   if (curProc === 'packaging') await renderPackaging(rows);
   else if (curProc === 'assembly') await renderAssembly(rows);
+  else if (curProc === 'inspection') await renderInspection(rows);
 }
 
 /* ════════════════════ 포장 (packaging) ════════════════════ */
@@ -499,6 +500,156 @@ async function renderAssembly(rows){
       r.production_qty||0, r.defect_qty||0, r.worker_name||'', r.start_time||'', r.end_time||'', r.note||'']);
   });
   lastXlsx = { name:'assembly', sheets:[ {n:'품목별요약',d:sh1}, {n:'설비별',d:sh2}, {n:'자재사용',d:sh3}, {n:'상세내역',d:sh4} ] };
+}
+
+/* ════════════════════ 검사 (inspection) ════════════════════ */
+function parseDefectTypes(str){
+  // "찍힘(3), 이물(2)" → [{type:'찍힘',qty:3},{type:'이물',qty:2}]
+  var out = [];
+  String(str||'').replace(/([^,()]+)\((\d+)\)/g, function(_, t, q){
+    var name = t.trim();
+    if (name) out.push({ type:name, qty:parseInt(q)||0 });
+    return '';
+  });
+  return out;
+}
+async function renderInspection(rows){
+  var body = document.getElementById('rpBody');
+  if (!rows.length){ body.innerHTML = '<div class="empty-msg">해당 기간에 제출된 검사 작업일지가 없습니다.</div>'; return; }
+  await loadProducts();
+
+  var bySabun = {}, byWorker = {}, byDefect = {}, tIns=0, tPass=0, tFail=0, recheckCnt=0;
+  rows.forEach(function(r){
+    var ins = r.inspect_qty||0, ps = r.pass_qty||0, fl = r.fail_qty||0;
+    tIns += ins; tPass += ps; tFail += fl;
+    if (r.recheck) recheckCnt++;
+    var sb = r.worker_id || '(사번미입력)';
+    if (!bySabun[sb]) bySabun[sb] = { ins:0, pass:0, fail:0, cnt:0, re:0, workers:{}, rows:[] };
+    var g = bySabun[sb];
+    g.ins += ins; g.pass += ps; g.fail += fl; g.cnt++; g.rows.push(r);
+    if (r.recheck) g.re++;
+    if (r.worker_name) g.workers[r.worker_name] = 1;
+    var w = r.worker_name || '(미지정)';
+    if (!byWorker[w]) byWorker[w] = { ins:0, pass:0, fail:0, cnt:0 };
+    byWorker[w].ins += ins; byWorker[w].pass += ps; byWorker[w].fail += fl; byWorker[w].cnt++;
+    parseDefectTypes(r.defect_type).forEach(function(d){
+      if (!byDefect[d.type]) byDefect[d.type] = { qty:0, sabuns:{} };
+      byDefect[d.type].qty += d.qty;
+      byDefect[d.type].sabuns[sb] = (byDefect[d.type].sabuns[sb]||0) + d.qty;
+    });
+  });
+  var sabuns = Object.keys(bySabun).sort(function(a,b){ return bySabun[b].ins - bySabun[a].ins; });
+  var workers = Object.keys(byWorker).sort(function(a,b){ return byWorker[b].ins - byWorker[a].ins; });
+  var defects = Object.keys(byDefect).sort(function(a,b){ return byDefect[b].qty - byDefect[a].qty; });
+  var passRate = function(p, i){ return i > 0 ? (Math.round(p/i*10000)/100) : 0; };
+
+  var h = '';
+  h += '<div class="sum-grid">'
+    + '<div class="sum-card"><div class="n">'+num(tIns)+'</div><div class="l">총 검사수량</div></div>'
+    + '<div class="sum-card"><div class="n" style="color:#0369a1">'+num(tPass)+'</div><div class="l">합격</div></div>'
+    + '<div class="sum-card"><div class="n" style="color:'+(tFail>0?'#dc2626':'#222')+'">'+num(tFail)+'</div><div class="l">불합격</div></div>'
+    + '<div class="sum-card"><div class="n">'+passRate(tPass,tIns)+'%</div><div class="l">합격률</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(sabuns.length)+'</div><div class="l">품목(사번) 수</div></div>'
+    + '</div>';
+
+  /* 1. 품목별 검사 실적 */
+  h += '<h2 class="sec">1. 품목(사번)별 검사 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 LOT 상세</span></h2>';
+  h += '<table class="rp"><tr><th style="width:74px">사번</th><th style="width:108px">품번</th><th>품명</th><th style="width:96px">검사자</th><th style="width:78px">검사수량</th><th style="width:64px">합격</th><th style="width:60px">불합격</th><th style="width:64px">합격률</th><th style="width:46px">재검</th><th style="width:26px"></th></tr>';
+  sabuns.forEach(function(sb, i){
+    var g = bySabun[sb];
+    var prod = PRODUCTS[sb] || { partNo:'-', partName:'-' };
+    h += '<tr class="grp-row" onclick="toggleDet(\'in'+i+'\')">'
+      + '<td>'+esc(sb)+'</td><td>'+esc(prod.partNo||'-')+'</td><td class="left">'+esc(prod.partName||'-')+'</td>'
+      + '<td style="font-size:11px">'+esc(Object.keys(g.workers).join(', ')||'-')+'</td>'
+      + '<td class="right" style="font-weight:700">'+num(g.ins)+'</td>'
+      + '<td class="right" style="color:#0369a1">'+num(g.pass)+'</td>'
+      + '<td class="right" style="color:'+(g.fail>0?'#dc2626':'#999')+'">'+num(g.fail)+'</td>'
+      + '<td>'+passRate(g.pass,g.ins)+'%</td>'
+      + '<td>'+(g.re>0?g.re:'-')+'</td>'
+      + '<td class="arrow" id="ar-in'+i+'">▼</td></tr>';
+    h += '<tr class="det-row" id="det-in'+i+'"><td colspan="10">'
+      + '<table class="det"><tr><th style="width:80px">일자</th><th>LOT</th><th>불량유형</th><th style="width:44px">재검</th><th>비고</th></tr>';
+    g.rows.forEach(function(r){
+      var lots = (r.lot_nos||[]).filter(function(l){return l;}).join(', ');
+      h += '<tr><td>'+esc(r.work_date)+'</td><td class="left">'+ (lots?esc(lots):'-') +'</td>'
+        + '<td class="left" style="color:'+(r.defect_type?'#b45309':'#999')+'">'+esc(r.defect_type||'-')+'</td>'
+        + '<td>'+(r.recheck?'<span style="color:#7c3aed;font-weight:700">재검</span>':'-')+'</td>'
+        + '<td class="left">'+esc(r.defect_memo||'')+'</td></tr>';
+    });
+    h += '</table></td></tr>';
+  });
+  h += '</table>';
+
+  /* 2. 불량유형별 집계 */
+  if (defects.length){
+    h += '<h2 class="sec">2. 불량유형별 집계</h2>';
+    h += '<table class="rp"><tr><th style="width:130px">불량유형</th><th style="width:70px">수량</th><th>발생 사번 (수량)</th></tr>';
+    defects.forEach(function(t){
+      var d = byDefect[t];
+      var sbList = Object.keys(d.sabuns).sort(function(a,b){ return d.sabuns[b]-d.sabuns[a]; })
+        .map(function(sb){ return sb+' ('+d.sabuns[sb]+')'; }).join(', ');
+      h += '<tr><td>'+esc(t)+'</td><td class="right" style="color:#dc2626;font-weight:700">'+num(d.qty)+'</td><td class="left" style="font-size:11px">'+esc(sbList)+'</td></tr>';
+    });
+    h += '</table>';
+  }
+
+  /* 3. 검사자별 실적 */
+  h += '<h2 class="sec">'+(defects.length?'3':'2')+'. 검사자별 실적</h2>';
+  h += '<table class="rp" style="max-width:520px"><tr><th>검사자</th><th style="width:86px">검사수량</th><th style="width:70px">합격</th><th style="width:70px">불합격</th><th style="width:64px">건수</th></tr>';
+  workers.forEach(function(w){
+    var g = byWorker[w];
+    h += '<tr><td>'+esc(w)+'</td><td class="right">'+num(g.ins)+'</td><td class="right" style="color:#0369a1">'+num(g.pass)+'</td>'
+      + '<td class="right" style="color:'+(g.fail>0?'#dc2626':'#999')+'">'+num(g.fail)+'</td><td>'+num(g.cnt)+'</td></tr>';
+  });
+  h += '</table>';
+
+  /* 4. 특이사항 */
+  var remSeen = {}, rems = [];
+  rows.forEach(function(r){
+    var t = (r.remarks||'').trim();
+    if (!t) return;
+    var k = r.work_date + '|' + t;
+    if (remSeen[k]) return; remSeen[k]=1;
+    rems.push({ d:r.work_date, by:r.created_by_name||r.worker_name||'-', t:t });
+  });
+  if (rems.length){
+    h += '<h2 class="sec">'+((defects.length?3:2)+1)+'. 특이사항 / 전달사항</h2>';
+    h += '<table class="rp"><tr><th style="width:90px">일자</th><th style="width:90px">작성자</th><th>내용</th></tr>';
+    rems.forEach(function(r){ h += '<tr><td>'+esc(r.d)+'</td><td>'+esc(r.by)+'</td><td class="left">'+esc(r.t)+'</td></tr>'; });
+    h += '</table>';
+  }
+  if (recheckCnt > 0){
+    h += '<div style="font-size:11px;color:#7c3aed;margin-top:10px">※ 재검 기록 '+recheckCnt+'건이 집계에 포함되어 있습니다 (품목별 표의 재검 열 참고)</div>';
+  }
+
+  body.innerHTML = h;
+
+  /* 엑셀 */
+  var sh1 = [['사번','품번','품명','검사자','검사수량','합격','불합격','합격률(%)','재검','건수']];
+  sabuns.forEach(function(sb){
+    var g=bySabun[sb], prod=PRODUCTS[sb]||{partNo:'',partName:''};
+    sh1.push([sb, prod.partNo, prod.partName, Object.keys(g.workers).join(', '), g.ins, g.pass, g.fail, passRate(g.pass,g.ins), g.re, g.cnt]);
+  });
+  var sh2 = [['불량유형','수량','발생 사번(수량)']];
+  defects.forEach(function(t){
+    var d=byDefect[t];
+    sh2.push([t, d.qty, Object.keys(d.sabuns).map(function(sb){ return sb+'('+d.sabuns[sb]+')'; }).join(', ')]);
+  });
+  var sh3 = [['검사자','검사수량','합격','불합격','건수']];
+  workers.forEach(function(w){ var g=byWorker[w]; sh3.push([w, g.ins, g.pass, g.fail, g.cnt]); });
+  var sh4 = [['일자','사번','품번','품명','LOT','검사수량','합격','불합격','불량유형','불량메모','재검','검사자','비고']];
+  rows.forEach(function(r){
+    var prod = PRODUCTS[r.worker_id]||{partNo:'',partName:''};
+    sh4.push([r.work_date, r.worker_id||'', prod.partNo, prod.partName,
+      (r.lot_nos||[]).join(', '), r.inspect_qty||0, r.pass_qty||0, r.fail_qty||0,
+      r.defect_type||'', r.defect_memo||'', r.recheck?'재검':'', r.worker_name||'', r.remarks||'']);
+  });
+  lastXlsx = { name:'inspection', sheets:[ {n:'품목별요약',d:sh1}, {n:'불량유형',d:sh2}, {n:'검사자별',d:sh3}, {n:'상세내역',d:sh4} ] };
+  if (rems.length){
+    var sh5 = [['일자','작성자','내용']];
+    rems.forEach(function(r){ sh5.push([r.d, r.by, r.t]); });
+    lastXlsx.sheets.push({ n:'특이사항', d:sh5 });
+  }
 }
 
 /* ── 상세 펼침 ── */
