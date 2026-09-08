@@ -218,7 +218,7 @@ async function loadReport(){
     if ((d.equip_type||'').toLowerCase()==='press') press++;
     if ((d.equip_type||'').toLowerCase()==='injection') inj++;
     if (hasDefect(d)) defect++;
-    if (changeList(d).length>0) change++;
+    change += changeList(d).length;   // 변동점은 항목 단위 집계 (한 기록에 교체+세척이면 2건)
     if (d.is_inactive) inactive++;
     if (moldFlag(d,'clean')) moldClean++;
     if (moldFlag(d,'damage')) moldDamage++;
