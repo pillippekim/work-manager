@@ -154,7 +154,7 @@ var PROCS = [
   { k:'cmb',       label:'배합',   grp:'전공정', table:'cmb_reports',       impl:false, na:'현재 미사용 공정입니다.' },
   { k:'cutting',   label:'재단',   grp:'전공정', table:'cutting_reports',   impl:false },
   { k:'molding',   label:'성형',   grp:'성형',   table:'molding_reports',   impl:false },
-  { k:'postcure',  label:'2차가류', grp:'후공정', table:'postcure_reports',  impl:false },
+  { k:'postcure',  label:'2차가류', grp:'후공정', table:'postcure_reports',  impl:true  },
   { k:'shot',      label:'쇼트',   grp:'후공정', table:'shot_reports',      impl:false },
   { k:'sasang',    label:'사상',   grp:'후공정', table:'sasang_reports',    impl:true  },
   { k:'coating',   label:'도포',   grp:'후공정', table:'coating_reports',   impl:true  },
@@ -286,6 +286,7 @@ async function loadReport(force){
   else if (curProc === 'inspection') await renderInspection(rows);
   else if (curProc === 'coating') await renderCoating(rows);
   else if (curProc === 'sasang') await renderSasang(rows);
+  else if (curProc === 'postcure') await renderPostcure(rows);
 }
 
 /* ════════════════════ 포장 (packaging) ════════════════════ */
@@ -546,6 +547,172 @@ async function renderAssembly(rows){
     var shL = [['일자','설비','사번','품명','수량','작업자']];
     lotMiss.forEach(function(r){ shL.push([r.work_date, r.equipment_no||'', r.sabun||'', r.product_name||(PRODUCTS[r.sabun]||{}).partName||'', r.production_qty||0, r.worker_name||'']); });
     lastXlsx.sheets.push({ n:'LOT미입력', d:shL });
+  }
+}
+
+/* ════════════════════ 2차가류 (postcure) ════════════════════ */
+/* 주의: worker_id 컬럼 = 사번(제품코드). 불량 개념 없음(input_qty 투입수량만). */
+function rangeStr(min, max, unit){
+  if (min == null) return '-';
+  return (min === max ? min : min + '~' + max) + (unit || '');
+}
+async function renderPostcure(rows){
+  var body = document.getElementById('rpBody');
+  if (!rows.length){ body.innerHTML = '<div class="empty-msg">해당 기간에 제출된 2차가류 작업일지가 없습니다.</div>'; return; }
+  await loadProducts();
+
+  /* 집계: 품목별 / 재질별 / 성형작업자별 */
+  var bySabun = {}, byMat = {}, byMw = {}, totalQty = 0;
+  rows.forEach(function(r){
+    var q = r.input_qty || 0;
+    totalQty += q;
+    var sb = r.worker_id || '(사번미입력)';
+    if (!bySabun[sb]) bySabun[sb] = { qty:0, cnt:0, workers:{}, mat:'', rows:[] };
+    var g = bySabun[sb];
+    g.qty += q; g.cnt++; g.rows.push(r);
+    if (r.worker_name) g.workers[r.worker_name] = 1;
+    if (!g.mat && r.material_name) g.mat = r.material_name;
+    var mt = r.material_name || '(재질미지정)';
+    if (!byMat[mt]) byMat[mt] = { qty:0, cnt:0, sabuns:{}, tMin:null, tMax:null, dMin:null, dMax:null };
+    var m = byMat[mt];
+    m.qty += q; m.cnt++; m.sabuns[sb] = 1;
+    var t = (r.temperature == null) ? null : Number(r.temperature);
+    if (t != null && !isNaN(t)){ if (m.tMin == null || t < m.tMin) m.tMin = t; if (m.tMax == null || t > m.tMax) m.tMax = t; }
+    var du = (r.duration_min == null) ? null : Number(r.duration_min);
+    if (du != null && !isNaN(du)){ if (m.dMin == null || du < m.dMin) m.dMin = du; if (m.dMax == null || du > m.dMax) m.dMax = du; }
+    var mw = (r.molding_worker || '').trim() || '(미지정)';
+    if (!byMw[mw]) byMw[mw] = { qty:0, cnt:0, sabuns:{} };
+    byMw[mw].qty += q; byMw[mw].cnt++; byMw[mw].sabuns[sb] = 1;
+  });
+  var sabuns = Object.keys(bySabun).sort(function(a,b){ return bySabun[b].qty - bySabun[a].qty; });
+  var mats = Object.keys(byMat).sort(function(a,b){ return byMat[b].qty - byMat[a].qty; });
+  var mws = Object.keys(byMw).sort(function(a,b){ return byMw[b].qty - byMw[a].qty; });
+  var mwReal = mws.filter(function(w){ return w !== '(미지정)'; });
+  var lotMiss = rows.filter(function(r){ return lotMissingOne(r.lot_no); });
+
+  var h = '';
+  /* 요약 카드 */
+  h += '<div class="sum-grid">'
+    + '<div class="sum-card"><div class="n">'+num(totalQty)+'</div><div class="l">총 투입수량</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(sabuns.length)+'</div><div class="l">품목(사번) 수</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(mats.length)+'</div><div class="l">재질 종류</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(mwReal.length)+'</div><div class="l">성형작업자 수</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(rows.length)+'</div><div class="l">제출 건수</div></div>'
+    + '</div>';
+  h += lotWarnStrip(lotMiss.length);
+
+  /* 1. 품목별 2차가류 실적 */
+  h += '<h2 class="sec">1. 품목(사번)별 2차가류 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 상세</span></h2>';
+  h += '<table class="rp"><tr><th style="width:74px">사번</th><th style="width:110px">품번</th><th>품명</th><th style="width:110px">재질</th><th style="width:100px">가류 작업자</th><th style="width:84px">투입수량</th><th style="width:46px">건수</th><th style="width:26px"></th></tr>';
+  sabuns.forEach(function(sb, i){
+    var g = bySabun[sb];
+    var prod = PRODUCTS[sb] || { partNo:'-', partName:'' };
+    var wNames = Object.keys(g.workers).join(', ') || '-';
+    h += '<tr class="grp-row" onclick="toggleDet(\'pc'+i+'\')">'
+      + '<td>'+esc(sb)+'</td><td>'+esc(prod.partNo||'-')+'</td><td class="left">'+esc(prod.partName||'-')+'</td>'
+      + '<td style="font-size:11px">'+esc(g.mat||'-')+'</td>'
+      + '<td style="font-size:11px">'+esc(wNames)+'</td>'
+      + '<td class="right" style="font-weight:700">'+num(g.qty)+'</td>'
+      + '<td>'+num(g.cnt)+'</td>'
+      + '<td class="arrow" id="ar-pc'+i+'">▼</td></tr>';
+    h += '<tr class="det-row" id="det-pc'+i+'"><td colspan="8">'
+      + '<table class="det"><tr><th style="width:80px">일자</th><th style="width:70px">온도(℃)</th><th style="width:70px">시간(분)</th><th style="width:64px">경도</th><th style="width:100px">성형작업자</th><th>LOT</th><th>비고</th></tr>';
+    g.rows.forEach(function(r){
+      h += '<tr><td>'+esc(r.work_date)+'</td>'
+        + '<td>'+((r.temperature==null)?'-':esc(r.temperature))+'</td>'
+        + '<td>'+((r.duration_min==null)?'-':esc(r.duration_min))+'</td>'
+        + '<td>'+esc((r.hardness||'').trim()||'-')+'</td>'
+        + '<td>'+esc((r.molding_worker||'').trim()||'-')+'</td>'
+        + '<td class="left">'+esc(r.lot_no||'-')+'</td>'
+        + '<td class="left">'+esc(r.note||'')+'</td></tr>';
+    });
+    h += '</table></td></tr>';
+  });
+  h += '</table>';
+
+  /* 2. 재질별 집계 (가류 조건 범위 포함) */
+  h += '<h2 class="sec">2. 재질별 가류 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 온도·시간은 기간 내 범위</span></h2>';
+  h += '<table class="rp" style="max-width:640px"><tr><th>재질</th><th style="width:90px">투입수량</th><th style="width:64px">품목 수</th><th style="width:54px">건수</th><th style="width:100px">온도(℃)</th><th style="width:90px">시간(분)</th></tr>';
+  mats.forEach(function(mt){
+    var m = byMat[mt];
+    h += '<tr><td>'+esc(mt)+'</td><td class="right">'+num(m.qty)+'</td>'
+      + '<td>'+num(Object.keys(m.sabuns).length)+'</td><td>'+num(m.cnt)+'</td>'
+      + '<td>'+rangeStr(m.tMin, m.tMax)+'</td>'
+      + '<td>'+rangeStr(m.dMin, m.dMax)+'</td></tr>';
+  });
+  h += '</table>';
+
+  /* 3. 성형작업자별 (추적성) */
+  h += '<h2 class="sec">3. 성형작업자별 투입 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 가류 투입된 성형품 기준</span></h2>';
+  h += '<table class="rp" style="max-width:460px"><tr><th>성형작업자</th><th style="width:90px">투입수량</th><th style="width:54px">건수</th><th style="width:64px">품목 수</th></tr>';
+  mws.forEach(function(w){
+    var g = byMw[w];
+    h += '<tr><td'+(w==='(미지정)'?' style="color:#98a0b0"':'')+'>'+esc(w)+'</td><td class="right">'+num(g.qty)+'</td>'
+      + '<td>'+num(g.cnt)+'</td><td>'+num(Object.keys(g.sabuns).length)+'</td></tr>';
+  });
+  h += '</table>';
+
+  /* 4. 특이사항 (remarks 컬럼, 일자+내용 dedupe) */
+  var remSeen = {}, rems = [];
+  rows.forEach(function(r){
+    var t = (r.remarks||'').trim();
+    if (!t) return;
+    var k = r.work_date + '|' + t;
+    if (remSeen[k]) return; remSeen[k]=1;
+    rems.push({ d:r.work_date, by:r.created_by_name||r.worker_name||'-', t:t });
+  });
+  if (rems.length){
+    h += '<h2 class="sec">4. 특이사항 / 전달사항</h2>';
+    h += '<table class="rp"><tr><th style="width:90px">일자</th><th style="width:90px">작성자</th><th>내용</th></tr>';
+    rems.forEach(function(r){ h += '<tr><td>'+esc(r.d)+'</td><td>'+esc(r.by)+'</td><td class="left">'+esc(r.t)+'</td></tr>'; });
+    h += '</table>';
+  }
+
+  if (lotMiss.length){
+    var lmRows = '';
+    lotMiss.forEach(function(r){
+      lmRows += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(r.worker_id||'-')+'</td>'
+        + '<td class="left">'+esc((PRODUCTS[r.worker_id]||{}).partName||'-')+'</td>'
+        + '<td>'+esc(r.material_name||'-')+'</td>'
+        + '<td class="right">'+num(r.input_qty)+'</td><td>'+esc(r.worker_name||'-')+'</td></tr>';
+    });
+    h += lotMissSection([{h:'일자',w:80},{h:'사번',w:80},{h:'품명'},{h:'재질',w:100},{h:'수량',w:80},{h:'작업자',w:90}], lmRows);
+  }
+  body.innerHTML = h;
+
+  /* 엑셀 */
+  var sh1 = [['사번','품번','품명','재질','가류 작업자','투입수량','건수']];
+  sabuns.forEach(function(sb){
+    var g=bySabun[sb], prod=PRODUCTS[sb]||{partNo:'',partName:''};
+    sh1.push([sb, prod.partNo, prod.partName, g.mat, Object.keys(g.workers).join(', '), g.qty, g.cnt]);
+  });
+  var sh2 = [['재질','투입수량','품목 수','건수','온도(℃)','시간(분)']];
+  mats.forEach(function(mt){
+    var m=byMat[mt];
+    sh2.push([mt, m.qty, Object.keys(m.sabuns).length, m.cnt, rangeStr(m.tMin,m.tMax), rangeStr(m.dMin,m.dMax)]);
+  });
+  var sh3 = [['성형작업자','투입수량','건수','품목 수']];
+  mws.forEach(function(w){
+    var g=byMw[w];
+    sh3.push([w, g.qty, g.cnt, Object.keys(g.sabuns).length]);
+  });
+  var sh4 = [['일자','사번','품번','품명','재질','온도(℃)','시간(분)','경도','성형작업자','투입수량','LOT','가류 작업자','비고']];
+  rows.forEach(function(r){
+    var prod = PRODUCTS[r.worker_id]||{partNo:'',partName:''};
+    sh4.push([r.work_date, r.worker_id||'', prod.partNo, prod.partName, r.material_name||'',
+      (r.temperature==null)?'':r.temperature, (r.duration_min==null)?'':r.duration_min,
+      r.hardness||'', r.molding_worker||'', r.input_qty||0, r.lot_no||'', r.worker_name||'', r.note||'']);
+  });
+  lastXlsx = { name:'postcure', sheets:[ {n:'품목별요약',d:sh1}, {n:'재질별',d:sh2}, {n:'성형작업자별',d:sh3}, {n:'상세내역',d:sh4} ] };
+  if (lotMiss.length){
+    var shL = [['일자','사번','품명','재질','수량','작업자']];
+    lotMiss.forEach(function(r){ shL.push([r.work_date, r.worker_id||'', (PRODUCTS[r.worker_id]||{}).partName||'', r.material_name||'', r.input_qty||0, r.worker_name||'']); });
+    lastXlsx.sheets.push({ n:'LOT미입력', d:shL });
+  }
+  if (rems.length){
+    var sh5 = [['일자','작성자','내용']];
+    rems.forEach(function(r){ sh5.push([r.d, r.by, r.t]); });
+    lastXlsx.sheets.push({ n:'특이사항', d:sh5 });
   }
 }
 
