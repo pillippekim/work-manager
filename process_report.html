@@ -550,6 +550,13 @@ async function renderAssembly(rows){
 }
 
 /* ════════════════════ 사상 (sasang) ════════════════════ */
+/* 설비 미입력 시 방법(work_method)으로 추론 — 수사상=수작업, 자동사상=LM 사상기(1대뿐) */
+function sasangEquipOf(r){
+  if (r.equipment_no && String(r.equipment_no).trim()) return r.equipment_no;
+  if (r.work_method === '수사상') return '수작업(수사상)';
+  if (r.work_method === '자동사상') return 'LM 사상기';
+  return '';
+}
 async function renderSasang(rows){
   var body = document.getElementById('rpBody');
   if (!rows.length){ body.innerHTML = '<div class="empty-msg">해당 기간에 제출된 사상 작업일지가 없습니다.</div>'; return; }
@@ -567,7 +574,7 @@ async function renderSasang(rows){
     if (r.worker_name) g.workers[r.worker_name] = 1;
     if (r.work_method) g.methods[r.work_method] = 1;
     if (!g.pname && r.product_name) g.pname = r.product_name;
-    var eq = r.equipment_no || '(설비미지정)';
+    var eq = sasangEquipOf(r) || '(설비미지정)';
     if (!byEquip[eq]) byEquip[eq] = { qty:0, def:0, cnt:0, sabuns:{}, workers:{} };
     byEquip[eq].qty += q; byEquip[eq].def += d; byEquip[eq].cnt++;
     byEquip[eq].sabuns[sb] = 1;
@@ -615,7 +622,7 @@ async function renderSasang(rows){
       + '<table class="det"><tr><th style="width:80px">일자</th><th style="width:110px">설비</th><th>LOT</th><th style="width:100px">시간</th><th>비고</th></tr>';
     g.rows.forEach(function(r){
       var tm = (r.start_time && r.end_time) ? (String(r.start_time).slice(0,5)+'~'+String(r.end_time).slice(0,5)) : '-';
-      h += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(r.equipment_no||'-')+'</td>'
+      h += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(sasangEquipOf(r)||'-')+'</td>'
         + '<td class="left">'+esc(r.lot_no||'-')+'</td><td>'+tm+'</td>'
         + '<td class="left">'+esc(r.note||'')+'</td></tr>';
     });
@@ -667,7 +674,7 @@ async function renderSasang(rows){
   if (lotMiss.length){
     var lmRows = '';
     lotMiss.forEach(function(r){
-      lmRows += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(r.equipment_no||'-')+'</td><td>'+esc(r.sabun||'-')+'</td>'
+      lmRows += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(sasangEquipOf(r)||'-')+'</td><td>'+esc(r.sabun||'-')+'</td>'
         + '<td class="left">'+esc(r.product_name||(PRODUCTS[r.sabun]||{}).partName||'-')+'</td>'
         + '<td class="right">'+num(r.production_qty)+'</td><td>'+esc(r.worker_name||'-')+'</td></tr>';
     });
@@ -694,14 +701,14 @@ async function renderSasang(rows){
   var sh4 = [['일자','근무','설비','사번','품번','품명','LOT','방법','생산수량','불량','작업자','시작','종료','비고']];
   rows.forEach(function(r){
     var prod = PRODUCTS[r.sabun]||{partNo:'',partName:''};
-    sh4.push([r.work_date, r.shift_type||'', r.equipment_no||'', r.sabun||'', prod.partNo,
+    sh4.push([r.work_date, r.shift_type||'', sasangEquipOf(r), r.sabun||'', prod.partNo,
       r.product_name||prod.partName, r.lot_no||'', r.work_method||'',
       r.production_qty||0, r.defect_qty||0, r.worker_name||'', r.start_time||'', r.end_time||'', r.note||'']);
   });
   lastXlsx = { name:'sasang', sheets:[ {n:'품목별요약',d:sh1}, {n:'설비별',d:sh2}, {n:'작업자별',d:sh3}, {n:'상세내역',d:sh4} ] };
   if (lotMiss.length){
     var shL = [['일자','설비','사번','품명','수량','작업자']];
-    lotMiss.forEach(function(r){ shL.push([r.work_date, r.equipment_no||'', r.sabun||'', r.product_name||(PRODUCTS[r.sabun]||{}).partName||'', r.production_qty||0, r.worker_name||'']); });
+    lotMiss.forEach(function(r){ shL.push([r.work_date, sasangEquipOf(r), r.sabun||'', r.product_name||(PRODUCTS[r.sabun]||{}).partName||'', r.production_qty||0, r.worker_name||'']); });
     lastXlsx.sheets.push({ n:'LOT미입력', d:shL });
   }
   if (rems.length){
