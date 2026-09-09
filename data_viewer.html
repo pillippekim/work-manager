@@ -2463,6 +2463,25 @@ function moldingWorkHours(r){
   return (''+r.start_time).slice(0,5) + '~' + (''+r.end_time).slice(0,5);
 }
 // 비가동 구간의 순수 분 = 구간 길이 - 점심(12:00~13:00)·저녁(17:00~17:30) 겹침 제외
+// 성형조건(온도/압력): note JSON conditions[유형][면]에서 추출 (기준 우선, 없으면 초품→중품→종품, 구버전 컬럼 폴백)
+function moldingCondOf(r){
+  var order = [['standard','기준'],['first','초품'],['middle','중품'],['last','종품']];
+  try {
+    var n = JSON.parse(r.note);
+    var conds = n.conditions || {};
+    var face = n.face || 'single';
+    for (var i = 0; i < order.length; i++){
+      var c = (conds[order[i][0]]||{})[face];
+      if (c && (c.pressure || c.upper || c.lower)){
+        return { p:c.pressure||'', u:c.upper||'', l:c.lower||'', t:order[i][1] };
+      }
+    }
+  } catch(e){}
+  if (r.upper_temp != null || r.lower_temp != null || (r.molding_pressure != null && r.molding_pressure !== '')){
+    return { p:r.molding_pressure||'', u:r.upper_temp!=null?r.upper_temp:'', l:r.lower_temp!=null?r.lower_temp:'', t:'기준' };
+  }
+  return null;
+}
 function moldingDtNetMin(start, end){
   var s = (''+start).split(':'), e = (''+end).split(':');
   var a1 = (+s[0])*60 + (+s[1]);
@@ -2551,10 +2570,10 @@ function renderMoldingTable(data) {
         <td style="text-align:right;font-weight:600">${(r.production_qty||0).toLocaleString()}</td>
         <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${r.defect_qty||0}</td>
         <td style="font-size:11px;white-space:nowrap">${(function(){
-          var u=r.upper_temp, l=r.lower_temp, p=r.molding_pressure;
-          if(u==null&&l==null&&(p==null||p==='')) return '-';
-          var t=(u!=null?u:'-')+'/'+(l!=null?l:'-')+'℃';
-          return t + (p!=null&&p!==''?' · '+p:'');
+          var c = moldingCondOf(r);
+          if (!c) return '-';
+          var t = (c.u!==''?c.u:'-')+'/'+(c.l!==''?c.l:'-')+'℃';
+          return (c.t!=='기준'?'<span style="color:#7c3aed">'+c.t+'</span> ':'') + t + (c.p!==''?' · '+c.p:'');
         })()}</td>
         <td style="font-size:11px;color:#e67e22">${dtCode}</td>
         <td style="font-size:11px;color:#e67e22">${dtMin}</td>
@@ -3117,9 +3136,10 @@ function downloadExcel() {
       '생산수량': r.production_qty || 0,
       '불량수량': r.defect_qty || 0,
       '작업유형': r.work_type || '',
-      '성형압력': r.molding_pressure || '',
-      '상판온도': r.upper_temp || '',
-      '하판온도': r.lower_temp || '',
+      '성형압력': (function(){ var c = moldingCondOf(r); return c ? c.p : ''; })(),
+      '상판온도': (function(){ var c = moldingCondOf(r); return c ? c.u : ''; })(),
+      '하판온도': (function(){ var c = moldingCondOf(r); return c ? c.l : ''; })(),
+      '조건유형': (function(){ var c = moldingCondOf(r); return c ? c.t : ''; })(),
       '비가동코드': r.downtime_code || '',
       '비가동시간(분)': (function(){ var _d = moldingDowntimeMin(r); return _d > 0 ? _d : ''; })(),
       '근무시간': moldingWorkHours(r) === '-' ? '' : moldingWorkHours(r),

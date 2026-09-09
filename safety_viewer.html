@@ -123,6 +123,26 @@ const SAFETY_TABLES = [
 
 let allData = [];
 
+// 설비별 중첩 check_data({설비키:{항목:값}}) 페이지들의 키 → 표시명/관리번호 매핑
+const EQ_KEY_MAP = {
+  freeze_1:['냉동사상기 1','생-B-01'], freeze_3:['냉동사상기 3','생-B-03'],
+  auto_3:['자동사상기 3','생-B-34'], cleaning:['클리닝기','품-A-006'],
+  compressor_1:['컴프레서 1','생-B-04'], compressor_2:['컴프레서 2','생-B-05'],
+  shot_grinder:['연마쇼트기','생-B-18'], postcure_1:['2차가류기','품-B-012']
+};
+// 쇼트·도포·2차가류처럼 한 기록에 여러 설비가 중첩된 경우 → 설비별 행으로 전개
+function expandSafetyRows(r){
+  const cd = r.check_data;
+  if (!cd || typeof cd !== 'object') return [r];
+  const entries = Object.entries(cd);
+  const nested = entries.filter(([k,v]) => v && typeof v === 'object' && !Array.isArray(v));
+  if (nested.length === 0) return [r];   // 평면 구조(성형·사상 등)는 그대로
+  return nested.map(([eqKey, sub]) => {
+    const m = EQ_KEY_MAP[eqKey] || [eqKey, ''];
+    return { ...r, equipment_no: r.equipment_no || m[0], equipment_id: r.equipment_id || m[1], check_data: sub };
+  });
+}
+
 async function init() {
   const user = await checkAuth();
   if (!user) return;
@@ -166,8 +186,10 @@ async function loadData() {
       const { data } = await q.order(t.dateCol, { ascending: false });
       if (data) {
         data.forEach(r => {
-          if (equipFilter && !(r.equipment_no||'').toLowerCase().includes(equipFilter)) return;
-          allData.push({ ...r, _process: t.label, _table: t.table });
+          expandSafetyRows(r).forEach(x => {
+            if (equipFilter && !(x.equipment_no||'').toLowerCase().includes(equipFilter)) return;
+            allData.push({ ...x, _process: t.label, _table: t.table });
+          });
         });
       }
     } catch(e) {}
