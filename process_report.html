@@ -72,6 +72,7 @@ table.det th { background:#eef1f8; font-weight:600; }
 table.det td.left { text-align:left; }
 .arrow { font-size:10px; color:#98a0b0; }
 .empty-msg { color:#999; font-size:12px; padding:14px; text-align:center; border:1px dashed #d5dae5; border-radius:6px; }
+.lot-warn { background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; font-size:12px; font-weight:700; border-radius:6px; padding:7px 12px; margin:-6px 0 14px; }
 .foot-note { font-size:11px; color:#888; margin-top:24px; border-top:1px solid #e5e8f0; padding-top:8px; }
 .na-msg { text-align:center; padding:60px 10px; color:#98a0b0; font-size:14px; }
 
@@ -171,6 +172,18 @@ function fmtLocal(d){ var y=d.getFullYear(),m=('0'+(d.getMonth()+1)).slice(-2),d
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function num(n){ return (n||0).toLocaleString('ko-KR'); }
 function procOf(k){ for (var i=0;i<PROCS.length;i++){ if (PROCS[i].k===k) return PROCS[i]; } return null; }
+/* LOT 미입력 판정: 배열형(lot_nos)·단일형(lot_no) 모두 대응 */
+function lotMissingArr(arr){ return !(arr||[]).some(function(l){ return l && String(l).trim(); }); }
+function lotMissingOne(v){ return !(v && String(v).trim()); }
+/* 경고 스트립 + 미입력 내역 섹션 HTML (cols: [{h:헤더,w:너비px(선택)}], rowsHtml: tr 문자열) */
+function lotWarnStrip(n){
+  return n > 0 ? '<div class="lot-warn">⚠ LOT 미입력 '+num(n)+'건 — 하단 [LOT 미입력 내역]에서 확인 후 보완 요청 바랍니다</div>' : '';
+}
+function lotMissSection(cols, rowsHtml){
+  var h = '<h2 class="sec" style="border-left-color:#dc2626;color:#b91c1c">⚠ LOT 미입력 내역</h2>';
+  h += '<table class="rp"><tr>' + cols.map(function(c){ return '<th'+(c.w?' style="width:'+c.w+'px"':'')+'>'+c.h+'</th>'; }).join('') + '</tr>' + rowsHtml + '</table>';
+  return h;
+}
 
 /* ── 탭바 렌더 ── */
 function renderTabs(){
@@ -295,6 +308,7 @@ async function renderPackaging(rows){
   });
   var sabuns = Object.keys(bySabun).sort(function(a,b){ return bySabun[b].qty - bySabun[a].qty; });
   var workers = Object.keys(byWorker).sort(function(a,b){ return byWorker[b].qty - byWorker[a].qty; });
+  var lotMiss = rows.filter(function(r){ return lotMissingArr(r.lot_nos); });
 
   var h = '';
   /* 요약 카드 */
@@ -305,6 +319,7 @@ async function renderPackaging(rows){
     + '<div class="sum-card"><div class="n">'+num(rows.length)+'</div><div class="l">작업 건수</div></div>'
     + '<div class="sum-card"><div class="n">'+num(workers.length)+'</div><div class="l">투입 작업자</div></div>'
     + '</div>';
+  h += lotWarnStrip(lotMiss.length);
 
   /* 1. 품목별 포장 실적 (클릭 → LOT 상세) */
   h += '<h2 class="sec">1. 품목(사번)별 포장 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 LOT 상세</span></h2>';
@@ -317,7 +332,7 @@ async function renderPackaging(rows){
       + '<td>'+esc(sb)+'</td><td>'+esc(prod.partNo||'-')+'</td><td class="left">'+esc(prod.partName||'-')+'</td>'
       + '<td style="font-size:11px">'+esc(wNames)+'</td>'
       + '<td class="right" style="font-weight:700">'+num(g.qty)+'</td>'
-      + '<td>'+num(Object.keys(g.lots).length)+'</td><td>'+num(g.cnt)+'</td>'
+      + '<td style="color:'+(Object.keys(g.lots).length===0?'#dc2626':'#222')+';font-weight:'+(Object.keys(g.lots).length===0?'700':'400')+'">'+num(Object.keys(g.lots).length)+'</td><td>'+num(g.cnt)+'</td>'
       + '<td class="arrow" id="ar-pk'+i+'">▼</td></tr>';
     h += '<tr class="det-row" id="det-pk'+i+'"><td colspan="8">'
       + '<table class="det"><tr><th style="width:80px">일자</th><th>LOT</th><th style="width:110px">배지</th><th>비고</th></tr>';
@@ -356,6 +371,15 @@ async function renderPackaging(rows){
     h += '</table>';
   }
 
+  if (lotMiss.length){
+    var lmRows = '';
+    lotMiss.forEach(function(r){
+      var prod = PRODUCTS[r.worker_id]||{partName:'-'};
+      lmRows += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(r.worker_id||'-')+'</td><td class="left">'+esc(prod.partName||'-')+'</td>'
+        + '<td class="right">'+num(r.quantity)+'</td><td>'+esc(r.worker_name||'-')+'</td><td class="left">'+esc(r.note||'')+'</td></tr>';
+    });
+    h += lotMissSection([{h:'일자',w:80},{h:'사번',w:80},{h:'품명'},{h:'수량',w:80},{h:'작업자',w:90},{h:'비고'}], lmRows);
+  }
   body.innerHTML = h;
 
   /* 엑셀 데이터 준비 */
@@ -373,6 +397,11 @@ async function renderPackaging(rows){
   var sh3 = [['작업자','포장수량','건수']];
   workers.forEach(function(w){ sh3.push([w, byWorker[w].qty, byWorker[w].cnt]); });
   lastXlsx = { name:'packaging', sheets:[ {n:'품목별요약',d:sh1}, {n:'상세내역',d:sh2}, {n:'작업자별',d:sh3} ] };
+  if (lotMiss.length){
+    var shL = [['일자','사번','품번','품명','수량','작업자','비고']];
+    lotMiss.forEach(function(r){ var p=PRODUCTS[r.worker_id]||{partNo:'',partName:''}; shL.push([r.work_date, r.worker_id||'', p.partNo, p.partName, r.quantity||0, r.worker_name||'', r.note||'']); });
+    lastXlsx.sheets.push({ n:'LOT미입력', d:shL });
+  }
   if (rems.length){
     var sh4 = [['일자','작성자','내용']];
     rems.forEach(function(r){ sh4.push([r.d, r.by, r.t]); });
@@ -414,6 +443,7 @@ async function renderAssembly(rows){
   var sabuns = Object.keys(bySabun).sort(function(a,b){ return bySabun[b].qty - bySabun[a].qty; });
   var equips = Object.keys(byEquip).sort(function(a,b){ return byEquip[b].qty - byEquip[a].qty; });
   var mats = Object.keys(byMat).sort(function(a,b){ return byMat[b] - byMat[a]; });
+  var lotMiss = rows.filter(function(r){ return lotMissingOne(r.lot_no); });
   var defRate = totalQty > 0 ? (totalDef / totalQty * 100) : 0;
 
   var h = '';
@@ -425,6 +455,7 @@ async function renderAssembly(rows){
     + '<div class="sum-card"><div class="n">'+num(sabuns.length)+'</div><div class="l">품목(사번) 수</div></div>'
     + '<div class="sum-card"><div class="n">'+num(equips.length)+'</div><div class="l">가동 설비</div></div>'
     + '</div>';
+  h += lotWarnStrip(lotMiss.length);
 
   /* 1. 품목별 조립 실적 */
   h += '<h2 class="sec">1. 품목(사번)별 조립 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 상세</span></h2>';
@@ -477,6 +508,15 @@ async function renderAssembly(rows){
     h += '</table>';
   }
 
+  if (lotMiss.length){
+    var lmRows = '';
+    lotMiss.forEach(function(r){
+      lmRows += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(r.equipment_no||'-')+'</td><td>'+esc(r.sabun||'-')+'</td>'
+        + '<td class="left">'+esc(r.product_name||(PRODUCTS[r.sabun]||{}).partName||'-')+'</td>'
+        + '<td class="right">'+num(r.production_qty)+'</td><td>'+esc(r.worker_name||'-')+'</td></tr>';
+    });
+    h += lotMissSection([{h:'일자',w:80},{h:'설비',w:90},{h:'사번',w:80},{h:'품명'},{h:'수량',w:80},{h:'작업자',w:90}], lmRows);
+  }
   body.innerHTML = h;
 
   /* 엑셀 */
@@ -500,6 +540,11 @@ async function renderAssembly(rows){
       r.production_qty||0, r.defect_qty||0, r.worker_name||'', r.start_time||'', r.end_time||'', r.note||'']);
   });
   lastXlsx = { name:'assembly', sheets:[ {n:'품목별요약',d:sh1}, {n:'설비별',d:sh2}, {n:'자재사용',d:sh3}, {n:'상세내역',d:sh4} ] };
+  if (lotMiss.length){
+    var shL = [['일자','설비','사번','품명','수량','작업자']];
+    lotMiss.forEach(function(r){ shL.push([r.work_date, r.equipment_no||'', r.sabun||'', r.product_name||(PRODUCTS[r.sabun]||{}).partName||'', r.production_qty||0, r.worker_name||'']); });
+    lastXlsx.sheets.push({ n:'LOT미입력', d:shL });
+  }
 }
 
 /* ════════════════════ 검사 (inspection) ════════════════════ */
@@ -541,6 +586,7 @@ async function renderInspection(rows){
   var sabuns = Object.keys(bySabun).sort(function(a,b){ return bySabun[b].ins - bySabun[a].ins; });
   var workers = Object.keys(byWorker).sort(function(a,b){ return byWorker[b].ins - byWorker[a].ins; });
   var defects = Object.keys(byDefect).sort(function(a,b){ return byDefect[b].qty - byDefect[a].qty; });
+  var lotMiss = rows.filter(function(r){ return lotMissingArr(r.lot_nos); });
   var passRate = function(p, i){ return i > 0 ? (Math.round(p/i*10000)/100) : 0; };
 
   var h = '';
@@ -551,6 +597,7 @@ async function renderInspection(rows){
     + '<div class="sum-card"><div class="n">'+passRate(tPass,tIns)+'%</div><div class="l">합격률</div></div>'
     + '<div class="sum-card"><div class="n">'+num(sabuns.length)+'</div><div class="l">품목(사번) 수</div></div>'
     + '</div>';
+  h += lotWarnStrip(lotMiss.length);
 
   /* 1. 품목별 검사 실적 */
   h += '<h2 class="sec">1. 품목(사번)별 검사 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 LOT 상세</span></h2>';
@@ -622,6 +669,15 @@ async function renderInspection(rows){
     h += '<div style="font-size:11px;color:#7c3aed;margin-top:10px">※ 재검 기록 '+recheckCnt+'건이 집계에 포함되어 있습니다 (품목별 표의 재검 열 참고)</div>';
   }
 
+  if (lotMiss.length){
+    var lmRows = '';
+    lotMiss.forEach(function(r){
+      var prod = PRODUCTS[r.worker_id]||{partName:'-'};
+      lmRows += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(r.worker_id||'-')+'</td><td class="left">'+esc(prod.partName||'-')+'</td>'
+        + '<td class="right">'+num(r.inspect_qty)+'</td><td>'+esc(r.worker_name||'-')+'</td><td>'+(r.recheck?'재검':'-')+'</td></tr>';
+    });
+    h += lotMissSection([{h:'일자',w:80},{h:'사번',w:80},{h:'품명'},{h:'검사수량',w:80},{h:'검사자',w:90},{h:'재검',w:50}], lmRows);
+  }
   body.innerHTML = h;
 
   /* 엑셀 */
@@ -645,6 +701,11 @@ async function renderInspection(rows){
       r.defect_type||'', r.defect_memo||'', r.recheck?'재검':'', r.worker_name||'', r.remarks||'']);
   });
   lastXlsx = { name:'inspection', sheets:[ {n:'품목별요약',d:sh1}, {n:'불량유형',d:sh2}, {n:'검사자별',d:sh3}, {n:'상세내역',d:sh4} ] };
+  if (lotMiss.length){
+    var shL = [['일자','사번','품번','품명','검사수량','검사자','재검']];
+    lotMiss.forEach(function(r){ var p=PRODUCTS[r.worker_id]||{partNo:'',partName:''}; shL.push([r.work_date, r.worker_id||'', p.partNo, p.partName, r.inspect_qty||0, r.worker_name||'', r.recheck?'재검':'']); });
+    lastXlsx.sheets.push({ n:'LOT미입력', d:shL });
+  }
   if (rems.length){
     var sh5 = [['일자','작성자','내용']];
     rems.forEach(function(r){ sh5.push([r.d, r.by, r.t]); });
