@@ -157,7 +157,7 @@ var PROCS = [
   { k:'postcure',  label:'2차가류', grp:'후공정', table:'postcure_reports',  impl:false },
   { k:'shot',      label:'쇼트',   grp:'후공정', table:'shot_reports',      impl:false },
   { k:'sasang',    label:'사상',   grp:'후공정', table:'sasang_reports',    impl:false },
-  { k:'coating',   label:'도포',   grp:'후공정', table:'coating_reports',   impl:false },
+  { k:'coating',   label:'도포',   grp:'후공정', table:'coating_reports',   impl:true  },
   { k:'assembly',  label:'조립',   grp:'후공정', table:'assembly_reports',  impl:true  },
   { k:'inspection',label:'검사',   grp:'후공정', table:'inspection_reports',impl:true  },
   { k:'packaging', label:'포장',   grp:'후공정', table:'packaging_reports', impl:true  }
@@ -284,6 +284,7 @@ async function loadReport(force){
   if (curProc === 'packaging') await renderPackaging(rows);
   else if (curProc === 'assembly') await renderAssembly(rows);
   else if (curProc === 'inspection') await renderInspection(rows);
+  else if (curProc === 'coating') await renderCoating(rows);
 }
 
 /* ════════════════════ 포장 (packaging) ════════════════════ */
@@ -706,6 +707,131 @@ async function renderInspection(rows){
     lotMiss.forEach(function(r){ var p=PRODUCTS[r.worker_id]||{partNo:'',partName:''}; shL.push([r.work_date, r.worker_id||'', p.partNo, p.partName, r.inspect_qty||0, r.worker_name||'', r.recheck?'재검':'']); });
     lastXlsx.sheets.push({ n:'LOT미입력', d:shL });
   }
+  if (rems.length){
+    var sh5 = [['일자','작성자','내용']];
+    rems.forEach(function(r){ sh5.push([r.d, r.by, r.t]); });
+    lastXlsx.sheets.push({ n:'특이사항', d:sh5 });
+  }
+}
+
+/* ════════════════════ 도포 (coating) ════════════════════ */
+async function renderCoating(rows){
+  var body = document.getElementById('rpBody');
+  if (!rows.length){ body.innerHTML = '<div class="empty-msg">해당 기간에 제출된 도포 작업일지가 없습니다.</div>'; return; }
+  await loadProducts();
+
+  var bySabun = {}, byType = {}, byWorker = {}, totalQty = 0, totalDef = 0;
+  rows.forEach(function(r){
+    var q = r.total_qty || 0, d = r.defect_qty || 0;
+    totalQty += q; totalDef += d;
+    var sb = r.worker_id || '(사번미입력)';
+    if (!bySabun[sb]) bySabun[sb] = { qty:0, def:0, cnt:0, workers:{}, types:{}, rows:[] };
+    var g = bySabun[sb];
+    g.qty += q; g.def += d; g.cnt++; g.rows.push(r);
+    if (r.worker_name) g.workers[r.worker_name] = 1;
+    if (r.work_type) g.types[r.work_type] = 1;
+    var t = r.work_type || '(유형미지정)';
+    if (!byType[t]) byType[t] = { qty:0, def:0, cnt:0, sabuns:{} };
+    byType[t].qty += q; byType[t].def += d; byType[t].cnt++; byType[t].sabuns[sb] = 1;
+    var w = r.worker_name || '(미지정)';
+    if (!byWorker[w]) byWorker[w] = { qty:0, def:0, cnt:0 };
+    byWorker[w].qty += q; byWorker[w].def += d; byWorker[w].cnt++;
+  });
+  var sabuns = Object.keys(bySabun).sort(function(a,b){ return bySabun[b].qty - bySabun[a].qty; });
+  var types = Object.keys(byType).sort(function(a,b){ return byType[b].qty - byType[a].qty; });
+  var workers = Object.keys(byWorker).sort(function(a,b){ return byWorker[b].qty - byWorker[a].qty; });
+  var defRate = totalQty > 0 ? (Math.round(totalDef/totalQty*10000)/100) : 0;
+
+  var h = '';
+  h += '<div class="sum-grid">'
+    + '<div class="sum-card"><div class="n">'+num(totalQty)+'</div><div class="l">총 작업수량</div></div>'
+    + '<div class="sum-card"><div class="n" style="color:'+(totalDef>0?'#dc2626':'#222')+'">'+num(totalDef)+'</div><div class="l">불량</div></div>'
+    + '<div class="sum-card"><div class="n" style="color:'+(totalDef>0?'#dc2626':'#222')+'">'+defRate+'%</div><div class="l">불량률</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(sabuns.length)+'</div><div class="l">품목(사번) 수</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(workers.length)+'</div><div class="l">투입 작업자</div></div>'
+    + '</div>';
+
+  /* 1. 품목별 도포 실적 */
+  h += '<h2 class="sec">1. 품목(사번)별 도포 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 상세</span></h2>';
+  h += '<table class="rp"><tr><th style="width:74px">사번</th><th style="width:108px">품번</th><th>품명</th><th style="width:100px">작업자</th><th style="width:120px">작업유형</th><th style="width:80px">총수량</th><th style="width:54px">불량</th><th style="width:46px">건수</th><th style="width:26px"></th></tr>';
+  sabuns.forEach(function(sb, i){
+    var g = bySabun[sb];
+    var prod = PRODUCTS[sb] || { partNo:'-', partName:'-' };
+    h += '<tr class="grp-row" onclick="toggleDet(\'ct'+i+'\')">'
+      + '<td>'+esc(sb)+'</td><td>'+esc(prod.partNo||'-')+'</td><td class="left">'+esc(prod.partName||'-')+'</td>'
+      + '<td style="font-size:11px">'+esc(Object.keys(g.workers).join(', ')||'-')+'</td>'
+      + '<td style="font-size:11px" class="left">'+esc(Object.keys(g.types).join(' · ')||'-')+'</td>'
+      + '<td class="right" style="font-weight:700">'+num(g.qty)+'</td>'
+      + '<td style="color:'+(g.def>0?'#dc2626':'#999')+'">'+num(g.def)+'</td>'
+      + '<td>'+num(g.cnt)+'</td>'
+      + '<td class="arrow" id="ar-ct'+i+'">▼</td></tr>';
+    h += '<tr class="det-row" id="det-ct'+i+'"><td colspan="9">'
+      + '<table class="det"><tr><th style="width:80px">일자</th><th>작업유형</th><th style="width:130px">라인 구성</th><th>비고</th></tr>';
+    g.rows.forEach(function(r){
+      var lineTxt = (r.qty_per_line && r.line_count) ? (num(r.qty_per_line)+'개 × '+num(r.line_count)+'라인') : '-';
+      h += '<tr><td>'+esc(r.work_date)+'</td><td class="left">'+esc(r.work_type||'-')+'</td>'
+        + '<td>'+lineTxt+'</td><td class="left">'+esc(r.note||'')+'</td></tr>';
+    });
+    h += '</table></td></tr>';
+  });
+  h += '</table>';
+
+  /* 2. 작업유형별 실적 */
+  h += '<h2 class="sec">2. 작업유형별 실적</h2>';
+  h += '<table class="rp"><tr><th>작업유형</th><th style="width:86px">총수량</th><th style="width:60px">불량</th><th style="width:60px">건수</th><th style="width:72px">품목 수</th></tr>';
+  types.forEach(function(t){
+    var g = byType[t];
+    h += '<tr><td class="left">'+esc(t)+'</td><td class="right">'+num(g.qty)+'</td>'
+      + '<td style="color:'+(g.def>0?'#dc2626':'#999')+'">'+num(g.def)+'</td>'
+      + '<td>'+num(g.cnt)+'</td><td>'+num(Object.keys(g.sabuns).length)+'</td></tr>';
+  });
+  h += '</table>';
+
+  /* 3. 작업자별 실적 */
+  h += '<h2 class="sec">3. 작업자별 실적</h2>';
+  h += '<table class="rp" style="max-width:480px"><tr><th>작업자</th><th style="width:86px">총수량</th><th style="width:64px">불량</th><th style="width:60px">건수</th></tr>';
+  workers.forEach(function(w){
+    var g = byWorker[w];
+    h += '<tr><td>'+esc(w)+'</td><td class="right">'+num(g.qty)+'</td>'
+      + '<td style="color:'+(g.def>0?'#dc2626':'#999')+'">'+num(g.def)+'</td><td>'+num(g.cnt)+'</td></tr>';
+  });
+  h += '</table>';
+
+  /* 4. 특이사항 */
+  var remSeen = {}, rems = [];
+  rows.forEach(function(r){
+    var t = (r.remarks||'').trim();
+    if (!t) return;
+    var k = r.work_date + '|' + t;
+    if (remSeen[k]) return; remSeen[k]=1;
+    rems.push({ d:r.work_date, by:r.created_by_name||r.worker_name||'-', t:t });
+  });
+  if (rems.length){
+    h += '<h2 class="sec">4. 특이사항 / 전달사항</h2>';
+    h += '<table class="rp"><tr><th style="width:90px">일자</th><th style="width:90px">작성자</th><th>내용</th></tr>';
+    rems.forEach(function(r){ h += '<tr><td>'+esc(r.d)+'</td><td>'+esc(r.by)+'</td><td class="left">'+esc(r.t)+'</td></tr>'; });
+    h += '</table>';
+  }
+
+  body.innerHTML = h;
+
+  /* 엑셀 */
+  var sh1 = [['사번','품번','품명','작업자','작업유형','총수량','불량','건수']];
+  sabuns.forEach(function(sb){
+    var g=bySabun[sb], prod=PRODUCTS[sb]||{partNo:'',partName:''};
+    sh1.push([sb, prod.partNo, prod.partName, Object.keys(g.workers).join(', '), Object.keys(g.types).join(' · '), g.qty, g.def, g.cnt]);
+  });
+  var sh2 = [['작업유형','총수량','불량','건수','품목 수']];
+  types.forEach(function(t){ var g=byType[t]; sh2.push([t, g.qty, g.def, g.cnt, Object.keys(g.sabuns).length]); });
+  var sh3 = [['작업자','총수량','불량','건수']];
+  workers.forEach(function(w){ var g=byWorker[w]; sh3.push([w, g.qty, g.def, g.cnt]); });
+  var sh4 = [['일자','사번','품번','품명','작업유형','라인당 수량','라인 수','총수량','불량','작업자','비고']];
+  rows.forEach(function(r){
+    var prod = PRODUCTS[r.worker_id]||{partNo:'',partName:''};
+    sh4.push([r.work_date, r.worker_id||'', prod.partNo, prod.partName, r.work_type||'',
+      r.qty_per_line||0, r.line_count||0, r.total_qty||0, r.defect_qty||0, r.worker_name||'', r.note||'']);
+  });
+  lastXlsx = { name:'coating', sheets:[ {n:'품목별요약',d:sh1}, {n:'작업유형별',d:sh2}, {n:'작업자별',d:sh3}, {n:'상세내역',d:sh4} ] };
   if (rems.length){
     var sh5 = [['일자','작성자','내용']];
     rems.forEach(function(r){ sh5.push([r.d, r.by, r.t]); });
