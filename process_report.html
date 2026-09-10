@@ -517,9 +517,9 @@ async function renderAssembly(rows){
     lotMiss.forEach(function(r){
       lmRows += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(r.equipment_no||'-')+'</td><td>'+esc(r.sabun||'-')+'</td>'
         + '<td class="left">'+esc(r.product_name||(PRODUCTS[r.sabun]||{}).partName||'-')+'</td>'
-        + '<td class="right">'+num(r.production_qty)+'</td><td>'+esc(r.worker_name||'-')+'</td></tr>';
+        + '<td class="right">'+num(r.production_qty)+'</td><td>'+esc(r.worker_name||'-')+'</td><td class="left">'+esc(r.note||'')+'</td></tr>';
     });
-    h += lotMissSection([{h:'일자',w:80},{h:'설비',w:90},{h:'사번',w:80},{h:'품명'},{h:'수량',w:80},{h:'작업자',w:90}], lmRows);
+    h += lotMissSection([{h:'일자',w:80},{h:'설비',w:90},{h:'사번',w:80},{h:'품명'},{h:'수량',w:80},{h:'작업자',w:90},{h:'비고'}], lmRows);
   }
   body.innerHTML = h;
 
@@ -545,8 +545,8 @@ async function renderAssembly(rows){
   });
   lastXlsx = { name:'assembly', sheets:[ {n:'품목별요약',d:sh1}, {n:'설비별',d:sh2}, {n:'자재사용',d:sh3}, {n:'상세내역',d:sh4} ] };
   if (lotMiss.length){
-    var shL = [['일자','설비','사번','품명','수량','작업자']];
-    lotMiss.forEach(function(r){ shL.push([r.work_date, r.equipment_no||'', r.sabun||'', r.product_name||(PRODUCTS[r.sabun]||{}).partName||'', r.production_qty||0, r.worker_name||'']); });
+    var shL = [['일자','설비','사번','품명','수량','작업자','비고']];
+    lotMiss.forEach(function(r){ shL.push([r.work_date, r.equipment_no||'', r.sabun||'', r.product_name||(PRODUCTS[r.sabun]||{}).partName||'', r.production_qty||0, r.worker_name||'', r.note||'']); });
     lastXlsx.sheets.push({ n:'LOT미입력', d:shL });
   }
 }
@@ -685,9 +685,9 @@ async function renderShot(rows){
     lotMiss.forEach(function(r){
       lmRows += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(shotTypeLabel(r.shot_type))+'</td><td>'+esc(r.worker_id||'-')+'</td>'
         + '<td class="left">'+esc((PRODUCTS[r.worker_id]||{}).partName||'-')+'</td>'
-        + '<td class="right">'+num(r.work_qty)+'</td><td>'+esc(r.worker_name||'-')+'</td></tr>';
+        + '<td class="right">'+num(r.work_qty)+'</td><td>'+esc(r.worker_name||'-')+'</td><td class="left">'+esc(r.note||'')+'</td></tr>';
     });
-    h += lotMissSection([{h:'일자',w:80},{h:'방식',w:84},{h:'사번',w:80},{h:'품명'},{h:'수량',w:80},{h:'작업자',w:90}], lmRows);
+    h += lotMissSection([{h:'일자',w:80},{h:'방식',w:84},{h:'사번',w:80},{h:'품명'},{h:'수량',w:80},{h:'작업자',w:90},{h:'비고'}], lmRows);
   }
   body.innerHTML = h;
 
@@ -717,8 +717,8 @@ async function renderShot(rows){
   });
   lastXlsx = { name:'shot', sheets:[ {n:'품목별요약',d:sh1}, {n:'방식별',d:sh2}, {n:'설비별',d:sh3}, {n:'상세내역',d:sh4} ] };
   if (lotMiss.length){
-    var shL = [['일자','방식','사번','품명','수량','작업자']];
-    lotMiss.forEach(function(r){ shL.push([r.work_date, shotTypeLabel(r.shot_type), r.worker_id||'', (PRODUCTS[r.worker_id]||{}).partName||'', r.work_qty||0, r.worker_name||'']); });
+    var shL = [['일자','방식','사번','품명','수량','작업자','비고']];
+    lotMiss.forEach(function(r){ shL.push([r.work_date, shotTypeLabel(r.shot_type), r.worker_id||'', (PRODUCTS[r.worker_id]||{}).partName||'', r.work_qty||0, r.worker_name||'', r.note||'']); });
     lastXlsx.sheets.push({ n:'LOT미입력', d:shL });
   }
   if (rems.length){
@@ -852,9 +852,9 @@ async function renderPostcure(rows){
       lmRows += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(r.worker_id||'-')+'</td>'
         + '<td class="left">'+esc((PRODUCTS[r.worker_id]||{}).partName||'-')+'</td>'
         + '<td>'+esc(r.material_name||'-')+'</td>'
-        + '<td class="right">'+num(r.input_qty)+'</td><td>'+esc(r.worker_name||'-')+'</td></tr>';
+        + '<td class="right">'+num(r.input_qty)+'</td><td>'+esc(r.worker_name||'-')+'</td><td class="left">'+esc(r.note||'')+'</td></tr>';
     });
-    h += lotMissSection([{h:'일자',w:80},{h:'사번',w:80},{h:'품명'},{h:'재질',w:100},{h:'수량',w:80},{h:'작업자',w:90}], lmRows);
+    h += lotMissSection([{h:'일자',w:80},{h:'사번',w:80},{h:'품명'},{h:'재질',w:100},{h:'수량',w:80},{h:'작업자',w:90},{h:'비고'}], lmRows);
   }
   body.innerHTML = h;
 
@@ -883,8 +883,8 @@ async function renderPostcure(rows){
   });
   lastXlsx = { name:'postcure', sheets:[ {n:'품목별요약',d:sh1}, {n:'재질별',d:sh2}, {n:'성형작업자별',d:sh3}, {n:'상세내역',d:sh4} ] };
   if (lotMiss.length){
-    var shL = [['일자','사번','품명','재질','수량','작업자']];
-    lotMiss.forEach(function(r){ shL.push([r.work_date, r.worker_id||'', (PRODUCTS[r.worker_id]||{}).partName||'', r.material_name||'', r.input_qty||0, r.worker_name||'']); });
+    var shL = [['일자','사번','품명','재질','수량','작업자','비고']];
+    lotMiss.forEach(function(r){ shL.push([r.work_date, r.worker_id||'', (PRODUCTS[r.worker_id]||{}).partName||'', r.material_name||'', r.input_qty||0, r.worker_name||'', r.note||'']); });
     lastXlsx.sheets.push({ n:'LOT미입력', d:shL });
   }
   if (rems.length){
@@ -1021,9 +1021,9 @@ async function renderSasang(rows){
     lotMiss.forEach(function(r){
       lmRows += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(sasangEquipOf(r)||'-')+'</td><td>'+esc(r.sabun||'-')+'</td>'
         + '<td class="left">'+esc(r.product_name||(PRODUCTS[r.sabun]||{}).partName||'-')+'</td>'
-        + '<td class="right">'+num(r.production_qty)+'</td><td>'+esc(r.worker_name||'-')+'</td></tr>';
+        + '<td class="right">'+num(r.production_qty)+'</td><td>'+esc(r.worker_name||'-')+'</td><td class="left">'+esc(r.note||'')+'</td></tr>';
     });
-    h += lotMissSection([{h:'일자',w:80},{h:'설비',w:110},{h:'사번',w:80},{h:'품명'},{h:'수량',w:80},{h:'작업자',w:90}], lmRows);
+    h += lotMissSection([{h:'일자',w:80},{h:'설비',w:110},{h:'사번',w:80},{h:'품명'},{h:'수량',w:80},{h:'작업자',w:90},{h:'비고'}], lmRows);
   }
   body.innerHTML = h;
 
@@ -1052,8 +1052,8 @@ async function renderSasang(rows){
   });
   lastXlsx = { name:'sasang', sheets:[ {n:'품목별요약',d:sh1}, {n:'설비별',d:sh2}, {n:'작업자별',d:sh3}, {n:'상세내역',d:sh4} ] };
   if (lotMiss.length){
-    var shL = [['일자','설비','사번','품명','수량','작업자']];
-    lotMiss.forEach(function(r){ shL.push([r.work_date, sasangEquipOf(r), r.sabun||'', r.product_name||(PRODUCTS[r.sabun]||{}).partName||'', r.production_qty||0, r.worker_name||'']); });
+    var shL = [['일자','설비','사번','품명','수량','작업자','비고']];
+    lotMiss.forEach(function(r){ shL.push([r.work_date, sasangEquipOf(r), r.sabun||'', r.product_name||(PRODUCTS[r.sabun]||{}).partName||'', r.production_qty||0, r.worker_name||'', r.note||'']); });
     lastXlsx.sheets.push({ n:'LOT미입력', d:shL });
   }
   if (rems.length){
