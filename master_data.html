@@ -190,7 +190,7 @@ th.sortable.sorted .sort-ind { color: #243bb2; font-size: 11px; }
           <div class="card-title">작업자 기준정보</div>
           <div class="card-sub">공정별 작업자 목록 관리</div>
         </div>
-        <button class="btn-add" onclick="toggleForm('worker')">+ 작업자 추가</button>
+        <button class="btn-add" onclick="resetWorkerForm();toggleForm('worker')">+ 작업자 추가</button>
       </div>
       <div class="search-bar">
         <input class="search-input" id="searchWorker" placeholder="🔍 이름 또는 공정 검색" oninput="filterWorkers()" />
@@ -223,8 +223,8 @@ th.sortable.sorted .sort-ind { color: #243bb2; font-size: 11px; }
           </div>
         </div>
         <div class="form-actions">
-          <button class="btn-cancel-form" onclick="toggleForm('worker')">취소</button>
-          <button class="btn-save" onclick="saveWorker()">저장</button>
+          <button class="btn-cancel-form" onclick="cancelWorkerEdit()">취소</button>
+          <button class="btn-save" id="w_saveBtn" onclick="saveWorker()">저장</button>
         </div>
       </div>
       <div class="table-scroll-wrap">
@@ -747,6 +747,7 @@ function renderWorkers(data, isSearch) {
       '<td><span class="active-badge ' + (r.active ? 'active-y' : 'active-n') + '">' + (r.active ? '재직중' : '퇴직') + '</span></td>' +
       '<td style="color:#aaa;font-size:12px">' + fmtDate(r.created_at) + '</td>' +
       '<td><div class="act-cell">' +
+        '<button class="toggle-btn" title="정보 수정" onclick="editWorker(' + r.id + ')">✏️ 수정</button>' +
         '<button class="toggle-btn" title="재직/퇴직 상태 변경" onclick="toggleWorker(' + r.id + ', ' + r.active + ')">' + (r.active ? '비활성화' : '활성화') + '</button>' +
         '<button class="icon-btn del" title="삭제" onclick="deleteWorker(' + r.id + ')">🗑️</button>' +
       '</div></td></tr>';
@@ -763,17 +764,61 @@ function renderWorkers(data, isSearch) {
   }
 }
 
+// ── 작업자 수정 모드 ──
+var editingWorkerId = null;
+
+function editWorker(id) {
+  var r = allWorkers.find(function(w){ return w.id === id; });
+  if (!r) { showToast('작업자 정보를 찾을 수 없어요.'); return; }
+  editingWorkerId = id;
+  document.getElementById('w_name').value = r.name || '';
+  document.getElementById('w_name_local').value = r.name_local || '';
+  document.getElementById('w_process').value = r.process || '포장';
+  var form = document.getElementById('form_worker');
+  form.classList.add('open');
+  var btn = document.getElementById('w_saveBtn');
+  btn.textContent = '수정 저장';
+  btn.style.background = '#d97706';
+  form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  showToast('✏️ ' + r.name + ' 수정 중 — 변경 후 [수정 저장]을 누르세요.');
+}
+
+function resetWorkerForm() {
+  editingWorkerId = null;
+  document.getElementById('w_name').value = '';
+  document.getElementById('w_name_local').value = '';
+  var btn = document.getElementById('w_saveBtn');
+  btn.textContent = '저장';
+  btn.style.background = '';
+}
+
+function cancelWorkerEdit() {
+  resetWorkerForm();
+  document.getElementById('form_worker').classList.remove('open');
+}
+
 async function saveWorker() {
   var name = document.getElementById('w_name').value.trim();
   var nameLocal = document.getElementById('w_name_local').value.trim();
   var process = document.getElementById('w_process').value;
   if (!name) { showToast('이름을 입력해주세요.'); return; }
+
+  if (editingWorkerId) {
+    // 수정: 등록일·재직상태는 그대로 두고 이름/한국어명/공정만 갱신 (한국어명 비우면 삭제)
+    var upd = { name: name, process: process, name_local: nameLocal || null };
+    var result = await db.from('workers').update(upd).eq('id', editingWorkerId);
+    if (result.error) { showToast('수정 실패: ' + result.error.message); return; }
+    cancelWorkerEdit();
+    showToast('작업자 정보가 수정됐어요 ✓');
+    loadWorkers();
+    return;
+  }
+
   var payload = { name: name, process: process, active: true };
   if (nameLocal) payload.name_local = nameLocal;
   var result = await db.from('workers').insert(payload);
   if (result.error) { showToast('저장 실패: ' + result.error.message); return; }
-  document.getElementById('w_name').value = '';
-  document.getElementById('w_name_local').value = '';
+  resetWorkerForm();
   toggleForm('worker');
   showToast('작업자가 추가됐어요 ✓');
   loadWorkers();
