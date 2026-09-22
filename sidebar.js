@@ -22,7 +22,7 @@ function initSidebar() {
     var isMoldPage = ['mold_dashboard.html','mold_layout.html','mold_detail.html'].indexOf(page) !== -1;
     var isMesPage = ['mes_data.html'].indexOf(page) !== -1;
     var isQualityPage = ['inspection_round_viewer.html', 'inspection_report.html'].indexOf(page) !== -1;
-    var isDataPage = ['data_viewer.html','safety_viewer.html','docs_manager.html','process_report.html'].indexOf(page) !== -1;
+    var isDataPage = ['data_viewer.html','safety_viewer.html','docs_manager.html','process_report.html','molding_condition.html'].indexOf(page) !== -1;
     var isSystemPage = ['master_data.html','users.html'].indexOf(page) !== -1;
     var isInventoryPage = ['inventory_layout.html','inventory_rack.html','inventory_io.html','inventory_viewer.html','inventory_zone.html','inventory_special.html'].indexOf(page) !== -1;
     var isAssetPage = ['asset_manage.html'].indexOf(page) !== -1;
@@ -43,6 +43,7 @@ function initSidebar() {
     // 데이터관리 active
     var dataViewActive = (page === 'data_viewer.html') ? ' nav-active' : '';
     var safetyViewActive = (page === 'safety_viewer.html') ? ' nav-active' : '';
+    var moldCondActive = (page === 'molding_condition.html') ? ' nav-active' : '';
     var docsActive = (page === 'docs_manager.html') ? ' nav-active' : '';
 
     // 시스템 active
@@ -233,6 +234,7 @@ function initSidebar() {
                     '<a class="nav-link' + procRptActive + '" href="process_report.html"><span class="n-icon">📈</span>공정별 생산보고서</a>' +
                     '<a class="nav-link' + dataViewActive + '" href="data_viewer.html"><span class="n-icon">📊</span>데이터 조회 및 추출</a>' +
                     '<a class="nav-link' + safetyViewActive + '" href="safety_viewer.html"><span class="n-icon">🔍</span>설비 점검 조회</a>' +
+                    '<a class="nav-link' + moldCondActive + '" href="molding_condition.html"><span class="n-icon">🌡️</span>성형조건 조회</a>' +
                     '<a class="nav-link' + docsActive + '" href="docs_manager.html"><span class="n-icon">📄</span>문서 관리</a>' +
                     '<a class="nav-link' + mesActive + '" href="mes_data.html"><span class="n-icon">📥</span>MES 자료 (재단·혼련·평량)</a>' +
                 '</div>' +
