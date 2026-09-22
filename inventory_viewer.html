@@ -142,6 +142,10 @@
     }
     .loading-spinner { font-size: 32px; margin-bottom: 10px; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .loc-link { display:inline-block; color:#243bb2; text-decoration:none; background:#eef2ff; border:1px solid #c7d2fe; border-radius:6px; padding:2px 8px; margin:1px 0; font-size:12px; font-weight:600; }
+    .loc-link::after { content:' ↗'; font-size:10px; color:#818cf8; }
+    .loc-link:hover { background:#243bb2; color:#fff; border-color:#243bb2; }
+    .loc-link:hover::after { color:#c7d2fe; }
   </style>
 </head>
 <body>
@@ -311,7 +315,12 @@
         productMap[pc].totalQty += s.quantity;
         productMap[pc].slotCount += 1;
         var rackName = s.inventory_racks ? s.inventory_racks.rack_name : '';
-        productMap[pc].locations.push(rackName + '-' + s.slot_code + '(' + s.quantity + ')');
+        var rackCode = s.inventory_racks ? s.inventory_racks.rack_code : '';
+        var locText = rackName + '-' + s.slot_code + '(' + s.quantity + ')';
+        // 적재대 현황(해당 동)으로 이동 + 이 사번 슬롯 하이라이트 링크
+        productMap[pc].locations.push(rackCode
+          ? '<a class="loc-link" href="inventory_rack.html?rack=' + encodeURIComponent(rackCode) + '&hl=' + encodeURIComponent(pc) + '" title="적재대 현황에서 이 사번 슬롯 보기">' + locText + '</a>'
+          : locText);
         if (s.lot_no) productMap[pc].lots.push(s.lot_no);
       }
 
@@ -326,7 +335,13 @@
         }
         productMap[pc].totalQty += (l.quantity || 0);
         productMap[pc].zoneCount = (productMap[pc].zoneCount || 0) + 1;
-        productMap[pc].locations.push(zoneLabel(l.zone_id) + '(' + (l.quantity || 0) + ')');
+        var zLabel = zoneLabel(l.zone_id) + '(' + (l.quantity || 0) + ')';
+        var zInfo = null;
+        for (var zi = 0; zi < allZones.length; zi++) { if (allZones[zi].id === l.zone_id) { zInfo = allZones[zi]; break; } }
+        // 대차 현황(해당 동·라인)으로 이동 + 이 사번 검색 필터 적용 링크
+        productMap[pc].locations.push((zInfo && zInfo.zone_code)
+          ? '<a class="loc-link" href="inventory_zone.html?zone=' + encodeURIComponent(zInfo.zone_code) + '&lane=' + encodeURIComponent(zInfo.lane_no || 1) + '&hl=' + encodeURIComponent(pc) + '" title="대차 현황에서 이 사번 보기">' + zLabel + '</a>'
+          : zLabel);
         if (l.lot_no) productMap[pc].lots.push(l.lot_no);
       }
 
@@ -391,7 +406,14 @@
     function exportProduct() {
       var table = document.getElementById('productTable');
       if (!table) return;
-      var wb = XLSX.utils.table_to_book(table, { sheet: '제품별재고' });
+      // 적재 위치 링크(a 태그)를 평문으로 치환한 복제본으로 엑셀 생성
+      // (엑셀에 상대경로 하이퍼링크가 들어가면 클릭 시 오류가 나므로)
+      var clone = table.cloneNode(true);
+      var links = clone.querySelectorAll('a');
+      for (var li = 0; li < links.length; li++) {
+        links[li].parentNode.replaceChild(document.createTextNode(links[li].textContent), links[li]);
+      }
+      var wb = XLSX.utils.table_to_book(clone, { sheet: '제품별재고' });
       XLSX.writeFile(wb, '제품별재고_' + todayStr() + '.xlsx');
       showToast('엑셀 다운로드 완료');
     }

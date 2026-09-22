@@ -231,6 +231,7 @@
     var params = new URLSearchParams(window.location.search);
     var zoneCode = params.get('zone') || 'ZA';
     var currentLane = parseInt(params.get('lane')) || 1;
+    var pendingZoneHl = params.get('hl') || null;  // 재고조회에서 ?hl=사번 으로 진입 시 1회 검색 필터용
 
     var zoneLots = [];
     var zoneSortDir = '';   // 사번 정렬: '' = 입고순(기본), 'asc' = 오름차순, 'desc' = 내림차순
@@ -261,6 +262,12 @@
 
         updateZoneTabs();
         applyCurrentZone();
+        // 재고조회 링크(?hl=사번)로 진입한 경우: 사번 검색 필터 적용 (최초 1회)
+        if (pendingZoneHl) {
+          var _kw = pendingZoneHl; pendingZoneHl = null;
+          var _zs = document.getElementById('zoneSearch');
+          if (_zs) { _zs.value = _kw; filterZoneTable(); }
+        }
       }).catch(function(err) {
         hideLoading();
         console.error(err);

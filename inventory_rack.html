@@ -296,6 +296,7 @@
     var allRacks = [];
     var currentRack = null;
     var currentSlots = [];
+    var pendingHighlight = null;  // 재고조회에서 ?hl=사번 으로 진입 시 1회 하이라이트용
     var allSlots = []; // 이동처리용 전체 슬롯
     var batchMode = false;
     var batchSelectedIds = [];
@@ -320,6 +321,8 @@
           }
           var params = new URLSearchParams(window.location.search);
           var rackParam = params.get('rack');
+          var hlParam = params.get('hl');
+          if (hlParam) pendingHighlight = hlParam;
           if (rackParam) { sel.value = rackParam; onRackChange(); }
         });
     }
@@ -344,6 +347,13 @@
             document.getElementById('slotGridArea').innerHTML = '<div class="no-slots">이 동에는 아직 슬롯이 등록되지 않았습니다.</div>';
           } else { renderSlotGrid(); }
           updateStats();
+          // 재고조회 링크(?hl=사번)로 진입한 경우: 해당 사번 슬롯 하이라이트 + 스크롤 (최초 1회)
+          if (pendingHighlight && currentSlots.length > 0) {
+            var _hlKw = pendingHighlight; pendingHighlight = null;
+            var _si = document.getElementById('slotSearchInput');
+            if (_si) _si.value = _hlKw;
+            highlightCurrentGrid(_hlKw);
+          }
         });
     }
 
@@ -533,7 +543,10 @@
       var slot = findSlotById(slotId);
       if (!slot) return;
 
-      var isOccupied = (slot.status === 'occupied' && slot.product_code);
+      // 그리드와 동일하게 "실데이터(사번+수량)" 기준으로 판정.
+      // status 컬럼이 어긋난 행(예: quantity>0인데 status='empty')이어도
+      // 재고가 실제로 있으면 출고/이동/조정 등 전체 기능을 제공한다. (음수 재고도 조정 가능해야 하므로 포함)
+      var isOccupied = !!(slot.product_code && (slot.quantity > 0 || slot.quantity < 0));
       var h = '';
 
       // 헤더
