@@ -106,7 +106,8 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let allData = [];      // 원본 기록
-let dispRows = [];     // 화면/엑셀용 전개 행 (교체 전/후 분리)
+let dispRows = [];     // 화면/엑셀용 전개 행 (교체 전/후 분리·정렬·중복 제외 적용)
+let statRows = [];     // 통계용 행 (교체 전 제외 필터 '이전' 기준 — 카드 수치가 기록 사실과 일치하도록)
 let PRODUCTS = {};     // 사번 → 품명 (products는 로그인 세션 필요 — RLS)
 
 const TYPES = [['standard','기준'],['first','초품'],['middle','중품'],['last','종품']];
@@ -239,6 +240,26 @@ function buildDispRows() {
     const after = conds ? condSetOf(conds, face, '_c') : null;
     if (after) dispRows.push({ ...base, stage: 'after', cond: after, old: false });
   });
+
+  // 통계는 "교체 전 제외" 필터 이전 기준으로 (기록 단위 사실 유지)
+  statRows = dispRows.filter(x => x.stage === '');
+
+  // [규칙] 같은 작업일·설비·사번·면에 "교체 후" 데이터가 있으면
+  //        교체 전 행은 표시/엑셀에서 제외 (교체 후 = 최종 유효 조건. DB 원본은 유지됨)
+  const rowKey = x => [x.work_date, x.equip, x.sabun, x.face].join('|');
+  const afterKeys = {};
+  dispRows.forEach(x => { if (x.stage === 'after') afterKeys[rowKey(x)] = true; });
+  dispRows = dispRows.filter(x => !(x.stage === '' && afterKeys[rowKey(x)]));
+
+  // [정렬] 작업일↓ → 설비↑ → 면(가→나→다→미지정) → 사번↑ → 교체 전 → 교체 후
+  const FACE_RANK = { ga: 1, na: 2, da: 3, single: 4 };
+  dispRows.sort((a, b) =>
+    (b.work_date > a.work_date ? 1 : b.work_date < a.work_date ? -1 : 0) ||
+    a.equip.localeCompare(b.equip, 'ko') ||
+    ((FACE_RANK[a.face] || 9) - (FACE_RANK[b.face] || 9)) ||
+    String(a.sabun).localeCompare(String(b.sabun)) ||
+    (a.stage === b.stage ? 0 : a.stage === '' ? -1 : 1)
+  );
 }
 
 function isFull(cond) {
@@ -249,8 +270,8 @@ function isFull(cond) {
 function renderStats() {
   const total = allData.length;
   let condCnt = 0, fullCnt = 0;
-  // 기록 단위 통계 (교체 후 행은 제외하고 원 기록 기준)
-  dispRows.filter(x => x.stage === '').forEach(x => {
+  // 기록 단위 통계 (교체 전 제외 필터 '이전'의 원 기록 기준)
+  statRows.forEach(x => {
     if (x.cond && !x.old) condCnt++;
     else if (x.old) condCnt++;
     if (isFull(x.cond)) fullCnt++;
