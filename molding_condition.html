@@ -212,11 +212,12 @@ function condSetOf(conds, face, suffix) {
 function buildDispRows() {
   dispRows = [];
   allData.forEach(r => {
-    let face = 'single', conds = null;
+    let face = 'single', conds = null, dts = [];
     try {
       const n = JSON.parse(r.note);
       face = n.face || 'single';
       conds = n.conditions || null;
+      dts = Array.isArray(n.downtime) ? n.downtime : [];
     } catch(e) {}
 
     const base = {
@@ -236,9 +237,19 @@ function buildDispRows() {
     }
     dispRows.push({ ...base, stage: '', cond: main, old: isOld });
 
-    // 금형 교체 후 세트
+    // 금형 교체 후 세트 — 조건표(_c)는 제출된 모든 행의 note에 동일 복사되므로,
+    // "🔄 교체 후" 행은 비가동 목록의 [금형교체 + 지정 사번](= 교체 후 작업 사번, 현장 관례)과
+    // 일치하는 기록에만 귀속시킨다. (교체 전 작업 기록에 교체 후 조건이 잘못 붙던 오류 수정)
     const after = conds ? condSetOf(conds, face, '_c') : null;
-    if (after) dispRows.push({ ...base, stage: 'after', cond: after, old: false });
+    if (after) {
+      const mcList = dts.filter(d => d && d.code === '금형교체' && d.sabun);
+      const mySabun = String(r.sabun || '').trim();
+      const myFaceLabel = r.work_type || '';   // 면 라벨(가면/나면/다면, 단면은 null)
+      const isAfterOwner = mcList.length === 0   // 지정 사번 없는 과거 데이터 → 기존 동작 유지(정보 손실 방지)
+        || mcList.some(d => String(d.sabun).trim() === mySabun
+                         && (!d.face || d.face === '전체' || d.face === myFaceLabel));
+      if (isAfterOwner) dispRows.push({ ...base, stage: 'after', cond: after, old: false });
+    }
   });
 
   // 통계는 "교체 전 제외" 필터 이전 기준으로 (기록 단위 사실 유지)
