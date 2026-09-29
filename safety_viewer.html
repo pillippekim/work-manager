@@ -33,6 +33,11 @@ td{border-bottom:1px solid #f1f5f9}
 .sf-detail > td { background: #f8fafc; border-bottom: 2px solid #e2e8f0; padding: 8px 12px; }
 .sf-detail-grid { display: flex; flex-wrap: wrap; gap: 6px; }
 .sf-detail-item { display: inline-flex; align-items: center; gap: 5px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 3px 8px; font-size: 12px; color: #334155; }
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{background:#eef2f7}
+.s-arr{font-size:10px;color:#243bb2;margin-left:2px}
+.filter-row th{background:#fbfcfe;padding:4px 6px;border-bottom:2px solid #e2e8f0}
+.filter-row select,.filter-row input{width:100%;min-width:56px;max-width:160px;padding:4px 6px;border:1px solid #dbe2ec;border-radius:5px;font-size:11px;background:#fff;outline:none;font-family:inherit;box-sizing:border-box}
 </style>
 </head>
 <body>
@@ -126,6 +131,10 @@ const SAFETY_TABLES = [
 ];
 
 let allData = [];
+let viewRows = [];                                        // 현재 화면(헤더 필터·정렬 적용) 행 — 표·엑셀 공용
+let sortState = { key: null, dir: 1 };                    // 헤더 클릭 정렬 상태
+const INIT_DIR = { check_date: -1, time: -1, result: -1 }; // 첫 클릭 시 내림차순(최신·이상 우선)이 자연스러운 컬럼
+let colFilters = { process:'', equip:'', eqid:'', result:'', checker:'' };
 
 // 설비별 중첩 check_data({설비키:{항목:값}}) 페이지들의 키 → 표시명/관리번호 매핑
 const EQ_KEY_MAP = {
@@ -263,12 +272,100 @@ function renderStats() {
   document.getElementById('statUnusable').textContent = unusable;
 }
 
+// ── 헤더 정렬·필터 ──
+function setSort(key) {
+  if (sortState.key === key) sortState.dir = -sortState.dir;
+  else { sortState.key = key; sortState.dir = INIT_DIR[key] || 1; }
+  applyView();
+}
+function setColFilter(key, val) { colFilters[key] = val; applyView(); }
+
+// 행의 이상 등급: × = 2, △ = 1, 정상 = 0 (점검결과 정렬·필터용)
+function issueRankOf(r) {
+  const cd = r.check_data || {};
+  let rank = 0;
+  for (const k in cd) {
+    const v = cd[k];
+    if (typeof v !== 'string' || k === 'remarks') continue;
+    if (v === '×') return 2;
+    if (v === '△') rank = 1;
+  }
+  return rank;
+}
+
+const SORT_VAL = {
+  check_date: r => r.check_date || '',
+  process: r => r._process || '',
+  equip: r => r.equipment_no || '',
+  eqid: r => r.equipment_id || '',
+  result: r => issueRankOf(r),
+  checker: r => r.checked_by_name || '',
+  time: r => r.checked_at || ''
+};
+
+function getViewRows() {
+  const rows = allData.filter(r => {
+    if (colFilters.process && (r._process || '') !== colFilters.process) return false;
+    if (colFilters.equip && (r.equipment_no || '') !== colFilters.equip) return false;
+    if (colFilters.eqid && (r.equipment_id || '').toLowerCase().indexOf(colFilters.eqid.trim().toLowerCase()) === -1) return false;
+    if (colFilters.checker && (r.checked_by_name || '') !== colFilters.checker) return false;
+    if (colFilters.result === 'issue' && issueRankOf(r) === 0) return false;
+    if (colFilters.result === 'normal' && issueRankOf(r) !== 0) return false;
+    return true;
+  });
+  if (sortState.key && SORT_VAL[sortState.key]) {
+    const fv = SORT_VAL[sortState.key], d = sortState.dir;
+    rows.sort((a, b) => {
+      const va = fv(a), vb = fv(b);
+      const c = (typeof va === 'number' && typeof vb === 'number') ? va - vb : String(va).localeCompare(String(vb), 'ko');
+      return c * d;
+    });
+  }
+  return rows;   // 정렬 미지정 시 조회 원래 순서 유지
+}
+
 function renderTable() {
   if (allData.length === 0) {
     document.getElementById('resultArea').innerHTML = '<div style="text-align:center;color:#aaa;padding:40px;font-size:14px">데이터가 없어요.</div>';
+    viewRows = [];
     return;
   }
-  
+  const uniq = fn => [...new Set(allData.map(fn).filter(v => v))].sort((a, b) => String(a).localeCompare(String(b), 'ko'));
+  const opts = (arr, cur) => '<option value="">전체</option>' + arr.map(v =>
+    `<option value="${v}"${String(v) === String(cur) ? ' selected' : ''}>${v}</option>`).join('');
+  const sTh = (key, label, extra) =>
+    `<th class="sortable" onclick="setSort('${key}')">${label}<span class="s-arr" data-k="${key}"></span>${extra || ''}</th>`;
+
+  // 헤더+필터 행은 조회 시 1회만 그림 → 이후 tbody만 갱신 (필터 입력 중 포커스 유지)
+  document.getElementById('resultArea').innerHTML = `
+    <div style="font-size:12px;color:#64748b;margin-bottom:6px" id="viewCount"></div>
+    <div class="table-wrap"><table>
+      <thead>
+      <tr>
+        <th>NO</th>${sTh('check_date','점검일')}${sTh('process','공정')}${sTh('equip','설비')}${sTh('eqid','관리번호')}
+        ${sTh('result','점검결과',' <span style="font-weight:400;font-size:11px;color:#94a3b8">(행 클릭 시 항목 표시)</span>')}<th>특이사항</th>${sTh('checker','점검자')}${sTh('time','점검시간')}
+      </tr>
+      <tr class="filter-row">
+        <th></th><th></th>
+        <th><select onchange="setColFilter('process',this.value)">${opts(uniq(r => r._process), colFilters.process)}</select></th>
+        <th><select onchange="setColFilter('equip',this.value)">${opts(uniq(r => r.equipment_no), colFilters.equip)}</select></th>
+        <th><input type="text" value="${colFilters.eqid}" oninput="setColFilter('eqid',this.value)" placeholder="검색"></th>
+        <th><select onchange="setColFilter('result',this.value)"><option value="">전체</option><option value="issue"${colFilters.result==='issue' ? ' selected' : ''}>이상 있음(△·×)</option><option value="normal"${colFilters.result==='normal' ? ' selected' : ''}>정상만</option></select></th>
+        <th></th>
+        <th><select onchange="setColFilter('checker',this.value)">${opts(uniq(r => r.checked_by_name), colFilters.checker)}</select></th>
+        <th></th>
+      </tr>
+      </thead>
+      <tbody id="sfTbody"></tbody>
+    </table></div>`;
+  applyView();
+}
+
+function applyView() {
+  viewRows = getViewRows();
+  const tb = document.getElementById('sfTbody');
+  if (!tb) return;
+
   const badgeHtml = (v, ttl) => {
     const t = ttl ? ` title="${ttl}"` : '';
     if (v==='○') return `<span class="badge badge-normal"${t}>○</span>`;
@@ -277,39 +374,36 @@ function renderTable() {
     if (v==='│') return `<span class="badge badge-notuse"${t}>│</span>`;
     return v||'-';
   };
-  
-  document.getElementById('resultArea').innerHTML = `
-    <div class="table-wrap"><table>
-      <thead><tr>
-        <th>NO</th><th>점검일</th><th>공정</th><th>설비</th><th>관리번호</th>
-        <th>점검결과 <span style="font-weight:400;font-size:11px;color:#94a3b8">(행 클릭 시 항목 표시)</span></th><th>특이사항</th><th>점검자</th><th>점검시간</th>
-      </tr></thead>
-      <tbody>
-      ${allData.map((r,i) => {
-        const cd = r.check_data || {};
-        const items = Object.entries(cd).filter(([k,v]) => typeof v === 'string' && k !== 'remarks');
-        const resultHtml = items.map(([k,v]) => badgeHtml(v, k + '. ' + itemLabelOf(r, k))).join(' ');
-        const detailHtml = items.map(([k,v]) => `<span class="sf-detail-item">${k}. ${itemLabelOf(r, k)} ${badgeHtml(v)}</span>`).join('');
-        const hasIssue = items.some(([k,v]) => v==='△' || v==='×');
-        const time = r.checked_at ? new Date(r.checked_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}) : '-';
-        const remarks = cd.remarks || r.overall_remarks || r.remarks || '-';
-        return `<tr class="sf-row" onclick="toggleSfDetail(${i})" style="cursor:pointer;${hasIssue?'background:#fef2f2':''}">
-          <td style="text-align:center">${i+1}</td>
-          <td>${r.check_date||r[Object.keys(r).find(k=>k.includes('date'))]||'-'}</td>
-          <td><span style="font-weight:600">${r._process}</span></td>
-          <td style="font-size:12px">${r.equipment_no||'-'}</td>
-          <td style="font-size:11px;color:#888">${r.equipment_id||'-'}</td>
-          <td>${resultHtml}</td>
-          <td style="font-size:12px">${remarks}</td>
-          <td>${r.checked_by_name||'-'}</td>
-          <td style="font-size:11px;color:#888">${time}</td>
-        </tr>
-        <tr class="sf-detail" id="sfDetail${i}" style="display:none">
-          <td colspan="9"><div class="sf-detail-grid">${detailHtml || '<span style="color:#aaa">점검 항목 없음</span>'}</div></td>
-        </tr>`;
-      }).join('')}
-      </tbody>
-    </table></div>`;
+
+  tb.innerHTML = viewRows.map((r,i) => {
+    const cd = r.check_data || {};
+    const items = Object.entries(cd).filter(([k,v]) => typeof v === 'string' && k !== 'remarks');
+    const resultHtml = items.map(([k,v]) => badgeHtml(v, k + '. ' + itemLabelOf(r, k))).join(' ');
+    const detailHtml = items.map(([k,v]) => `<span class="sf-detail-item">${k}. ${itemLabelOf(r, k)} ${badgeHtml(v)}</span>`).join('');
+    const hasIssue = items.some(([k,v]) => v==='△' || v==='×');
+    const time = r.checked_at ? new Date(r.checked_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}) : '-';
+    const remarks = cd.remarks || r.overall_remarks || r.remarks || '-';
+    return `<tr class="sf-row" onclick="toggleSfDetail(${i})" style="cursor:pointer;${hasIssue?'background:#fef2f2':''}">
+      <td style="text-align:center">${i+1}</td>
+      <td>${r.check_date||r[Object.keys(r).find(k=>k.includes('date'))]||'-'}</td>
+      <td><span style="font-weight:600">${r._process}</span></td>
+      <td style="font-size:12px">${r.equipment_no||'-'}</td>
+      <td style="font-size:11px;color:#888">${r.equipment_id||'-'}</td>
+      <td>${resultHtml}</td>
+      <td style="font-size:12px">${remarks}</td>
+      <td>${r.checked_by_name||'-'}</td>
+      <td style="font-size:11px;color:#888">${time}</td>
+    </tr>
+    <tr class="sf-detail" id="sfDetail${i}" style="display:none">
+      <td colspan="9"><div class="sf-detail-grid">${detailHtml || '<span style="color:#aaa">점검 항목 없음</span>'}</div></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="9" style="text-align:center;color:#aaa;padding:24px">필터 조건에 맞는 행이 없어요.</td></tr>';
+
+  const vc = document.getElementById('viewCount');
+  if (vc) vc.textContent = `표시 ${viewRows.length}건 / 전체 ${allData.length}건` + (viewRows.length !== allData.length ? ' — 필터 적용 중 (엑셀도 표시된 행만 저장)' : '');
+  document.querySelectorAll('.s-arr').forEach(el => {
+    el.textContent = (el.dataset.k === sortState.key) ? (sortState.dir === 1 ? '▲' : '▼') : '';
+  });
 }
 
 // 점검 항목 상세행 접기/펼치기
@@ -319,8 +413,8 @@ function toggleSfDetail(i) {
 }
 
 function downloadExcel() {
-  if (allData.length === 0) { showToast('다운로드할 데이터가 없어요.'); return; }
-  const rows = allData.map((r,i) => {
+  if (viewRows.length === 0) { showToast('다운로드할 데이터가 없어요. (필터를 확인해 주세요)'); return; }
+  const rows = viewRows.map((r,i) => {
     const cd = r.check_data || {};
     const items = Object.entries(cd).filter(([k,v]) => typeof v === 'string' && k !== 'remarks');
     return {

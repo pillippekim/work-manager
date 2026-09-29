@@ -24,6 +24,11 @@
 .table-wrap{overflow-x:auto}
 th{background:#f8fafc;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;white-space:nowrap}
 td{border-bottom:1px solid #f1f5f9;white-space:nowrap}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{background:#eef2f7}
+.s-arr{font-size:10px;color:#243bb2;margin-left:2px}
+.filter-row th{background:#fbfcfe;padding:4px 6px;border-bottom:2px solid #e2e8f0}
+.filter-row select,.filter-row input{width:100%;min-width:56px;max-width:150px;padding:4px 6px;border:1px solid #dbe2ec;border-radius:5px;font-size:11px;background:#fff;outline:none;font-family:inherit;box-sizing:border-box}
 th .th-sub{font-size:10px;font-weight:400;color:#94a3b8;margin-top:1px}
 th.cond-std{background:#fff8e6}
 th.cond-first{background:#e9f9f0}
@@ -112,6 +117,11 @@ let PRODUCTS = {};     // 사번 → 품명 (products는 로그인 세션 필요
 
 const TYPES = [['standard','기준'],['first','초품'],['middle','중품'],['last','종품']];
 const FACE_LABELS = { single:'-', ga:'가면', na:'나면', da:'다면' };
+const FACE_RANK = { ga: 1, na: 2, da: 3, single: 4 };
+let viewRows = [];                                   // 현재 화면(헤더 필터·정렬 적용) 행 — 표·엑셀 공용
+let sortState = { key: null, dir: 1 };               // 헤더 클릭 정렬 상태
+const INIT_DIR = { work_date: -1 };                  // 첫 클릭 시 내림차순이 자연스러운 컬럼
+let colFilters = { shift:'', equip:'', face:'', sabun:'', pname:'', stage:'', worker:'' };
 const FACE_COLORS = { ga:'#fff3cd', na:'#dbeafe', da:'#d4edda' };
 
 async function init() {
@@ -262,15 +272,7 @@ function buildDispRows() {
   dispRows.forEach(x => { if (x.stage === 'after') afterKeys[rowKey(x)] = true; });
   dispRows = dispRows.filter(x => !(x.stage === '' && afterKeys[rowKey(x)]));
 
-  // [정렬] 작업일↓ → 설비↑ → 면(가→나→다→미지정) → 사번↑ → 교체 전 → 교체 후
-  const FACE_RANK = { ga: 1, na: 2, da: 3, single: 4 };
-  dispRows.sort((a, b) =>
-    (b.work_date > a.work_date ? 1 : b.work_date < a.work_date ? -1 : 0) ||
-    a.equip.localeCompare(b.equip, 'ko') ||
-    ((FACE_RANK[a.face] || 9) - (FACE_RANK[b.face] || 9)) ||
-    String(a.sabun).localeCompare(String(b.sabun)) ||
-    (a.stage === b.stage ? 0 : a.stage === '' ? -1 : 1)
-  );
+  // 정렬은 헤더 정렬·필터와 함께 getViewRows()에서 처리
 }
 
 function isFull(cond) {
@@ -300,47 +302,129 @@ function condCellHtml(v) {
   return `<td class="cond-cell">${[p, t].filter(Boolean).join(' · ') || '·'}</td>`;
 }
 
+// ── 헤더 정렬·필터 ──
+function setSort(key) {
+  if (sortState.key === key) sortState.dir = -sortState.dir;
+  else { sortState.key = key; sortState.dir = INIT_DIR[key] || 1; }
+  applyView();
+}
+function setColFilter(key, val) { colFilters[key] = val; applyView(); }
+
+// 기본 정렬: 작업일↓ → 설비↑ → 면(가→나→다) → 사번↑ → 교체 전 → 후 (헤더 정렬 시엔 뒷순위 유지용)
+function defaultCmp(a, b) {
+  return (b.work_date > a.work_date ? 1 : b.work_date < a.work_date ? -1 : 0) ||
+    a.equip.localeCompare(b.equip, 'ko') ||
+    ((FACE_RANK[a.face] || 9) - (FACE_RANK[b.face] || 9)) ||
+    String(a.sabun).localeCompare(String(b.sabun)) ||
+    (a.stage === b.stage ? 0 : a.stage === '' ? -1 : 1);
+}
+function condPOf(x, key) { const v = x.cond && x.cond[key]; const n = v ? parseFloat(v.p) : NaN; return isNaN(n) ? -1 : n; }
+const SORT_VAL = {
+  work_date: x => x.work_date, shift: x => x.shift, equip: x => x.equip,
+  face: x => (FACE_RANK[x.face] || 9), sabun: x => String(x.sabun), pname: x => x.pname || '',
+  stage: x => (x.stage === 'after' ? 1 : 0), worker: x => x.worker || '',
+  standard: x => condPOf(x, 'standard'), first: x => condPOf(x, 'first'),
+  middle: x => condPOf(x, 'middle'), last: x => condPOf(x, 'last')
+};
+
+function getViewRows() {
+  const rows = dispRows.filter(x => {
+    if (colFilters.shift && x.shift !== colFilters.shift) return false;
+    if (colFilters.equip && x.equip !== colFilters.equip) return false;
+    if (colFilters.face && x.face !== colFilters.face) return false;
+    if (colFilters.stage) { const st = x.stage === 'after' ? 'after' : 'pre'; if (st !== colFilters.stage) return false; }
+    if (colFilters.worker && (x.worker || '') !== colFilters.worker) return false;
+    if (colFilters.sabun && String(x.sabun).toLowerCase().indexOf(colFilters.sabun.trim().toLowerCase()) === -1) return false;
+    if (colFilters.pname && (x.pname || '').toLowerCase().indexOf(colFilters.pname.trim().toLowerCase()) === -1) return false;
+    return true;
+  });
+  if (sortState.key && SORT_VAL[sortState.key]) {
+    const fv = SORT_VAL[sortState.key], d = sortState.dir;
+    rows.sort((a, b) => {
+      const va = fv(a), vb = fv(b);
+      const c = (typeof va === 'number' && typeof vb === 'number') ? va - vb : String(va).localeCompare(String(vb), 'ko');
+      return (c * d) || defaultCmp(a, b);
+    });
+  } else rows.sort(defaultCmp);
+  return rows;
+}
+
 function renderTable() {
   if (dispRows.length === 0) {
     document.getElementById('resultArea').innerHTML = '<div style="text-align:center;color:#aaa;padding:40px;font-size:14px">데이터가 없어요.</div>';
+    viewRows = [];
     return;
   }
   const hasFace = dispRows.some(x => x.face !== 'single');
+  const uniq = k => [...new Set(dispRows.map(x => x[k]).filter(v => v !== '' && v != null))].sort((a, b) => String(a).localeCompare(String(b), 'ko'));
+  const opts = (arr, cur, labelFn) => '<option value="">전체</option>' + arr.map(v =>
+    `<option value="${v}"${String(v) === String(cur) ? ' selected' : ''}>${labelFn ? labelFn(v) : v}</option>`).join('');
+  const sTh = (key, label, cls, extra) =>
+    `<th class="sortable${cls ? ' ' + cls : ''}" onclick="setSort('${key}')">${label}<span class="s-arr" data-k="${key}"></span>${extra || ''}</th>`;
+  const sub = '<div class="th-sub">압력 · 상판/하판온도</div>';
+  const facesArr = ['ga', 'na', 'da'].filter(fc => dispRows.some(x => x.face === fc));
 
+  // 헤더+필터 행은 조회 시 1회만 그림 → 이후 tbody만 갱신 (필터 입력 중 포커스 유지)
   document.getElementById('resultArea').innerHTML = `
+    <div style="font-size:12px;color:#64748b;margin-bottom:6px" id="viewCount"></div>
     <div class="table-wrap"><table>
-      <thead><tr>
-        <th>NO</th><th>작업일</th><th>근무</th><th>설비</th>${hasFace ? '<th>면</th>' : ''}<th>사번</th><th>재질</th><th>구분</th>
-        <th class="cond-std">기준<div class="th-sub">압력 · 상판/하판온도</div></th><th class="cond-first">초품<div class="th-sub">압력 · 상판/하판온도</div></th><th class="cond-middle">중품<div class="th-sub">압력 · 상판/하판온도</div></th><th class="cond-last">종품<div class="th-sub">압력 · 상판/하판온도</div></th>
-        <th>작업자</th>
-      </tr></thead>
-      <tbody>
-      ${dispRows.map((x, i) => {
-        const faceTd = hasFace
-          ? `<td>${x.face !== 'single' ? `<span class="face-tag" style="background:${FACE_COLORS[x.face]||'#f1f5f9'}">${FACE_LABELS[x.face]||x.face}</span>` : '-'}</td>`
-          : '';
-        const stageTd = x.stage === 'after'
-          ? '<td><span class="tag-change">🔄 교체 후</span></td>'
-          : `<td>교체 전${x.old ? '<span class="tag-old">구버전 단일기록</span>' : ''}</td>`;
-        const c = x.cond || { standard:null, first:null, middle:null, last:null };
-        return `<tr${x.stage==='after' ? ' style="background:#fffbf5"' : ''}>
-          <td style="text-align:center">${i+1}</td>
-          <td>${x.work_date}</td><td>${x.shift}</td>
-          <td style="font-size:12px">${x.equip}</td>
-          ${faceTd}<td>${x.sabun}</td><td style="font-size:12px">${x.pname || '-'}</td>
-          ${stageTd}
-          ${condCellHtml(c.standard)}${condCellHtml(c.first)}${condCellHtml(c.middle)}${condCellHtml(c.last)}
-          <td style="font-size:12px">${x.worker || '-'}</td>
-        </tr>`;
-      }).join('')}
-      </tbody>
+      <thead>
+      <tr>
+        <th>NO</th>${sTh('work_date','작업일')}${sTh('shift','근무')}${sTh('equip','설비')}${hasFace ? sTh('face','면') : ''}${sTh('sabun','사번')}${sTh('pname','재질')}${sTh('stage','구분')}
+        ${sTh('standard','기준','cond-std',sub)}${sTh('first','초품','cond-first',sub)}${sTh('middle','중품','cond-middle',sub)}${sTh('last','종품','cond-last',sub)}
+        ${sTh('worker','작업자')}
+      </tr>
+      <tr class="filter-row">
+        <th></th><th></th>
+        <th><select onchange="setColFilter('shift',this.value)">${opts(uniq('shift'), colFilters.shift)}</select></th>
+        <th><select onchange="setColFilter('equip',this.value)">${opts(uniq('equip'), colFilters.equip)}</select></th>
+        ${hasFace ? `<th><select onchange="setColFilter('face',this.value)">${opts(facesArr, colFilters.face, fc => FACE_LABELS[fc] || fc)}</select></th>` : ''}
+        <th><input type="text" value="${colFilters.sabun}" oninput="setColFilter('sabun',this.value)" placeholder="검색"></th>
+        <th><input type="text" value="${colFilters.pname}" oninput="setColFilter('pname',this.value)" placeholder="검색"></th>
+        <th><select onchange="setColFilter('stage',this.value)"><option value="">전체</option><option value="pre"${colFilters.stage==='pre' ? ' selected' : ''}>교체 전</option><option value="after"${colFilters.stage==='after' ? ' selected' : ''}>교체 후</option></select></th>
+        <th></th><th></th><th></th><th></th>
+        <th><select onchange="setColFilter('worker',this.value)">${opts(uniq('worker'), colFilters.worker)}</select></th>
+      </tr>
+      </thead>
+      <tbody id="condTbody"></tbody>
     </table></div>
-    <div style="font-size:11px;color:#94a3b8;margin-top:8px">· 각 칸: <b>압력</b>kgf/cm² · 상판/하판℃ &nbsp;|&nbsp; "·" = 미입력 &nbsp;|&nbsp; 구버전 단일기록 = 조건 세분화 이전 방식으로 입력된 데이터(기준 열에 표시)</div>`;
+    <div style="font-size:11px;color:#94a3b8;margin-top:8px">· 각 칸: <b>압력</b>kgf/cm² · 상판/하판℃ &nbsp;|&nbsp; "·" = 미입력 &nbsp;|&nbsp; 헤더 클릭 = 정렬, 헤더 아래 = 필터 &nbsp;|&nbsp; 구버전 단일기록 = 조건 세분화 이전 방식으로 입력된 데이터(기준 열에 표시)</div>`;
+  applyView();
+}
+
+function applyView() {
+  viewRows = getViewRows();
+  const hasFace = dispRows.some(x => x.face !== 'single');
+  const tb = document.getElementById('condTbody');
+  if (!tb) return;
+  tb.innerHTML = viewRows.map((x, i) => {
+    const faceTd = hasFace
+      ? `<td>${x.face !== 'single' ? `<span class="face-tag" style="background:${FACE_COLORS[x.face]||'#f1f5f9'}">${FACE_LABELS[x.face]||x.face}</span>` : '-'}</td>`
+      : '';
+    const stageTd = x.stage === 'after'
+      ? '<td><span class="tag-change">🔄 교체 후</span></td>'
+      : `<td>교체 전${x.old ? '<span class="tag-old">구버전 단일기록</span>' : ''}</td>`;
+    const c = x.cond || { standard:null, first:null, middle:null, last:null };
+    return `<tr${x.stage==='after' ? ' style="background:#fffbf5"' : ''}>
+      <td style="text-align:center">${i+1}</td>
+      <td>${x.work_date}</td><td>${x.shift}</td>
+      <td style="font-size:12px">${x.equip}</td>
+      ${faceTd}<td>${x.sabun}</td><td style="font-size:12px">${x.pname || '-'}</td>
+      ${stageTd}
+      ${condCellHtml(c.standard)}${condCellHtml(c.first)}${condCellHtml(c.middle)}${condCellHtml(c.last)}
+      <td style="font-size:12px">${x.worker || '-'}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="${hasFace ? 13 : 12}" style="text-align:center;color:#aaa;padding:24px">필터 조건에 맞는 행이 없어요.</td></tr>`;
+  const vc = document.getElementById('viewCount');
+  if (vc) vc.textContent = `표시 ${viewRows.length}행 / 전체 ${dispRows.length}행` + (viewRows.length !== dispRows.length ? ' — 필터 적용 중 (엑셀도 표시된 행만 저장)' : '');
+  document.querySelectorAll('.s-arr').forEach(el => {
+    el.textContent = (el.dataset.k === sortState.key) ? (sortState.dir === 1 ? '▲' : '▼') : '';
+  });
 }
 
 function downloadExcel() {
-  if (dispRows.length === 0) { showToast('다운로드할 데이터가 없어요.'); return; }
-  const rows = dispRows.map((x, i) => {
+  if (viewRows.length === 0) { showToast('다운로드할 데이터가 없어요. (필터를 확인해 주세요)'); return; }
+  const rows = viewRows.map((x, i) => {
     const c = x.cond || {};
     const row = {
       'NO': i+1, '작업일': x.work_date, '근무': x.shift, '설비': x.equip,
