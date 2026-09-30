@@ -310,13 +310,14 @@ function setSort(key) {
 }
 function setColFilter(key, val) { colFilters[key] = val; applyView(); }
 
-// 기본 정렬: 작업일↓ → 설비↑ → 면(가→나→다) → 사번↑ → 교체 전 → 후 (헤더 정렬 시엔 뒷순위 유지용)
+// 기본 정렬: 작업일↓ → 설비↑ → 면(가→나→다) → 교체 전 그룹 → 교체 후 그룹 → 사번↑
+// (같은 설비·면 안에서 교체 전 행들이 항상 교체 후 행들보다 위에 오도록 구분을 사번보다 우선)
 function defaultCmp(a, b) {
   return (b.work_date > a.work_date ? 1 : b.work_date < a.work_date ? -1 : 0) ||
     a.equip.localeCompare(b.equip, 'ko') ||
     ((FACE_RANK[a.face] || 9) - (FACE_RANK[b.face] || 9)) ||
-    String(a.sabun).localeCompare(String(b.sabun)) ||
-    (a.stage === b.stage ? 0 : a.stage === '' ? -1 : 1);
+    (a.stage === b.stage ? 0 : a.stage === '' ? -1 : 1) ||
+    String(a.sabun).localeCompare(String(b.sabun));
 }
 function condPOf(x, key) { const v = x.cond && x.cond[key]; const n = v ? parseFloat(v.p) : NaN; return isNaN(n) ? -1 : n; }
 const SORT_VAL = {
