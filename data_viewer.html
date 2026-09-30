@@ -1446,22 +1446,27 @@ function renderStats() {
     // 같은 제출의 모든 행에 downtime이 동일 복사되므로(날짜·설비·면·사번·시작시각) 키로 중복 제거
     const mcSeen = {};
     let moldChangeCnt = 0;
+    const mcDetails = [];   // 카드 툴팁용 내역: 어느 설비·사번·시각의 교체인지
     mold.forEach(r => {
       try {
         const dts = (JSON.parse(r.note).downtime) || [];
         dts.forEach(d => {
           if (!d || d.code !== '금형교체') return;
           const key = [r.work_date, r.equipment_no, d.face || '', d.sabun || '', d.start || ''].join('|');
-          if (!mcSeen[key]) { mcSeen[key] = true; moldChangeCnt++; }
+          if (!mcSeen[key]) {
+            mcSeen[key] = true; moldChangeCnt++;
+            mcDetails.push(r.work_date + ' ' + (r.equipment_no || '?') + (d.face && d.face !== '전체' ? ' ' + d.face : '') + ' · 교체 후 사번 ' + (d.sabun || '미지정') + ' · ' + (d.start || '?') + '~' + (d.end || '?'));
+          }
         });
       } catch(e) {}
     });
+    const mcTitle = mcDetails.length ? mcDetails.join('\n') : '금형교체 없음';
     statsEl.style.gridTemplateColumns = 'repeat(5,1fr)';   // 이 탭만 카드 5장
     statsEl.innerHTML = `
       <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">성형 건수</div><div class="stat-num blue">${mold.length} <span class="stat-unit">건</span></div></div>
       <div class="stat-card"><div class="stat-icon">🔧</div><div class="stat-label">총 생산수량</div><div class="stat-num green">${totalQty.toLocaleString()} <span class="stat-unit">EA</span></div></div>
       <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-label">총 불량수량</div><div class="stat-num" style="color:#dc2626">${totalDefect.toLocaleString()} <span class="stat-unit">EA</span></div></div>
-      <div class="stat-card"><div class="stat-icon">🔄</div><div class="stat-label">금형교체</div><div class="stat-num" style="color:#d97706">${moldChangeCnt} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card" title="${mcTitle}" style="cursor:help"><div class="stat-icon">🔄</div><div class="stat-label">금형교체</div><div class="stat-num" style="color:#d97706">${moldChangeCnt} <span class="stat-unit">건</span></div></div>
       <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">작업자 / 반</div><div class="stat-num orange">${workers} <span class="stat-unit">명</span><span style="font-size:12px;color:#888"> (${teamStr})</span></div></div>
     `;
   } else if (currentProcess === '조립') {
