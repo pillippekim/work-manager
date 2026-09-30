@@ -59,6 +59,12 @@
 .btn-section-detail { font-size: 12px; color: #243bb2; background: none; border: none; cursor: pointer; font-family: inherit; }
 .btn-section-detail:hover { text-decoration: underline; }
 
+/* ── 통계 카드 가로형 (현장 의견 2026-09-30): 라벨·숫자 한 줄 배치로 상하 공간 축소 ── */
+.stats-row .stat-card { display:flex; align-items:center; gap:8px; padding:0.55rem 0.9rem; }
+.stats-row .stat-icon { font-size:17px; margin-bottom:0; flex-shrink:0; }
+.stats-row .stat-label { font-size:11.5px; margin-bottom:0; white-space:nowrap; }
+.stats-row .stat-num { font-size:19px; margin-left:auto; white-space:nowrap; }
+
 /* ── 줄바꿈 방지 (현장 의견 2026-09-30) ──
    모든 데이터 셀을 한 줄로 표시. 표가 넓어지면 기존 가로 스크롤(.table-wrap overflow-x)로 이동.
    · 긴 자유 텍스트(비고·특이사항)는 말줄임(…) 처리 — 전체 내용은 [보기]/수정 모달에서 확인
@@ -1224,6 +1230,7 @@ function render() {
 
 function renderStats() {
   const statsEl = document.getElementById('statsRow');
+  statsEl.style.gridTemplateColumns = '';   // 기본 4열 (성형탭에서만 5열로 변경)
   const pkg = cachedData.포장 || [];
   const ins = cachedData.검사 || [];
   const cmb = cachedData.CMB || [];
@@ -1435,10 +1442,26 @@ function renderStats() {
     const workers = new Set(mold.map(r=>r.worker_name).filter(Boolean)).size;
     const teams = new Set(mold.map(r=>r.team).filter(Boolean));
     const teamStr = [...teams].join(', ') || '-';
+    // 금형교체 건수: note JSON의 비가동 목록에서 code='금형교체' 집계.
+    // 같은 제출의 모든 행에 downtime이 동일 복사되므로(날짜·설비·면·사번·시작시각) 키로 중복 제거
+    const mcSeen = {};
+    let moldChangeCnt = 0;
+    mold.forEach(r => {
+      try {
+        const dts = (JSON.parse(r.note).downtime) || [];
+        dts.forEach(d => {
+          if (!d || d.code !== '금형교체') return;
+          const key = [r.work_date, r.equipment_no, d.face || '', d.sabun || '', d.start || ''].join('|');
+          if (!mcSeen[key]) { mcSeen[key] = true; moldChangeCnt++; }
+        });
+      } catch(e) {}
+    });
+    statsEl.style.gridTemplateColumns = 'repeat(5,1fr)';   // 이 탭만 카드 5장
     statsEl.innerHTML = `
       <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">성형 건수</div><div class="stat-num blue">${mold.length} <span class="stat-unit">건</span></div></div>
       <div class="stat-card"><div class="stat-icon">🔧</div><div class="stat-label">총 생산수량</div><div class="stat-num green">${totalQty.toLocaleString()} <span class="stat-unit">EA</span></div></div>
       <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-label">총 불량수량</div><div class="stat-num" style="color:#dc2626">${totalDefect.toLocaleString()} <span class="stat-unit">EA</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🔄</div><div class="stat-label">금형교체</div><div class="stat-num" style="color:#d97706">${moldChangeCnt} <span class="stat-unit">건</span></div></div>
       <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">작업자 / 반</div><div class="stat-num orange">${workers} <span class="stat-unit">명</span><span style="font-size:12px;color:#888"> (${teamStr})</span></div></div>
     `;
   } else if (currentProcess === '조립') {
@@ -2473,17 +2496,17 @@ function moldingWorkHours(r){
 // 비가동 구간의 순수 분 = 구간 길이 - 점심(12:00~13:00)·저녁(17:00~17:30) 겹침 제외
 // 성형조건(온도/압력): note JSON conditions[유형][면]에서 추출 (기준 우선, 없으면 초품→중품→종품, 구버전 컬럼 폴백)
 function moldingCondOf(r){
-  var order = [['standard','기준'],['first','초품'],['middle','중품'],['last','종품']];
+  // 기준(standard) 값만 표시 (2026-09-30 현장 의견: 초/중/종 값으로 대체하지 않음)
+  // 기준 미입력이면 '-' — 유형별 전체 값은 성형조건 조회 페이지에서 확인
   try {
     var n = JSON.parse(r.note);
     var conds = n.conditions || {};
     var face = n.face || 'single';
-    for (var i = 0; i < order.length; i++){
-      var c = (conds[order[i][0]]||{})[face];
-      if (c && (c.pressure || c.upper || c.lower)){
-        return { p:c.pressure||'', u:c.upper||'', l:c.lower||'', t:order[i][1] };
-      }
+    var c = (conds.standard||{})[face];
+    if (c && (c.pressure || c.upper || c.lower)){
+      return { p:c.pressure||'', u:c.upper||'', l:c.lower||'', t:'기준' };
     }
+    if (n.conditions) return null;   // 조건표는 있으나 기준 미입력 → 다른 유형으로 대체하지 않음
   } catch(e){}
   if (r.upper_temp != null || r.lower_temp != null || (r.molding_pressure != null && r.molding_pressure !== '')){
     return { p:r.molding_pressure||'', u:r.upper_temp!=null?r.upper_temp:'', l:r.lower_temp!=null?r.lower_temp:'', t:'기준' };
