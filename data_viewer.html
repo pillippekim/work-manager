@@ -1460,22 +1460,26 @@ function renderStats() {
     const teamStr = [...teams].join(', ') || '-';
     // 금형교체 건수: note JSON의 비가동 목록에서 code='금형교체' 집계.
     // 같은 제출의 모든 행에 downtime이 동일 복사되므로(날짜·설비·면·사번·시작시각) 키로 중복 제거
-    const mcSeen = {};
-    let moldChangeCnt = 0;
-    const mcDetails = [];   // 카드 툴팁용 내역: 어느 설비·사번·시각의 교체인지
+    // 금형교체 집계 규칙:
+    //  · 제출 시 비가동 목록이 그날 모든 행의 note에 복사되고, 이후 한 행만 수정하면
+    //    형제 행들에 "수정 전 시각"의 옛 사본이 남는다 → 시각까지 키에 넣으면 같은 교체가 2건으로 잡힘.
+    //  · 따라서 키 = 날짜|설비|면|교체후사번 (시각 제외). 표시 시각은 "교체 후 사번 본인 행"의
+    //    note 기록을 우선(수정이 반영된 최신본), 없으면 처음 만난 사본 사용.
+    const mcMap = {};
     mold.forEach(r => {
       try {
         const dts = (JSON.parse(r.note).downtime) || [];
         dts.forEach(d => {
           if (!d || d.code !== '금형교체') return;
-          const key = [r.work_date, r.equipment_no, d.face || '', d.sabun || '', d.start || ''].join('|');
-          if (!mcSeen[key]) {
-            mcSeen[key] = true; moldChangeCnt++;
-            mcDetails.push(r.work_date + ' ' + (r.equipment_no || '?') + (d.face && d.face !== '전체' ? ' ' + d.face : '') + ' · 교체 후 사번 ' + (d.sabun || '미지정') + ' · ' + (d.start || '?') + '~' + (d.end || '?'));
-          }
+          const key = [r.work_date, r.equipment_no, d.face || '', d.sabun || ''].join('|');
+          const isAuth = !!(d.sabun && String(r.sabun) === String(d.sabun));
+          const line = r.work_date + ' ' + (r.equipment_no || '?') + (d.face && d.face !== '전체' ? ' ' + d.face : '') + ' · 교체 후 사번 ' + (d.sabun || '미지정') + ' · ' + (d.start || '?') + '~' + (d.end || '?');
+          if (!mcMap[key] || (isAuth && !mcMap[key].auth)) mcMap[key] = { line: line, auth: isAuth };
         });
       } catch(e) {}
     });
+    const mcDetails = Object.keys(mcMap).map(k => mcMap[k].line);
+    const moldChangeCnt = mcDetails.length;
     const mcTitle = mcDetails.length ? mcDetails.join('\n') : '금형교체 없음';
     window._mcDetailLines = mcDetails;
     statsEl.style.gridTemplateColumns = 'repeat(5,1fr)';   // 이 탭만 카드 5장
