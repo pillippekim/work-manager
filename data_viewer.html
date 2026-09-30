@@ -59,8 +59,16 @@
 .btn-section-detail { font-size: 12px; color: #243bb2; background: none; border: none; cursor: pointer; font-family: inherit; }
 .btn-section-detail:hover { text-decoration: underline; }
 
+/* ── 줄바꿈 방지 (현장 의견 2026-09-30) ──
+   모든 데이터 셀을 한 줄로 표시. 표가 넓어지면 기존 가로 스크롤(.table-wrap overflow-x)로 이동.
+   · 긴 자유 텍스트(비고·특이사항)는 말줄임(…) 처리 — 전체 내용은 [보기]/수정 모달에서 확인
+   · 인라인 스타일로 white-space:normal 지정된 셀(불량유형 등 의도적 줄바꿈)은 그대로 유지됨 */
+.table-wrap table td { white-space: nowrap; max-width: 420px; overflow: hidden; text-overflow: ellipsis; padding: 8px 6px; }
+.lot-cell { white-space: normal !important; }   /* LOT 태그 목록은 여러 줄이 정상 */
+
 /* 행 액션 버튼 (이 페이지 고유 스타일 확장) */
-.row-actions { display: flex; gap: 4px; }
+.row-actions { display: flex; gap: 3px; flex-wrap: nowrap; }
+.table-wrap .btn-row { white-space: nowrap; padding: 3px 7px; margin-right: 0; }
 .btn-row-edit:disabled { background: #f5f5f5; color: #ccc; cursor: not-allowed; }
 .btn-row-del:disabled { color: #ccc; border-color: #eee; cursor: not-allowed; }
 
