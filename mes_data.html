@@ -142,7 +142,7 @@ function renderPanel(){
   document.getElementById('panel').innerHTML =
     '<div class="upload-card">'+
       '<div class="u-title">⬆️ '+P.title+' MES 엑셀 업로드</div>'+
-      '<div class="u-desc">MES에서 취출한 '+P.title+' 작업일보 엑셀을 올리세요. 소계([▶…])·총계 행은 자동 제거되고, 시간(분)·온도(숫자) 변환 후 저장됩니다.<br>※ 같은 날짜의 기존 데이터는 새 파일로 <b>교체</b>됩니다.</div>'+
+      '<div class="u-desc">MES에서 취출한 '+P.title+' 작업일보 엑셀을 올리세요. 총계·사번별계 행은 자동 제거되고(평량의 <b>뱃지계 소계는 내리수 보존을 위해 저장</b>), 시간(분)·온도(숫자) 변환 후 저장됩니다.<br>※ 같은 날짜의 기존 데이터는 새 파일로 <b>교체</b>됩니다.</div>'+
       '<div class="dropzone" id="dropZone" ondragover="dzOver(event)" ondragleave="dzLeave(event)" ondrop="dzDrop(event)">'+
         '<div class="dz-hint">⬇️ 엑셀 파일을 이 영역으로 <b>끌어다 놓거나</b>, 아래 버튼으로 선택하세요</div>'+
         '<div class="u-row">'+
@@ -234,12 +234,23 @@ function handleFile(file){
       var missing=P.map.filter(function(m){return colIdx[m[1]]===-1;}).map(function(m){return m[0];});
       if(missing.length){ throw new Error('엑셀에 다음 컬럼이 없습니다: '+missing.join(', ')); }
 
-      var rows=[], dates={}, skipped=0;
+      var rows=[], dates={}, skipped=0, subCnt=0, lastDate=null;
       for(var r=hIdx+1;r<aoa.length;r++){
         var raw=aoa[r];
         if(!raw) continue;
         var joined=raw.map(function(x){return String(x);}).join(' ');
-        if(joined.indexOf('▶')!==-1){ skipped++; continue; }            // 소계(사번별계/뱃지계)
+        // 평량 뱃지계 소계: 내리수가 이 행에만 있으므로 저장 (material='[▶뱃지계]' 표식)
+        // ※ 소계 행은 일자 칸이 병합으로 비어 있을 수 있어 직전 작업행 날짜로 보충
+        if(curProc==='weighing' && joined.indexOf('뱃지계')!==-1){
+          var srec={ source_file:file.name };
+          P.map.forEach(function(m){ srec[m[1]]=conv(m[2], raw[colIdx[m[1]]]); });
+          srec.material='[▶뱃지계]';
+          if(!srec.work_date) srec.work_date=lastDate;
+          if(srec.work_date && srec.product_code){ rows.push(srec); dates[srec.work_date]=true; subCnt++; }
+          else { skipped++; }
+          continue;
+        }
+        if(joined.indexOf('▶')!==-1){ skipped++; continue; }            // 소계(사번별계 등)
         var sun=raw[sunIdx];
         if(sun===''||sun==null||isNaN(parseFloat(sun))){ skipped++; continue; } // 총계/요약/빈행
         var rec={ source_file:file.name };
@@ -247,13 +258,14 @@ function handleFile(file){
         if(!rec.work_date || !rec.product_code){ skipped++; continue; }   // 날짜/제품번호 없으면 제외
         rows.push(rec);
         dates[rec.work_date]=true;
+        lastDate=rec.work_date;
       }
       if(rows.length===0){ throw new Error('업로드할 실제 작업행이 없습니다. (소계/총계만 있는 파일일 수 있어요)'); }
       pending[curProc]={ rows:rows, dates:Object.keys(dates), fname:file.name };
       document.getElementById('uBtn').disabled=false;
       document.getElementById('uResult').style.color='#166534';
       document.getElementById('uResult').textContent=
-        '✅ 검증 완료: 실제 '+rows.length+'건 (소계·총계 등 '+skipped+'행 제외) · 날짜: '+Object.keys(dates).join(', ')+'\n"업로드" 버튼을 누르면 저장됩니다.';
+        '✅ 검증 완료: '+(rows.length-subCnt)+'건'+(subCnt?' + 뱃지계 소계 '+subCnt+'건':'')+' (총계 등 '+skipped+'행 제외) · 날짜: '+Object.keys(dates).join(', ')+'\n"업로드" 버튼을 누르면 저장됩니다.';
     }catch(err){
       document.getElementById('uBtn').disabled=true;
       document.getElementById('uResult').style.color='#dc2626';
@@ -320,12 +332,18 @@ async function loadData(){
 function cell(v){ return (v==null||v==='')?'-':String(v); }
 function renderRows(){
   var P=PROC[curProc];
-  document.getElementById('mesCnt').textContent='총 '+lastRows.length+'건';
+  var subN=0;
+  for(var k=0;k<lastRows.length;k++){ if(lastRows[k].material==='[▶뱃지계]') subN++; }
+  document.getElementById('mesCnt').textContent='총 '+(lastRows.length-subN)+'건'+(subN?' · 뱃지계 소계 '+subN+'건':'');
   if(!lastRows.length){ document.getElementById('mesBody').innerHTML='<tr><td class="empty" colspan="'+P.view.length+'">데이터가 없습니다</td></tr>'; return; }
   var html='';
   for(var i=0;i<lastRows.length;i++){
     var d=lastRows[i];
-    html+='<tr>'+P.view.map(function(c){ return '<td>'+cell(d[c[0]])+'</td>'; }).join('')+'</tr>';
+    var isSub=(d.material==='[▶뱃지계]');   // 평량 뱃지계 소계 행 — 원본 일보처럼 회색 강조
+    html+='<tr'+(isSub?' style="background:#e2e8f0;font-weight:700"':'')+'>'+P.view.map(function(c){
+      if(isSub && c[0]==='material') return '<td>▶ 뱃지계</td>';
+      return '<td>'+cell(d[c[0]])+'</td>';
+    }).join('')+'</tr>';
   }
   document.getElementById('mesBody').innerHTML=html;
 }
