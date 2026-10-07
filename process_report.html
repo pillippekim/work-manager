@@ -153,7 +153,7 @@ var myInfo = null;
 var PROCS = [
   { k:'cmb',       label:'배합',   grp:'전공정', table:'cmb_reports',       impl:false, na:'현재 미사용 공정입니다.' },
   { k:'cutting',   label:'재단',   grp:'전공정', table:'cutting_reports',   impl:true  },
-  { k:'molding',   label:'성형',   grp:'성형',   table:'molding_reports',   impl:false },
+  { k:'molding',   label:'성형',   grp:'성형',   table:'molding_reports',   impl:true  },
   { k:'postcure',  label:'2차가류', grp:'후공정', table:'postcure_reports',  impl:true  },
   { k:'shot',      label:'쇼트',   grp:'후공정', table:'shot_reports',      impl:true  },
   { k:'sasang',    label:'사상',   grp:'후공정', table:'sasang_reports',    impl:true  },
@@ -289,6 +289,7 @@ async function loadReport(force){
   else if (curProc === 'postcure') await renderPostcure(rows);
   else if (curProc === 'shot') await renderShot(rows);
   else if (curProc === 'cutting') await renderCutting(rows);
+  else if (curProc === 'molding') await renderMolding(rows);
 }
 
 /* ════════════════════ 포장 (packaging) ════════════════════ */
@@ -1512,6 +1513,351 @@ async function renderCutting(rows){
     var sh5 = [['일자','작성자','내용']];
     rems.forEach(function(r){ sh5.push([r.d, r.by, r.t]); });
     lastXlsx.sheets.push({ n:'특이사항', d:sh5 });
+  }
+}
+
+/* ════════════════════ 성형 (molding) ════════════════════ */
+/* 컬럼: sabun(사번) · equipment_no(호기) · team(반) · shift_type · work_type(면: 가면/나면/다면/'') · batch_no · cavity · shot_count
+   production_qty(양품 = C/V×Shot−불량) · defect_qty · start_time/end_time · note(JSON: text·face·conditions·downtime)
+   ※ LOT 개념 없음(배치=batch_no). 비가동/식사 제외 계산은 data_viewer와 동일 규칙(#18). */
+function mdNote(r){ try { var n = JSON.parse(r.note); return (n && typeof n === 'object') ? n : {}; } catch(e){ return { text: r.note || '' }; } }
+function mdToMin(t){ var p=(''+t).split(':'); return (+p[0])*60 + (+p[1]); }
+/* 구간(start~end) 순수 분 = 길이 − 점심(12:00~13:00)·저녁(17:00~17:30) 겹침 (자정 걸침 대응) */
+function mdNetMin(start, end){
+  if (!start || !end) return 0;
+  var a1 = mdToMin(start), len = mdToMin(end) - a1; if (len < 0) len += 1440;
+  if (isNaN(len)) return 0;
+  var a2 = a1 + len;
+  var ov = function(b1,b2){ var lo=Math.max(a1,b1), hi=Math.min(a2,b2); return hi>lo ? hi-lo : 0; };
+  var meal = function(m1,m2){ return ov(m1,m2) + ov(m1+1440,m2+1440); };
+  var net = len - meal(720,780) - meal(1020,1050);
+  return net < 0 ? 0 : net;
+}
+function mdHr(min){ return (Math.round((min||0)/6)/10).toLocaleString('ko-KR', {minimumFractionDigits:1, maximumFractionDigits:1}); }
+function mdPct(a, b){ return b > 0 ? (Math.round(a/b*1000)/10).toFixed(1) : '-'; }
+function mdFaceRank(f){ var m={'가면':0,'나면':1,'다면':2}; return (f in m) ? m[f] : 3; }
+function mdRateColor(rate){ return rate === '-' ? '#999' : (+rate >= 85 ? '#059669' : (+rate >= 70 ? '#d97706' : '#dc2626')); }
+function mdEqCmp(a, b){ return String(a).localeCompare(String(b), 'ko', {numeric:true}); }
+
+async function renderMolding(rows){
+  var body = document.getElementById('rpBody');
+  if (!rows.length){ body.innerHTML = '<div class="empty-msg">해당 기간에 제출된 성형 작업일지가 없습니다.</div>'; return; }
+  await loadProducts();
+
+  var byEq = {}, bySabun = {}, byWorker = {}, totProd = 0, totDef = 0, totShot = 0;
+  var shiftSeen = {}, shiftFaces = {}, dtSeen = {}, dtList = [], mcMap = {}, noteSeen = {}, notes = [], teams = {};
+
+  rows.forEach(function(r){
+    var n = mdNote(r);
+    var p = r.production_qty || 0, d = r.defect_qty || 0, s = r.shot_count || 0;
+    var eq = r.equipment_no || '(설비미지정)', sb = r.sabun || '(사번미입력)', face = r.work_type || '';
+    totProd += p; totDef += d; totShot += s;
+    if (r.team) teams[r.team] = 1;
+
+    /* 1) 호기별 */
+    if (!byEq[eq]) byEq[eq] = { prod:0, def:0, shot:0, cnt:0, avail:0, dt:0, dtRaw:0, shifts:0, faces:{}, fs:{}, teams:{}, sabuns:{}, mc:0, rows:[] };
+    var E = byEq[eq];
+    E.prod += p; E.def += d; E.shot += s; E.cnt++; E.rows.push(r);
+    if (face) E.faces[face] = 1;
+    if (!E.fs[face]) E.fs[face] = { prod:0, def:0, shot:0, cnt:0, avail:0, dt:0 };
+    E.fs[face].prod += p; E.fs[face].def += d; E.fs[face].shot += s; E.fs[face].cnt++;
+    if (r.team) E.teams[r.team] = 1;
+    E.sabuns[sb] = 1;
+    /* 가동가능시간: 같은 제출(날짜·호기·근무·시각)은 면/사번 행이 여러 개여도 1회만 */
+    if (r.start_time && r.end_time){
+      var sk = [r.work_date, eq, r.shift_type||'', (''+r.start_time).slice(0,5), (''+r.end_time).slice(0,5)].join('|');
+      if (!shiftSeen[sk]){ shiftSeen[sk] = { eq:eq, min:mdNetMin(r.start_time, r.end_time), faces:{} }; E.shifts++; }
+      shiftSeen[sk].faces[face] = 1;
+      var dk = [r.work_date, eq, r.shift_type||''].join('|');
+      if (!shiftFaces[dk]) shiftFaces[dk] = {};
+      shiftFaces[dk][face] = 1;
+    }
+
+    /* 2) 품목별 */
+    if (!bySabun[sb]) bySabun[sb] = { prod:0, def:0, shot:0, cnt:0, eqs:{}, cvs:{}, workers:{}, rows:[] };
+    var P = bySabun[sb];
+    P.prod += p; P.def += d; P.shot += s; P.cnt++; P.rows.push(r);
+    P.eqs[eq + (face ? ' ' + face : '')] = 1;
+    if (r.cavity) P.cvs[r.cavity] = 1;
+    if (r.worker_name) P.workers[r.worker_name] = 1;
+
+    /* 3) 작업자별 */
+    var w = r.worker_name || '(미지정)';
+    if (!byWorker[w]) byWorker[w] = { prod:0, def:0, shot:0, cnt:0, days:{}, eqs:{} };
+    var W = byWorker[w];
+    W.prod += p; W.def += d; W.shot += s; W.cnt++; W.days[r.work_date] = 1; W.eqs[eq] = 1;
+
+    /* 4) 비가동: 본인 사번 기록 + 사번 미지정(공통) 기록만 — 형제 행의 옛 사본(#29) 배제 */
+    (n.downtime || []).forEach(function(dt){
+      if (!dt || !dt.code) return;
+      if (dt.sabun && String(dt.sabun) !== String(r.sabun)) return;
+      var key = [r.work_date, eq, r.shift_type||'', dt.face||'', dt.code, dt.sabun||'', dt.start||'', dt.end||''].join('|');
+      if (dtSeen[key]) return; dtSeen[key] = 1;
+      dtList.push({ date:r.work_date, eq:eq, shift:r.shift_type||'', face:dt.face||'전체', sabun:dt.sabun||'', code:dt.code,
+                    start:dt.start||'', end:dt.end||'', min:mdNetMin(dt.start, dt.end), detail:dt.detail||'', worker:r.worker_name||'' });
+    });
+
+    /* 5) 금형교체: data_viewer와 동일 규칙 — 키=날짜|설비|면|교체후사번(시각 제외), 본인 행 기록 우선 */
+    (n.downtime || []).forEach(function(dt){
+      if (!dt || dt.code !== '금형교체') return;
+      var key = [r.work_date, eq, dt.face||'', dt.sabun||''].join('|');
+      var isAuth = !!(dt.sabun && String(r.sabun) === String(dt.sabun));
+      if (!mcMap[key] || (isAuth && !mcMap[key].auth)){
+        mcMap[key] = { auth:isAuth, date:r.work_date, eq:eq, face:(dt.face && dt.face !== '전체') ? dt.face : '', sabun:dt.sabun||'',
+                       start:dt.start||'', end:dt.end||'', min:mdNetMin(dt.start, dt.end), detail:dt.detail||'', worker:r.worker_name||'' };
+      }
+    });
+
+    /* 6) 특이사항: 제출 시 전 행에 복사되므로 날짜|설비|내용 dedupe */
+    var t = (n.text || '').trim();
+    if (t){
+      var nk = r.work_date + '|' + eq + '|' + t;
+      if (!noteSeen[nk]){ noteSeen[nk] = 1; notes.push({ d:r.work_date, eq:eq, by:r.worker_name||r.created_by_name||'-', t:t }); }
+    }
+  });
+
+  /* 면별 가동가능시간: 각 근무에서 실제 가동한 면마다 근무시간 전체를 부여 */
+  Object.keys(shiftSeen).forEach(function(k){
+    var S = shiftSeen[k], E = byEq[S.eq];
+    Object.keys(S.faces).forEach(function(f){ E.fs[f].avail += S.min; });
+  });
+  /* 면별 비가동 귀속(실제 기록 분 그대로, 환산 없음):
+     · 면 지정(가/나/다면) → 그 면에만
+     · '전체'·면 미지정 → 그 근무에 가동한 모든 면에 각각 (설비가 통째로 섰으므로 면마다 같은 시간 정지) */
+  dtList.forEach(function(x){
+    var E = byEq[x.eq]; if (!E) return;
+    E.dtRaw += x.min;
+    var present = shiftFaces[[x.date, x.eq, x.shift].join('|')] || {};
+    var pf = Object.keys(present);
+    if (!pf.length) pf = Object.keys(E.fs);
+    var targets = (x.face && x.face !== '전체' && E.fs[x.face]) ? [x.face] : pf;
+    targets.forEach(function(f){ if (E.fs[f]) E.fs[f].dt += x.min; });
+  });
+  /* 면별 상한(비가동 ≤ 가동가능) 적용 후 호기 합계 = 면 합계 */
+  Object.keys(byEq).forEach(function(k){
+    var E = byEq[k];
+    E.avail = 0; E.dt = 0;
+    Object.keys(E.fs).forEach(function(f){
+      var F = E.fs[f]; F.dt = Math.min(F.dt, F.avail);
+      E.avail += F.avail; E.dt += F.dt;
+    });
+  });
+  var mcs = Object.keys(mcMap).map(function(k){ return mcMap[k]; }).sort(function(a,b){
+    return a.date !== b.date ? (a.date < b.date ? -1 : 1) : (mdEqCmp(a.eq, b.eq) || (a.start < b.start ? -1 : 1));
+  });
+  mcs.forEach(function(m){ if (byEq[m.eq]) byEq[m.eq].mc++; });
+
+  var eqs = Object.keys(byEq).sort(mdEqCmp);
+  var sabuns = Object.keys(bySabun).sort(function(a,b){ return bySabun[b].prod - bySabun[a].prod; });
+  var workers = Object.keys(byWorker).sort(function(a,b){ return byWorker[b].prod - byWorker[a].prod; });
+  var totAvail = 0, totDt = 0;
+  eqs.forEach(function(k){ totAvail += byEq[k].avail; totDt += Math.min(byEq[k].dt, byEq[k].avail); });
+  var totRate = mdPct(totAvail - totDt, totAvail);
+  var defRate = mdPct(totDef, totProd + totDef);
+
+  /* 비가동 코드별 */
+  var byCode = {}, dtTotal = 0;
+  dtList.forEach(function(x){
+    if (!byCode[x.code]) byCode[x.code] = { cnt:0, min:0, eqs:{} };
+    byCode[x.code].cnt++; byCode[x.code].min += x.min; byCode[x.code].eqs[x.eq] = 1; dtTotal += x.min;
+  });
+  var codes = Object.keys(byCode).sort(function(a,b){ return byCode[b].min - byCode[a].min; });
+  dtList.sort(function(a,b){ return a.date !== b.date ? (a.date < b.date ? -1 : 1) : (mdEqCmp(a.eq, b.eq) || (a.start < b.start ? -1 : 1)); });
+
+  var rowsSorted = function(list){
+    return list.slice().sort(function(a,b){
+      if (a.work_date !== b.work_date) return a.work_date < b.work_date ? -1 : 1;
+      var c = mdEqCmp(a.equipment_no||'', b.equipment_no||''); if (c) return c;
+      return String(a.work_type||'').localeCompare(String(b.work_type||''), 'ko');
+    });
+  };
+  var prodOf = function(sb){ return PRODUCTS[sb] || { partNo:'-', partName:(sb && bySabun[sb] && bySabun[sb].rows[0] && bySabun[sb].rows[0].product_name) || '-' }; };
+
+  var h = '';
+  h += '<div class="sum-grid" style="grid-template-columns:repeat(6,1fr)">'
+    + '<div class="sum-card"><div class="n">'+num(totProd)+'</div><div class="l">총 생산(양품)</div></div>'
+    + '<div class="sum-card"><div class="n" style="color:'+(totDef>0?'#dc2626':'#222')+'">'+num(totDef)+'</div><div class="l">불량 ('+defRate+'%)</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(totShot)+'</div><div class="l">총 Shot</div></div>'
+    + '<div class="sum-card"><div class="n" style="color:#2563eb">'+totRate+(totRate!=='-'?'%':'')+'</div><div class="l">설비 가동률</div></div>'
+    + '<div class="sum-card"><div class="n" style="color:'+(mcs.length?'#d97706':'#222')+'">'+num(mcs.length)+'</div><div class="l">금형교체</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(workers.length)+'</div><div class="l">작업자'+(Object.keys(teams).length?' ('+esc(Object.keys(teams).sort().join('·'))+')':'')+'</div></div>'
+    + '</div>';
+
+  /* 1. 호기별 실적·가동 */
+  h += '<h2 class="sec">1. 호기별 실적 · 가동 현황 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 상세</span></h2>';
+  h += '<table class="rp"><tr><th style="width:78px">호기</th><th style="width:46px">반</th><th style="width:40px">근무<br>횟수</th><th style="width:76px">생산</th><th style="width:56px">불량</th><th style="width:50px">불량률</th><th style="width:66px">Shot</th>'
+    + '<th style="width:60px">가동가능<br>(h)</th><th style="width:56px">비가동<br>(h)</th><th style="width:60px">실생산<br>(h)</th><th style="width:56px">가동률</th><th style="width:44px">금형<br>교체</th><th style="width:40px">품목</th><th style="width:26px"></th></tr>';
+  eqs.forEach(function(k, i){
+    var E = byEq[k], dt = Math.min(E.dt, E.avail), run = E.avail - dt, rate = mdPct(run, E.avail);
+    var rc = mdRateColor(rate);
+    var fc = Object.keys(E.faces).length;
+    var fsum = fc > 1 ? '<div style="font-size:9.5px;color:#999">'+fc+'면 합</div>' : '';
+    h += '<tr class="grp-row" onclick="toggleDet(\'mde'+i+'\')">'
+      + '<td style="font-weight:700">'+esc(k)+(fc>1?'<div style="font-size:10px;color:#888;font-weight:400">'+fc+'면</div>':'')+'</td>'
+      + '<td style="font-size:11px">'+esc(Object.keys(E.teams).sort().join(',')||'-')+'</td>'
+      + '<td>'+num(E.shifts)+'</td>'
+      + '<td class="right" style="font-weight:700">'+num(E.prod)+'</td>'
+      + '<td class="right" style="color:'+(E.def>0?'#dc2626':'#999')+'">'+num(E.def)+'</td>'
+      + '<td>'+mdPct(E.def, E.prod+E.def)+'</td>'
+      + '<td class="right">'+num(E.shot)+'</td>'
+      + '<td>'+(E.avail?mdHr(E.avail)+fsum:'-')+'</td>'
+      + '<td style="color:'+(dt>0?'#e67e22':'#999')+'">'+mdHr(dt)+(dt>0?fsum:'')+'</td>'
+      + '<td>'+(E.avail?mdHr(run)+fsum:'-')+'</td>'
+      + '<td style="font-weight:700;color:'+rc+'">'+rate+(rate!=='-'?'%':'')+'</td>'
+      + '<td style="color:'+(E.mc?'#d97706':'#999')+'">'+num(E.mc)+'</td>'
+      + '<td>'+num(Object.keys(E.sabuns).length)+'</td>'
+      + '<td class="arrow" id="ar-mde'+i+'">▼</td></tr>';
+    /* 다면 설비: 면별 행(항상 표시) — 각 면을 독립 생산 단위로 집계 */
+    if (fc > 1){
+      Object.keys(E.fs).sort(function(a,b){ return mdFaceRank(a) - mdFaceRank(b); }).forEach(function(f){
+        var F = E.fs[f], frun = F.avail - F.dt, frate = mdPct(frun, F.avail);
+        h += '<tr style="background:#fafbfd;font-size:11px">'
+          + '<td style="text-align:right;color:#666">└ '+esc(f||'(면없음)')+'</td><td></td><td></td>'
+          + '<td class="right">'+num(F.prod)+'</td>'
+          + '<td class="right" style="color:'+(F.def>0?'#dc2626':'#999')+'">'+num(F.def)+'</td>'
+          + '<td>'+mdPct(F.def, F.prod+F.def)+'</td>'
+          + '<td class="right">'+num(F.shot)+'</td>'
+          + '<td>'+(F.avail?mdHr(F.avail):'-')+'</td>'
+          + '<td style="color:'+(F.dt>0?'#e67e22':'#999')+'">'+mdHr(F.dt)+'</td>'
+          + '<td>'+(F.avail?mdHr(frun):'-')+'</td>'
+          + '<td style="font-weight:600;color:'+mdRateColor(frate)+'">'+frate+(frate!=='-'?'%':'')+'</td>'
+          + '<td></td><td></td><td></td></tr>';
+      });
+    }
+    h += '<tr class="det-row" id="det-mde'+i+'"><td colspan="14">'
+      + '<table class="det"><tr><th style="width:78px">일자</th><th style="width:40px">근무</th><th style="width:40px">면</th><th style="width:70px">사번</th><th>품명</th><th style="width:76px">Batch</th><th style="width:36px">C/V</th><th style="width:50px">Shot</th><th style="width:60px">생산</th><th style="width:44px">불량</th><th style="width:76px">근무시간</th><th style="width:64px">작업자</th></tr>';
+    rowsSorted(E.rows).forEach(function(r){
+      h += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(r.shift_type||'')+'</td><td>'+esc(r.work_type||'-')+'</td><td>'+esc(r.sabun||'-')+'</td>'
+        + '<td class="left">'+esc(prodOf(r.sabun).partName||r.product_name||'-')+'</td><td style="font-size:10px">'+esc(r.batch_no||'-')+'</td>'
+        + '<td>'+esc(r.cavity||'-')+'</td><td class="right">'+num(r.shot_count)+'</td><td class="right">'+num(r.production_qty)+'</td>'
+        + '<td class="right" style="color:'+((r.defect_qty||0)>0?'#dc2626':'#999')+'">'+num(r.defect_qty)+'</td>'
+        + '<td style="font-size:10px">'+(r.start_time&&r.end_time?esc((''+r.start_time).slice(0,5)+'~'+(''+r.end_time).slice(0,5)):'-')+'</td>'
+        + '<td>'+esc(r.worker_name||'-')+'</td></tr>';
+    });
+    h += '</table></td></tr>';
+  });
+  h += '<tr style="background:#f7f8fb;font-weight:700"><td colspan="3">합계</td><td class="right">'+num(totProd)+'</td><td class="right">'+num(totDef)+'</td><td>'+defRate+'</td><td class="right">'+num(totShot)+'</td>'
+    + '<td>'+mdHr(totAvail)+'</td><td>'+mdHr(totDt)+'</td><td>'+mdHr(totAvail-totDt)+'</td><td>'+totRate+(totRate!=='-'?'%':'')+'</td><td>'+num(mcs.length)+'</td><td>'+num(sabuns.length)+'</td><td></td></tr>';
+  h += '</table>';
+  h += '<div style="font-size:10.5px;color:#888;margin:4px 0 0">※ 가동가능 = 근무시간 − 식사(12:00~13:00, 17:00~17:30) · 가동률 = 실생산 ÷ 가동가능 · 다면 설비는 면마다 독립 집계(면 지정 비가동 → 해당 면만, "전체" 비가동 → 가동한 모든 면에 각각) 후 호기 행에 합산 · 생산 = 양품(C/V×Shot−불량), 불량률 = 불량 ÷ (생산+불량)</div>';
+
+  /* 2. 품목별 */
+  h += '<h2 class="sec">2. 품목(사번)별 성형 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 상세</span></h2>';
+  h += '<table class="rp"><tr><th style="width:74px">사번</th><th style="width:108px">품번</th><th>품명</th><th style="width:120px">호기(면)</th><th style="width:44px">C/V</th><th style="width:66px">Shot</th><th style="width:78px">생산</th><th style="width:56px">불량</th><th style="width:50px">불량률</th><th style="width:40px">건수</th><th style="width:26px"></th></tr>';
+  sabuns.forEach(function(sb, i){
+    var P = bySabun[sb], prod = prodOf(sb);
+    h += '<tr class="grp-row" onclick="toggleDet(\'mdp'+i+'\')">'
+      + '<td>'+esc(sb)+'</td><td>'+esc(prod.partNo||'-')+'</td><td class="left">'+esc(prod.partName||'-')+'</td>'
+      + '<td style="font-size:11px">'+esc(Object.keys(P.eqs).sort(mdEqCmp).join(', '))+'</td>'
+      + '<td style="font-size:11px">'+esc(Object.keys(P.cvs).join('/')||'-')+'</td>'
+      + '<td class="right">'+num(P.shot)+'</td>'
+      + '<td class="right" style="font-weight:700">'+num(P.prod)+'</td>'
+      + '<td class="right" style="color:'+(P.def>0?'#dc2626':'#999')+'">'+num(P.def)+'</td>'
+      + '<td>'+mdPct(P.def, P.prod+P.def)+'</td><td>'+num(P.cnt)+'</td>'
+      + '<td class="arrow" id="ar-mdp'+i+'">▼</td></tr>';
+    h += '<tr class="det-row" id="det-mdp'+i+'"><td colspan="11">'
+      + '<table class="det"><tr><th style="width:78px">일자</th><th style="width:40px">근무</th><th style="width:70px">호기</th><th style="width:40px">면</th><th style="width:80px">Batch</th><th style="width:36px">C/V</th><th style="width:50px">Shot</th><th style="width:60px">생산</th><th style="width:44px">불량</th><th style="width:64px">작업자</th><th>비고</th></tr>';
+    rowsSorted(P.rows).forEach(function(r){
+      h += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(r.shift_type||'')+'</td><td>'+esc(r.equipment_no||'-')+'</td><td>'+esc(r.work_type||'-')+'</td>'
+        + '<td style="font-size:10px">'+esc(r.batch_no||'-')+'</td><td>'+esc(r.cavity||'-')+'</td><td class="right">'+num(r.shot_count)+'</td>'
+        + '<td class="right">'+num(r.production_qty)+'</td><td class="right" style="color:'+((r.defect_qty||0)>0?'#dc2626':'#999')+'">'+num(r.defect_qty)+'</td>'
+        + '<td>'+esc(r.worker_name||'-')+'</td><td class="left" style="font-size:10px">'+esc(mdNote(r).text||'')+'</td></tr>';
+    });
+    h += '</table></td></tr>';
+  });
+  h += '</table>';
+
+  /* 3. 작업자별 */
+  h += '<h2 class="sec">3. 작업자별 실적</h2>';
+  h += '<table class="rp" style="max-width:720px"><tr><th>작업자</th><th style="width:150px">담당 호기</th><th style="width:56px">근무일</th><th style="width:70px">Shot</th><th style="width:80px">생산</th><th style="width:60px">불량</th><th style="width:54px">불량률</th><th style="width:48px">건수</th></tr>';
+  workers.forEach(function(w){
+    var W = byWorker[w];
+    h += '<tr><td>'+esc(w)+'</td><td style="font-size:11px">'+esc(Object.keys(W.eqs).sort(mdEqCmp).join(', '))+'</td><td>'+num(Object.keys(W.days).length)+'</td>'
+      + '<td class="right">'+num(W.shot)+'</td><td class="right" style="font-weight:700">'+num(W.prod)+'</td>'
+      + '<td class="right" style="color:'+(W.def>0?'#dc2626':'#999')+'">'+num(W.def)+'</td><td>'+mdPct(W.def, W.prod+W.def)+'</td><td>'+num(W.cnt)+'</td></tr>';
+  });
+  h += '</table>';
+
+  /* 4. 비가동 사유별 */
+  var sec = 4;
+  if (codes.length){
+    h += '<h2 class="sec">'+(sec++)+'. 비가동 사유별 집계 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 상세 · 식사시간 제외 분</span></h2>';
+    h += '<table class="rp" style="max-width:760px"><tr><th style="width:110px">사유</th><th style="width:50px">건수</th><th style="width:70px">시간(분)</th><th style="width:62px">시간(h)</th><th style="width:56px">비중</th><th>발생 호기</th><th style="width:26px"></th></tr>';
+    codes.forEach(function(c, i){
+      var C = byCode[c];
+      h += '<tr class="grp-row" onclick="toggleDet(\'mdc'+i+'\')"><td style="font-weight:700;color:#c2410c">'+esc(c)+'</td><td>'+num(C.cnt)+'</td><td class="right">'+num(C.min)+'</td><td>'+mdHr(C.min)+'</td>'
+        + '<td>'+mdPct(C.min, dtTotal)+'%</td><td style="font-size:11px" class="left">'+esc(Object.keys(C.eqs).sort(mdEqCmp).join(', '))+'</td>'
+        + '<td class="arrow" id="ar-mdc'+i+'">▼</td></tr>';
+      h += '<tr class="det-row" id="det-mdc'+i+'"><td colspan="7"><table class="det"><tr><th style="width:78px">일자</th><th style="width:40px">근무</th><th style="width:70px">호기</th><th style="width:40px">면</th><th style="width:96px">시간</th><th style="width:44px">분</th><th style="width:66px">사번</th><th>상세</th></tr>';
+      dtList.filter(function(x){ return x.code === c; }).forEach(function(x){
+        h += '<tr><td>'+esc(x.date)+'</td><td>'+esc(x.shift)+'</td><td>'+esc(x.eq)+'</td><td>'+esc(x.face)+'</td><td>'+esc((x.start||'?')+'~'+(x.end||'?'))+'</td>'
+          + '<td>'+num(x.min)+'</td><td>'+esc(x.sabun||'-')+'</td><td class="left">'+esc(x.detail||'')+'</td></tr>';
+      });
+      h += '</table></td></tr>';
+    });
+    h += '<tr style="background:#f7f8fb;font-weight:700"><td>합계</td><td>'+num(dtList.length)+'</td><td class="right">'+num(dtTotal)+'</td><td>'+mdHr(dtTotal)+'</td><td>100%</td><td colspan="2"></td></tr>';
+    h += '</table>';
+  }
+
+  /* 5. 금형교체 내역 */
+  if (mcs.length){
+    h += '<h2 class="sec">'+(sec++)+'. 금형교체 내역 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 교체 후 사번 기준 중복 제거</span></h2>';
+    h += '<table class="rp" style="max-width:820px"><tr><th style="width:84px">일자</th><th style="width:76px">호기</th><th style="width:44px">면</th><th style="width:100px">시간</th><th style="width:48px">분</th><th style="width:80px">교체 후 사번</th><th>교체 후 품명</th><th style="width:70px">작업자</th></tr>';
+    mcs.forEach(function(m){
+      h += '<tr><td>'+esc(m.date)+'</td><td>'+esc(m.eq)+'</td><td>'+esc(m.face||'-')+'</td><td>'+esc((m.start||'?')+'~'+(m.end||'?'))+'</td><td>'+num(m.min)+'</td>'
+        + '<td>'+esc(m.sabun||'미지정')+'</td><td class="left">'+esc(m.sabun ? (prodOf(m.sabun).partName||'-') : '-')+'</td><td>'+esc(m.worker||'-')+'</td></tr>';
+    });
+    h += '</table>';
+  }
+
+  /* 6. 특이사항 */
+  if (notes.length){
+    notes.sort(function(a,b){ return a.d !== b.d ? (a.d < b.d ? -1 : 1) : mdEqCmp(a.eq, b.eq); });
+    h += '<h2 class="sec">'+(sec++)+'. 특이사항 / 전달사항</h2>';
+    h += '<table class="rp"><tr><th style="width:84px">일자</th><th style="width:76px">호기</th><th style="width:80px">작성자</th><th>내용</th></tr>';
+    notes.forEach(function(x){ h += '<tr><td>'+esc(x.d)+'</td><td>'+esc(x.eq)+'</td><td>'+esc(x.by)+'</td><td class="left">'+esc(x.t)+'</td></tr>'; });
+    h += '</table>';
+  }
+  body.innerHTML = h;
+
+  /* 엑셀 */
+  var r1 = function(v){ return Math.round((v||0)*10)/10; };
+  var shE = [['호기','면','반','근무횟수','생산','불량','불량률(%)','Shot','가동가능(분)','비가동(분)','실생산(분)','가동률(%)','금형교체','품목수','비가동 기록합(분)']];
+  eqs.forEach(function(k){
+    var E = byEq[k], dt = Math.min(E.dt, E.avail), fc = Object.keys(E.faces).length;
+    shE.push([k, fc>1?fc+'면 합':'', Object.keys(E.teams).sort().join(','), E.shifts, E.prod, E.def, mdPct(E.def,E.prod+E.def), E.shot, E.avail, r1(dt), r1(E.avail-dt), mdPct(E.avail-dt,E.avail), E.mc, Object.keys(E.sabuns).length, E.dtRaw]);
+    if (fc > 1){
+      Object.keys(E.fs).sort(function(a,b){ return mdFaceRank(a) - mdFaceRank(b); }).forEach(function(f){
+        var F = E.fs[f];
+        shE.push([k, f, '', '', F.prod, F.def, mdPct(F.def,F.prod+F.def), F.shot, F.avail, F.dt, F.avail-F.dt, mdPct(F.avail-F.dt,F.avail), '', '', '']);
+      });
+    }
+  });
+  var shP = [['사번','품번','품명','호기(면)','C/V','Shot','생산','불량','불량률(%)','건수']];
+  sabuns.forEach(function(sb){ var P=bySabun[sb], pr=prodOf(sb); shP.push([sb, pr.partNo, pr.partName, Object.keys(P.eqs).sort(mdEqCmp).join(', '), Object.keys(P.cvs).join('/'), P.shot, P.prod, P.def, mdPct(P.def,P.prod+P.def), P.cnt]); });
+  var shW = [['작업자','담당호기','근무일','Shot','생산','불량','불량률(%)','건수']];
+  workers.forEach(function(w){ var W=byWorker[w]; shW.push([w, Object.keys(W.eqs).sort(mdEqCmp).join(', '), Object.keys(W.days).length, W.shot, W.prod, W.def, mdPct(W.def,W.prod+W.def), W.cnt]); });
+  var shD = [['일자','근무','반','호기','면','사번','품번','품명','Batch','C/V','Shot','생산','불량','시작','종료','작업자','비고']];
+  rowsSorted(rows).forEach(function(r){
+    var pr = prodOf(r.sabun);
+    shD.push([r.work_date, r.shift_type||'', r.team||'', r.equipment_no||'', r.work_type||'', r.sabun||'', pr.partNo, pr.partName, r.batch_no||'', r.cavity||'', r.shot_count||0, r.production_qty||0, r.defect_qty||0,
+      (''+(r.start_time||'')).slice(0,5), (''+(r.end_time||'')).slice(0,5), r.worker_name||'', mdNote(r).text||'']);
+  });
+  lastXlsx = { name:'molding', sheets:[ {n:'호기별',d:shE}, {n:'품목별',d:shP}, {n:'작업자별',d:shW}, {n:'상세내역',d:shD} ] };
+  if (dtList.length){
+    var shT = [['일자','근무','호기','면','사유','시작','종료','분(식사제외)','사번','상세','작업자']];
+    dtList.forEach(function(x){ shT.push([x.date, x.shift, x.eq, x.face, x.code, x.start, x.end, x.min, x.sabun, x.detail, x.worker]); });
+    lastXlsx.sheets.push({ n:'비가동', d:shT });
+  }
+  if (mcs.length){
+    var shM = [['일자','호기','면','시작','종료','분','교체후사번','교체후품명','작업자']];
+    mcs.forEach(function(m){ shM.push([m.date, m.eq, m.face, m.start, m.end, m.min, m.sabun, m.sabun?prodOf(m.sabun).partName:'', m.worker]); });
+    lastXlsx.sheets.push({ n:'금형교체', d:shM });
+  }
+  if (notes.length){
+    var shN = [['일자','호기','작성자','내용']];
+    notes.forEach(function(x){ shN.push([x.d, x.eq, x.by, x.t]); });
+    lastXlsx.sheets.push({ n:'특이사항', d:shN });
   }
 }
 
