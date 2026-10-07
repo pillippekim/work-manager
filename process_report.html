@@ -152,7 +152,7 @@ var myInfo = null;
 /* ── 공정 탭 정의 (공정 흐름 순서 / impl=true 만 구현됨) ── */
 var PROCS = [
   { k:'cmb',       label:'배합',   grp:'전공정', table:'cmb_reports',       impl:false, na:'현재 미사용 공정입니다.' },
-  { k:'cutting',   label:'재단',   grp:'전공정', table:'cutting_reports',   impl:false },
+  { k:'cutting',   label:'재단',   grp:'전공정', table:'cutting_reports',   impl:true  },
   { k:'molding',   label:'성형',   grp:'성형',   table:'molding_reports',   impl:false },
   { k:'postcure',  label:'2차가류', grp:'후공정', table:'postcure_reports',  impl:true  },
   { k:'shot',      label:'쇼트',   grp:'후공정', table:'shot_reports',      impl:true  },
@@ -288,6 +288,7 @@ async function loadReport(force){
   else if (curProc === 'sasang') await renderSasang(rows);
   else if (curProc === 'postcure') await renderPostcure(rows);
   else if (curProc === 'shot') await renderShot(rows);
+  else if (curProc === 'cutting') await renderCutting(rows);
 }
 
 /* ════════════════════ 포장 (packaging) ════════════════════ */
@@ -1361,6 +1362,152 @@ async function renderCoating(rows){
       r.qty_per_line||0, r.line_count||0, r.total_qty||0, r.defect_qty||0, r.worker_name||'', r.note||'']);
   });
   lastXlsx = { name:'coating', sheets:[ {n:'품목별요약',d:sh1}, {n:'작업유형별',d:sh2}, {n:'작업자별',d:sh3}, {n:'상세내역',d:sh4} ] };
+  if (rems.length){
+    var sh5 = [['일자','작성자','내용']];
+    rems.forEach(function(r){ sh5.push([r.d, r.by, r.t]); });
+    lastXlsx.sheets.push({ n:'특이사항', d:sh5 });
+  }
+}
+
+/* ════════════════════ 재단 (cutting) ════════════════════ */
+/* 컬럼: worker_id=사번(제품코드, #20 함정) · material_name · box_count · total_qty · scrap_weight(kg) · lot_no(단일) · note · remarks */
+async function renderCutting(rows){
+  var body = document.getElementById('rpBody');
+  if (!rows.length){ body.innerHTML = '<div class="empty-msg">해당 기간에 제출된 재단 작업일지가 없습니다.</div>'; return; }
+  await loadProducts();
+  var kg = function(v){ return (Math.round((v||0)*10)/10).toLocaleString('ko-KR'); };
+
+  var bySabun = {}, byMat = {}, byWorker = {}, totalQty = 0, totalBox = 0, totalScrap = 0;
+  rows.forEach(function(r){
+    var q = r.total_qty || 0, b = r.box_count || 0, s = r.scrap_weight || 0;
+    totalQty += q; totalBox += b; totalScrap += s;
+    var sb = r.worker_id || '(사번미입력)';
+    if (!bySabun[sb]) bySabun[sb] = { qty:0, box:0, scrap:0, cnt:0, workers:{}, mats:{}, rows:[] };
+    var g = bySabun[sb];
+    g.qty += q; g.box += b; g.scrap += s; g.cnt++; g.rows.push(r);
+    if (r.worker_name) g.workers[r.worker_name] = 1;
+    if (r.material_name) g.mats[r.material_name] = 1;
+    var m = r.material_name || '(재질미지정)';
+    if (!byMat[m]) byMat[m] = { qty:0, box:0, scrap:0, cnt:0, sabuns:{} };
+    byMat[m].qty += q; byMat[m].box += b; byMat[m].scrap += s; byMat[m].cnt++; byMat[m].sabuns[sb] = 1;
+    var w = r.worker_name || '(미지정)';
+    if (!byWorker[w]) byWorker[w] = { qty:0, box:0, scrap:0, cnt:0 };
+    byWorker[w].qty += q; byWorker[w].box += b; byWorker[w].scrap += s; byWorker[w].cnt++;
+  });
+  var sabuns = Object.keys(bySabun).sort(function(a,b){ return bySabun[b].qty - bySabun[a].qty; });
+  var mats = Object.keys(byMat).sort(function(a,b){ return byMat[b].qty - byMat[a].qty; });
+  var workers = Object.keys(byWorker).sort(function(a,b){ return byWorker[b].qty - byWorker[a].qty; });
+  var lotMiss = rows.filter(function(r){ return lotMissingOne(r.lot_no); });
+
+  var h = '';
+  h += '<div class="sum-grid">'
+    + '<div class="sum-card"><div class="n">'+num(totalQty)+'</div><div class="l">총 재단수량</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(totalBox)+'</div><div class="l">총 BOX</div></div>'
+    + '<div class="sum-card"><div class="n" style="color:'+(totalScrap>0?'#d97706':'#222')+'">'+kg(totalScrap)+'</div><div class="l">스크랩(kg)</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(sabuns.length)+'</div><div class="l">품목(사번) 수</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(workers.length)+'</div><div class="l">투입 작업자</div></div>'
+    + '</div>';
+  h += lotWarnStrip(lotMiss.length);
+
+  /* 1. 품목별 재단 실적 */
+  h += '<h2 class="sec">1. 품목(사번)별 재단 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 상세</span></h2>';
+  h += '<table class="rp"><tr><th style="width:74px">사번</th><th style="width:108px">품번</th><th>품명</th><th style="width:100px">작업자</th><th style="width:130px">재질</th><th style="width:80px">총수량</th><th style="width:60px">BOX</th><th style="width:76px">스크랩(kg)</th><th style="width:46px">건수</th><th style="width:26px"></th></tr>';
+  sabuns.forEach(function(sb, i){
+    var g = bySabun[sb];
+    var prod = PRODUCTS[sb] || { partNo:'-', partName:'-' };
+    h += '<tr class="grp-row" onclick="toggleDet(\'cu'+i+'\')">'
+      + '<td>'+esc(sb)+'</td><td>'+esc(prod.partNo||'-')+'</td><td class="left">'+esc(prod.partName||'-')+'</td>'
+      + '<td style="font-size:11px">'+esc(Object.keys(g.workers).join(', ')||'-')+'</td>'
+      + '<td style="font-size:11px" class="left">'+esc(Object.keys(g.mats).join(' · ')||'-')+'</td>'
+      + '<td class="right" style="font-weight:700">'+num(g.qty)+'</td>'
+      + '<td>'+num(g.box)+'</td>'
+      + '<td class="right" style="color:'+(g.scrap>0?'#d97706':'#999')+'">'+kg(g.scrap)+'</td>'
+      + '<td>'+num(g.cnt)+'</td>'
+      + '<td class="arrow" id="ar-cu'+i+'">▼</td></tr>';
+    h += '<tr class="det-row" id="det-cu'+i+'"><td colspan="10">'
+      + '<table class="det"><tr><th style="width:80px">일자</th><th style="width:130px">재질</th><th style="width:110px">LOT</th><th style="width:56px">BOX</th><th style="width:70px">수량</th><th style="width:80px">스크랩(kg)</th><th>비고</th></tr>';
+    g.rows.forEach(function(r){
+      h += '<tr><td>'+esc(r.work_date)+'</td><td class="left">'+esc(r.material_name||'-')+'</td>'
+        + '<td style="font-size:11px;color:'+(lotMissingOne(r.lot_no)?'#dc2626':'#555')+'">'+esc(r.lot_no||'미입력')+'</td>'
+        + '<td>'+num(r.box_count)+'</td><td class="right">'+num(r.total_qty)+'</td>'
+        + '<td class="right">'+kg(r.scrap_weight)+'</td><td class="left">'+esc(r.note||'')+'</td></tr>';
+    });
+    h += '</table></td></tr>';
+  });
+  h += '</table>';
+
+  /* 2. 재질별 실적 (재단 특화) */
+  h += '<h2 class="sec">2. 재질별 실적</h2>';
+  h += '<table class="rp"><tr><th>재질</th><th style="width:86px">총수량</th><th style="width:64px">BOX</th><th style="width:84px">스크랩(kg)</th><th style="width:60px">건수</th><th style="width:72px">품목 수</th></tr>';
+  mats.forEach(function(m){
+    var g = byMat[m];
+    h += '<tr><td class="left">'+esc(m)+'</td><td class="right">'+num(g.qty)+'</td><td>'+num(g.box)+'</td>'
+      + '<td class="right" style="color:'+(g.scrap>0?'#d97706':'#999')+'">'+kg(g.scrap)+'</td>'
+      + '<td>'+num(g.cnt)+'</td><td>'+num(Object.keys(g.sabuns).length)+'</td></tr>';
+  });
+  h += '</table>';
+
+  /* 3. 작업자별 실적 */
+  h += '<h2 class="sec">3. 작업자별 실적</h2>';
+  h += '<table class="rp" style="max-width:560px"><tr><th>작업자</th><th style="width:86px">총수량</th><th style="width:64px">BOX</th><th style="width:84px">스크랩(kg)</th><th style="width:60px">건수</th></tr>';
+  workers.forEach(function(w){
+    var g = byWorker[w];
+    h += '<tr><td>'+esc(w)+'</td><td class="right">'+num(g.qty)+'</td><td>'+num(g.box)+'</td>'
+      + '<td class="right">'+kg(g.scrap)+'</td><td>'+num(g.cnt)+'</td></tr>';
+  });
+  h += '</table>';
+
+  /* 4. 특이사항 (일자+내용 dedupe) */
+  var remSeen = {}, rems = [];
+  rows.forEach(function(r){
+    var t = (r.remarks||'').trim();
+    if (!t) return;
+    var k = r.work_date + '|' + t;
+    if (remSeen[k]) return; remSeen[k]=1;
+    rems.push({ d:r.work_date, by:r.created_by_name||r.worker_name||'-', t:t });
+  });
+  if (rems.length){
+    h += '<h2 class="sec">4. 특이사항 / 전달사항</h2>';
+    h += '<table class="rp"><tr><th style="width:90px">일자</th><th style="width:90px">작성자</th><th>내용</th></tr>';
+    rems.forEach(function(r){ h += '<tr><td>'+esc(r.d)+'</td><td>'+esc(r.by)+'</td><td class="left">'+esc(r.t)+'</td></tr>'; });
+    h += '</table>';
+  }
+
+  /* LOT 미입력 내역 (비고 포함 — §6-3 규칙) */
+  if (lotMiss.length){
+    var lmRows = '';
+    lotMiss.forEach(function(r){
+      var prod = PRODUCTS[r.worker_id]||{partName:'-'};
+      lmRows += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(r.worker_id||'-')+'</td><td class="left">'+esc(prod.partName||'-')+'</td>'
+        + '<td class="left">'+esc(r.material_name||'-')+'</td><td>'+num(r.box_count)+'</td>'
+        + '<td class="right">'+num(r.total_qty)+'</td><td>'+esc(r.worker_name||'-')+'</td><td class="left">'+esc(r.note||'')+'</td></tr>';
+    });
+    h += lotMissSection([{h:'일자',w:80},{h:'사번',w:80},{h:'품명'},{h:'재질',w:120},{h:'BOX',w:56},{h:'수량',w:70},{h:'작업자',w:90},{h:'비고'}], lmRows);
+  }
+  body.innerHTML = h;
+
+  /* 엑셀 */
+  var sh1 = [['사번','품번','품명','작업자','재질','총수량','BOX','스크랩(kg)','건수']];
+  sabuns.forEach(function(sb){
+    var g=bySabun[sb], prod=PRODUCTS[sb]||{partNo:'',partName:''};
+    sh1.push([sb, prod.partNo, prod.partName, Object.keys(g.workers).join(', '), Object.keys(g.mats).join(' · '), g.qty, g.box, Math.round(g.scrap*10)/10, g.cnt]);
+  });
+  var sh2 = [['재질','총수량','BOX','스크랩(kg)','건수','품목 수']];
+  mats.forEach(function(m){ var g=byMat[m]; sh2.push([m, g.qty, g.box, Math.round(g.scrap*10)/10, g.cnt, Object.keys(g.sabuns).length]); });
+  var sh3 = [['작업자','총수량','BOX','스크랩(kg)','건수']];
+  workers.forEach(function(w){ var g=byWorker[w]; sh3.push([w, g.qty, g.box, Math.round(g.scrap*10)/10, g.cnt]); });
+  var sh4 = [['일자','사번','품번','품명','재질','LOT','BOX','수량','스크랩(kg)','작업자','비고']];
+  rows.forEach(function(r){
+    var prod = PRODUCTS[r.worker_id]||{partNo:'',partName:''};
+    sh4.push([r.work_date, r.worker_id||'', prod.partNo, prod.partName, r.material_name||'', r.lot_no||'',
+      r.box_count||0, r.total_qty||0, r.scrap_weight||0, r.worker_name||'', r.note||'']);
+  });
+  lastXlsx = { name:'cutting', sheets:[ {n:'품목별요약',d:sh1}, {n:'재질별',d:sh2}, {n:'작업자별',d:sh3}, {n:'상세내역',d:sh4} ] };
+  if (lotMiss.length){
+    var shL = [['일자','사번','품번','품명','재질','BOX','수량','작업자','비고']];
+    lotMiss.forEach(function(r){ var p=PRODUCTS[r.worker_id]||{partNo:'',partName:''}; shL.push([r.work_date, r.worker_id||'', p.partNo, p.partName, r.material_name||'', r.box_count||0, r.total_qty||0, r.worker_name||'', r.note||'']); });
+    lastXlsx.sheets.push({ n:'LOT미입력', d:shL });
+  }
   if (rems.length){
     var sh5 = [['일자','작성자','내용']];
     rems.forEach(function(r){ sh5.push([r.d, r.by, r.t]); });
