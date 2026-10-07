@@ -1555,12 +1555,16 @@ async function renderMolding(rows){
     if (r.team) teams[r.team] = 1;
 
     /* 1) 호기별 */
-    if (!byEq[eq]) byEq[eq] = { prod:0, def:0, shot:0, cnt:0, avail:0, dt:0, dtRaw:0, shifts:0, faces:{}, fs:{}, teams:{}, sabuns:{}, mc:0, rows:[] };
+    if (!byEq[eq]) byEq[eq] = { prod:0, def:0, shot:0, cnt:0, avail:0, dt:0, dtRaw:0, shifts:0, faces:{}, fs:{}, sb:{}, sbOrd:[], teams:{}, sabuns:{}, mc:0, rows:[] };
     var E = byEq[eq];
     E.prod += p; E.def += d; E.shot += s; E.cnt++; E.rows.push(r);
     if (face) E.faces[face] = 1;
-    if (!E.fs[face]) E.fs[face] = { prod:0, def:0, shot:0, cnt:0, avail:0, dt:0 };
+    if (!E.fs[face]) E.fs[face] = { prod:0, def:0, shot:0, cnt:0, avail:0, dt:0, sb:{}, sbOrd:[] };
     E.fs[face].prod += p; E.fs[face].def += d; E.fs[face].shot += s; E.fs[face].cnt++;
+    [[E.fs[face].sb, E.fs[face].sbOrd], [E.sb, E.sbOrd]].forEach(function(t){
+      if (!t[0][sb]){ t[0][sb] = { prod:0, def:0, shot:0, cnt:0, cvs:{} }; t[1].push(sb); }
+      var X = t[0][sb]; X.prod += p; X.def += d; X.shot += s; X.cnt++; if (r.cavity) X.cvs[r.cavity] = 1;
+    });
     if (r.team) E.teams[r.team] = 1;
     E.sabuns[sb] = 1;
     /* 가동가능시간: 같은 제출(날짜·호기·근무·시각)은 면/사번 행이 여러 개여도 1회만 */
@@ -1685,8 +1689,35 @@ async function renderMolding(rows){
 
   /* 1. 호기별 실적·가동 */
   h += '<h2 class="sec">1. 호기별 실적 · 가동 현황 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 상세</span></h2>';
-  h += '<table class="rp"><tr><th style="width:78px">호기</th><th style="width:46px">반</th><th style="width:40px">근무<br>횟수</th><th style="width:76px">생산</th><th style="width:56px">불량</th><th style="width:50px">불량률</th><th style="width:66px">Shot</th>'
-    + '<th style="width:60px">가동가능<br>(h)</th><th style="width:56px">비가동<br>(h)</th><th style="width:60px">실생산<br>(h)</th><th style="width:56px">가동률</th><th style="width:44px">금형<br>교체</th><th style="width:40px">품목</th><th style="width:26px"></th></tr>';
+  h += '<table class="rp"><tr><th style="width:78px">호기</th><th style="width:150px">사번 · 품명</th><th style="width:40px">반</th><th style="width:40px">근무<br>횟수</th><th style="width:76px">생산</th><th style="width:56px">불량</th><th style="width:50px">불량률</th><th style="width:66px">Shot</th>'
+    + '<th style="width:60px">가동가능<br>(h)</th><th style="width:56px">비가동<br>(h)</th><th style="width:60px">실생산<br>(h)</th><th style="width:56px">가동률</th><th style="width:44px">금형<br>교체</th><th style="width:26px"></th></tr>';
+  /* 사번 셀: 사번(굵게) + 품명 + C/V, 금형교체로 투입된 사번은 🔄 */
+  var mcTarget = {};
+  mcs.forEach(function(m){ if (m.sabun) mcTarget[m.eq + '|' + m.sabun] = 1; });
+  var sbCell = function(eq, sb, X){
+    var pn = prodOf(sb).partName || '-';
+    return '<td class="left" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px" title="'+esc(sb+' '+pn)+'">'
+      + (mcTarget[eq+'|'+sb] ? '<span title="금형교체 후 투입">🔄</span>' : '')
+      + '<b>'+esc(sb)+'</b> <span style="color:#555">'+esc(pn)+'</span>'
+      + (X && Object.keys(X.cvs).length ? ' <span style="color:#999;font-size:10px">C/V '+esc(Object.keys(X.cvs).join('/'))+'</span>' : '')
+      + '</td>';
+  };
+  var multiCell = function(n){ return '<td class="left" style="font-size:11px;color:#888">'+n+'개 품목 ↓</td>'; };
+  /* 사번 하위 행: 생산·불량·Shot만 (시간 지표는 면/호기 단위) */
+  var sbRows = function(eq, map, ord, indent){
+    var out = '';
+    ord.forEach(function(sb){
+      var X = map[sb];
+      out += '<tr style="font-size:11px;color:#444">'
+        + '<td style="text-align:right;color:#aaa">'+indent+'</td>' + sbCell(eq, sb, X) + '<td></td><td></td>'
+        + '<td class="right">'+num(X.prod)+'</td>'
+        + '<td class="right" style="color:'+(X.def>0?'#dc2626':'#999')+'">'+num(X.def)+'</td>'
+        + '<td>'+mdPct(X.def, X.prod+X.def)+'</td>'
+        + '<td class="right">'+num(X.shot)+'</td>'
+        + '<td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+    });
+    return out;
+  };
   eqs.forEach(function(k, i){
     var E = byEq[k], dt = Math.min(E.dt, E.avail), run = E.avail - dt, rate = mdPct(run, E.avail);
     var rc = mdRateColor(rate);
@@ -1694,6 +1725,7 @@ async function renderMolding(rows){
     var fsum = fc > 1 ? '<div style="font-size:9.5px;color:#999">'+fc+'면 합</div>' : '';
     h += '<tr class="grp-row" onclick="toggleDet(\'mde'+i+'\')">'
       + '<td style="font-weight:700">'+esc(k)+(fc>1?'<div style="font-size:10px;color:#888;font-weight:400">'+fc+'면</div>':'')+'</td>'
+      + (fc > 1 ? '<td class="left" style="font-size:11px;color:#888">면별 ↓</td>' : (E.sbOrd.length === 1 ? sbCell(k, E.sbOrd[0], E.sb[E.sbOrd[0]]) : multiCell(E.sbOrd.length)))
       + '<td style="font-size:11px">'+esc(Object.keys(E.teams).sort().join(',')||'-')+'</td>'
       + '<td>'+num(E.shifts)+'</td>'
       + '<td class="right" style="font-weight:700">'+num(E.prod)+'</td>'
@@ -1705,14 +1737,17 @@ async function renderMolding(rows){
       + '<td>'+(E.avail?mdHr(run)+fsum:'-')+'</td>'
       + '<td style="font-weight:700;color:'+rc+'">'+rate+(rate!=='-'?'%':'')+'</td>'
       + '<td style="color:'+(E.mc?'#d97706':'#999')+'">'+num(E.mc)+'</td>'
-      + '<td>'+num(Object.keys(E.sabuns).length)+'</td>'
       + '<td class="arrow" id="ar-mde'+i+'">▼</td></tr>';
+    /* 단면 설비에 여러 사번(금형교체·기간 조회) → 사번 행 */
+    if (fc <= 1 && E.sbOrd.length > 1) h += sbRows(k, E.sb, E.sbOrd, '·');
     /* 다면 설비: 면별 행(항상 표시) — 각 면을 독립 생산 단위로 집계 */
     if (fc > 1){
       Object.keys(E.fs).sort(function(a,b){ return mdFaceRank(a) - mdFaceRank(b); }).forEach(function(f){
         var F = E.fs[f], frun = F.avail - F.dt, frate = mdPct(frun, F.avail);
         h += '<tr style="background:#fafbfd;font-size:11px">'
-          + '<td style="text-align:right;color:#666">└ '+esc(f||'(면없음)')+'</td><td></td><td></td>'
+          + '<td style="text-align:right;color:#666">└ '+esc(f||'(면없음)')+'</td>'
+          + (F.sbOrd.length === 1 ? sbCell(k, F.sbOrd[0], F.sb[F.sbOrd[0]]) : multiCell(F.sbOrd.length))
+          + '<td></td><td></td>'
           + '<td class="right">'+num(F.prod)+'</td>'
           + '<td class="right" style="color:'+(F.def>0?'#dc2626':'#999')+'">'+num(F.def)+'</td>'
           + '<td>'+mdPct(F.def, F.prod+F.def)+'</td>'
@@ -1721,7 +1756,8 @@ async function renderMolding(rows){
           + '<td style="color:'+(F.dt>0?'#e67e22':'#999')+'">'+mdHr(F.dt)+'</td>'
           + '<td>'+(F.avail?mdHr(frun):'-')+'</td>'
           + '<td style="font-weight:600;color:'+mdRateColor(frate)+'">'+frate+(frate!=='-'?'%':'')+'</td>'
-          + '<td></td><td></td><td></td></tr>';
+          + '<td></td><td></td></tr>';
+        if (F.sbOrd.length > 1) h += sbRows(k, F.sb, F.sbOrd, '·');
       });
     }
     h += '<tr class="det-row" id="det-mde'+i+'"><td colspan="14">'
@@ -1736,10 +1772,10 @@ async function renderMolding(rows){
     });
     h += '</table></td></tr>';
   });
-  h += '<tr style="background:#f7f8fb;font-weight:700"><td colspan="3">합계</td><td class="right">'+num(totProd)+'</td><td class="right">'+num(totDef)+'</td><td>'+defRate+'</td><td class="right">'+num(totShot)+'</td>'
-    + '<td>'+mdHr(totAvail)+'</td><td>'+mdHr(totDt)+'</td><td>'+mdHr(totAvail-totDt)+'</td><td>'+totRate+(totRate!=='-'?'%':'')+'</td><td>'+num(mcs.length)+'</td><td>'+num(sabuns.length)+'</td><td></td></tr>';
+  h += '<tr style="background:#f7f8fb;font-weight:700"><td colspan="4">합계</td><td class="right">'+num(totProd)+'</td><td class="right">'+num(totDef)+'</td><td>'+defRate+'</td><td class="right">'+num(totShot)+'</td>'
+    + '<td>'+mdHr(totAvail)+'</td><td>'+mdHr(totDt)+'</td><td>'+mdHr(totAvail-totDt)+'</td><td>'+totRate+(totRate!=='-'?'%':'')+'</td><td>'+num(mcs.length)+'</td><td></td></tr>';
   h += '</table>';
-  h += '<div style="font-size:10.5px;color:#888;margin:4px 0 0">※ 가동가능 = 근무시간 − 식사(12:00~13:00, 17:00~17:30) · 가동률 = 실생산 ÷ 가동가능 · 다면 설비는 면마다 독립 집계(면 지정 비가동 → 해당 면만, "전체" 비가동 → 가동한 모든 면에 각각) 후 호기 행에 합산 · 생산 = 양품(C/V×Shot−불량), 불량률 = 불량 ÷ (생산+불량)</div>';
+  h += '<div style="font-size:10.5px;color:#888;margin:4px 0 0">※ 가동가능 = 근무시간 − 식사(12:00~13:00, 17:00~17:30) · 가동률 = 실생산 ÷ 가동가능 · 다면 설비는 면마다 독립 집계(면 지정 비가동 → 해당 면만, "전체" 비가동 → 가동한 모든 면에 각각) 후 호기 행에 합산 · 🔄 = 금형교체 후 투입 사번 · 사번 행은 교체 전→후(입력) 순서 · 생산 = 양품(C/V×Shot−불량), 불량률 = 불량 ÷ (생산+불량)</div>';
 
   /* 2. 품목별 */
   h += '<h2 class="sec">2. 품목(사번)별 성형 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 상세</span></h2>';
@@ -1822,16 +1858,24 @@ async function renderMolding(rows){
 
   /* 엑셀 */
   var r1 = function(v){ return Math.round((v||0)*10)/10; };
-  var shE = [['호기','면','반','근무횟수','생산','불량','불량률(%)','Shot','가동가능(분)','비가동(분)','실생산(분)','가동률(%)','금형교체','품목수','비가동 기록합(분)']];
+  var shE = [['호기','면','사번','품명','C/V','반','근무횟수','생산','불량','불량률(%)','Shot','가동가능(분)','비가동(분)','실생산(분)','가동률(%)','금형교체','비가동 기록합(분)']];
+  var xSb = function(k, f, map, ord){
+    ord.forEach(function(sb){ var X = map[sb];
+      shE.push([k, f, sb, prodOf(sb).partName, Object.keys(X.cvs).join('/'), '', '', X.prod, X.def, mdPct(X.def,X.prod+X.def), X.shot, '', '', '', '', mcTarget[k+'|'+sb]?'교체후투입':'', '']); });
+  };
   eqs.forEach(function(k){
     var E = byEq[k], dt = Math.min(E.dt, E.avail), fc = Object.keys(E.faces).length;
-    shE.push([k, fc>1?fc+'면 합':'', Object.keys(E.teams).sort().join(','), E.shifts, E.prod, E.def, mdPct(E.def,E.prod+E.def), E.shot, E.avail, r1(dt), r1(E.avail-dt), mdPct(E.avail-dt,E.avail), E.mc, Object.keys(E.sabuns).length, E.dtRaw]);
+    var one = fc <= 1 && E.sbOrd.length === 1 ? E.sbOrd[0] : '';
+    shE.push([k, fc>1?fc+'면 합':'', one || (fc>1?'':E.sbOrd.length+'개 품목'), one ? prodOf(one).partName : '', one ? Object.keys(E.sb[one].cvs).join('/') : '',
+      Object.keys(E.teams).sort().join(','), E.shifts, E.prod, E.def, mdPct(E.def,E.prod+E.def), E.shot, E.avail, r1(dt), r1(E.avail-dt), mdPct(E.avail-dt,E.avail), E.mc, E.dtRaw]);
     if (fc > 1){
       Object.keys(E.fs).sort(function(a,b){ return mdFaceRank(a) - mdFaceRank(b); }).forEach(function(f){
-        var F = E.fs[f];
-        shE.push([k, f, '', '', F.prod, F.def, mdPct(F.def,F.prod+F.def), F.shot, F.avail, F.dt, F.avail-F.dt, mdPct(F.avail-F.dt,F.avail), '', '', '']);
+        var F = E.fs[f], o1 = F.sbOrd.length === 1 ? F.sbOrd[0] : '';
+        shE.push([k, f, o1 || F.sbOrd.length+'개 품목', o1 ? prodOf(o1).partName : '', o1 ? Object.keys(F.sb[o1].cvs).join('/') : '',
+          '', '', F.prod, F.def, mdPct(F.def,F.prod+F.def), F.shot, F.avail, F.dt, F.avail-F.dt, mdPct(F.avail-F.dt,F.avail), '', '']);
+        if (F.sbOrd.length > 1) xSb(k, f, F.sb, F.sbOrd);
       });
-    }
+    } else if (E.sbOrd.length > 1) xSb(k, '', E.sb, E.sbOrd);
   });
   var shP = [['사번','품번','품명','호기(면)','C/V','Shot','생산','불량','불량률(%)','건수']];
   sabuns.forEach(function(sb){ var P=bySabun[sb], pr=prodOf(sb); shP.push([sb, pr.partNo, pr.partName, Object.keys(P.eqs).sort(mdEqCmp).join(', '), Object.keys(P.cvs).join('/'), P.shot, P.prod, P.def, mdPct(P.def,P.prod+P.def), P.cnt]); });
