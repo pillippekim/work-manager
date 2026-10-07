@@ -969,6 +969,12 @@
         // ── 작업 목록 구성 (요청 폭주 방지를 위해 소분 실행) ──
         var tasks = [];           // {kind:'item'|'slot'|'move', run:fn}
         var slotPlanCount = 0;    // 차감 예정 슬롯 수
+        // ── 슬롯 UPDATE 통합 (2026-10-07 경합 수정) ──
+        // 같은 슬롯이 여러 출하 항목에 매칭되면 UPDATE가 여러 발 나가고, 병렬 실행 시 도착 순서가
+        // 꼬여 중간 계산값이 최종값을 덮어쓰는 사고가 있었음(9/3 6동-417호: 0으로 비운 뒤 1,000이 덮어씀).
+        // 매칭 단계가 항목 순서대로 잔량을 누적 차감하므로 슬롯마다 "마지막 계산값" 1발만 보내면
+        // 순차 실행과 동일한 결과 + 경합 원천 차단. (한 사번의 여러 슬롯 분산 차감은 기존과 동일하게 슬롯별 실행)
+        var slotFinal = {};       // slot_id → { ud: 최종 UPDATE 내용, label: 표시용 }
         for (var i = 0; i < matchResults.length; i++) {
           (function(mr) {
             var row = mr.row;
@@ -987,11 +993,8 @@
                 var ud = { quantity: ms.after_qty };
                 if (ms.after_qty <= 0) { ud.quantity = 0; ud.status = 'empty'; ud.emptied_at = new Date().toISOString(); }
                 if (isLast && mr.remain_qty > 0) { ud.shortage_qty = mr.remain_qty; }
-                slotPlanCount++;
-                tasks.push({ kind: 'slot', label: ms.rack_name + '-' + ms.slot_code, run: function() {
-                  // .select('id')로 실제 반영된 행을 응답에 포함 → 0건 반영을 성공으로 오인하지 않음
-                  return supabase.from('inventory_rack_slots').update(ud).eq('id', ms.slot_id).select('id');
-                }});
+                // 같은 슬롯의 이전 계획을 덮어씀 → 마지막 계산값만 남음 (추적용 이동 이력은 아래에서 항목별로 기록)
+                slotFinal[ms.slot_id] = { ud: ud, label: ms.rack_name + '-' + ms.slot_code };
                 tasks.push({ kind: 'move', label: ms.rack_name + '-' + ms.slot_code, run: function() {
                   return supabase.from('inventory_movements').insert({
                     product_code: row.product_code, movement_type: 'outbound',
@@ -1003,6 +1006,16 @@
             }
           })(matchResults[i]);
         }
+
+        // 슬롯당 최종 UPDATE 1건만 실행 목록에 추가 (경합 불가능)
+        Object.keys(slotFinal).forEach(function(sid) {
+          var sf = slotFinal[sid];
+          slotPlanCount++;
+          tasks.push({ kind: 'slot', label: sf.label, run: function() {
+            // .select('id')로 실제 반영된 행을 응답에 포함 → 0건 반영을 성공으로 오인하지 않음
+            return supabase.from('inventory_rack_slots').update(sf.ud).eq('id', sid).select('id');
+          }});
+        });
 
         // ── 40건씩 소분 실행 (대량 동시요청 유실 방지) ──
         var BATCH = 40, done = 0, errList = [], slotApplied = 0;
