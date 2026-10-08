@@ -78,7 +78,7 @@ table.det td.left { text-align:left; }
 
 @media print {
   body { background:#fff; }
-  .top-header, .sidebar, .page-header, .rp-controls, .proc-tabs { display:none !important; }
+  .top-header, .sidebar, .page-header, .rp-controls, .proc-tabs, .no-print { display:none !important; }
   .main { margin:0 !important; padding:0 !important; }
   .paper { box-shadow:none; margin:0; max-width:100%; padding:10mm 12mm; border-radius:0; }
   .sign-box { top:6mm; right:8mm; }
@@ -151,8 +151,10 @@ var myInfo = null;
 
 /* ── 공정 탭 정의 (공정 흐름 순서 / impl=true 만 구현됨) ── */
 var PROCS = [
-  { k:'cmb',       label:'배합',   grp:'전공정', table:'cmb_reports',       impl:false, na:'현재 미사용 공정입니다.' },
-  { k:'cutting',   label:'재단',   grp:'전공정', table:'cutting_reports',   impl:true  },
+  /* 전공정 3종은 MES 업로드 원자료(mes_*_raw) 기준 — mes:true → fetchMesRows 사용. 재단은 현장일지(cutting_reports) 보조 보기 지원 */
+  { k:'weighing',  label:'평량',   grp:'전공정(MES)', table:'mes_weighing_raw', impl:true, mes:true },
+  { k:'mixing',    label:'혼련',   grp:'전공정(MES)', table:'mes_mixing_raw',   impl:true, mes:true },
+  { k:'cutting',   label:'재단',   grp:'전공정(MES)', table:'mes_cutting_raw',  impl:true, mes:true, alt:'cutting_reports' },
   { k:'molding',   label:'성형',   grp:'성형',   table:'molding_reports',   impl:true  },
   { k:'postcure',  label:'2차가류', grp:'후공정', table:'postcure_reports',  impl:true  },
   { k:'shot',      label:'쇼트',   grp:'후공정', table:'shot_reports',      impl:true  },
@@ -267,14 +269,15 @@ async function loadReport(force){
     return;
   }
 
-  var key = curProc + '|' + s + '|' + e;
+  var useAlt = (curProc === 'cutting' && cutSrc === 'field');
+  var key = curProc + (useAlt ? '@field' : '') + '|' + s + '|' + e;
   var rows;
   if (!force && dataCache[key]){
     rows = dataCache[key];
   } else {
     body.innerHTML = '<div class="empty-msg">데이터를 불러오는 중...</div>';
     try {
-      rows = await fetchAllRows(p.table, s, e);
+      rows = useAlt ? await fetchAllRows(p.alt, s, e) : (p.mes ? await fetchMesRows(p.table, s, e) : await fetchAllRows(p.table, s, e));
       dataCache[key] = rows;
     } catch(err){
       body.innerHTML = '<div class="empty-msg">조회 실패: '+ esc(err.message||err) +'</div>';
@@ -288,7 +291,9 @@ async function loadReport(force){
   else if (curProc === 'sasang') await renderSasang(rows);
   else if (curProc === 'postcure') await renderPostcure(rows);
   else if (curProc === 'shot') await renderShot(rows);
-  else if (curProc === 'cutting') await renderCutting(rows);
+  else if (curProc === 'cutting') await (useAlt ? renderCutting(rows) : renderMesCutting(rows));
+  else if (curProc === 'mixing') await renderMesMixing(rows);
+  else if (curProc === 'weighing') await renderMesWeighing(rows);
   else if (curProc === 'molding') await renderMolding(rows);
 }
 
@@ -1374,7 +1379,7 @@ async function renderCoating(rows){
 /* 컬럼: worker_id=사번(제품코드, #20 함정) · material_name · box_count · total_qty · scrap_weight(kg) · lot_no(단일) · note · remarks */
 async function renderCutting(rows){
   var body = document.getElementById('rpBody');
-  if (!rows.length){ body.innerHTML = '<div class="empty-msg">해당 기간에 제출된 재단 작업일지가 없습니다.</div>'; return; }
+  if (!rows.length){ body.innerHTML = cutSrcBar() + '<div class="empty-msg">해당 기간에 제출된 재단 작업일지가 없습니다.</div>'; return; }
   await loadProducts();
   var kg = function(v){ return (Math.round((v||0)*10)/10).toLocaleString('ko-KR'); };
 
@@ -1400,7 +1405,7 @@ async function renderCutting(rows){
   var workers = Object.keys(byWorker).sort(function(a,b){ return byWorker[b].qty - byWorker[a].qty; });
   var lotMiss = rows.filter(function(r){ return lotMissingOne(r.lot_no); });
 
-  var h = '';
+  var h = cutSrcBar();
   h += '<div class="sum-grid">'
     + '<div class="sum-card"><div class="n">'+num(totalQty)+'</div><div class="l">총 재단수량</div></div>'
     + '<div class="sum-card"><div class="n">'+num(totalBox)+'</div><div class="l">총 BOX</div></div>'
@@ -1514,6 +1519,372 @@ async function renderCutting(rows){
     rems.forEach(function(r){ sh5.push([r.d, r.by, r.t]); });
     lastXlsx.sheets.push({ n:'특이사항', d:sh5 });
   }
+}
+
+/* ════════════════════ MES 공통 (재단·혼련·평량 — mes_*_raw) ════════════════════ */
+/* MES 원자료: deleted_at·created_at 없음 → 전용 조회. product_code = 사번(제품코드). 같은 날짜 재업로드 시 통째로 교체됨(mes_data.html). */
+async function fetchMesRows(table, s, e){
+  var all=[], from=0, step=1000;
+  while (true){
+    var res = await db.from(table).select('*')
+      .gte('work_date', s).lte('work_date', e)
+      .order('work_date', {ascending:true})
+      .order('id', {ascending:true})
+      .range(from, from+step-1);
+    if (res.error) throw res.error;
+    all = all.concat(res.data||[]);
+    if (!res.data || res.data.length < step) break;
+    from += step;
+  }
+  return all;
+}
+var cutSrc = 'mes';   /* 재단 탭 자료원: 'mes'(기본) | 'field'(현장 작업일지, 10월 이전 자료용) */
+function setCutSrc(v){ cutSrc = v; loadReport(false); }
+function cutSrcBar(){
+  var b = function(v, t){ var on = cutSrc===v; return '<button type="button" onclick="setCutSrc(\''+v+'\')" style="font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid '+(on?'#243bb2':'#cfd5e3')+';background:'+(on?'#243bb2':'#fff')+';color:'+(on?'#fff':'#555')+';cursor:pointer;font-weight:'+(on?'700':'400')+'">'+t+'</button>'; };
+  return '<div class="no-print" style="display:flex;gap:6px;align-items:center;margin:-4px 0 10px;font-size:11px;color:#888">자료원: '+b('mes','MES 재단일보')+b('field','현장 작업일지(구)')+'<span style="margin-left:4px">'+(cutSrc==='mes'?'— MES 자료 페이지에서 업로드한 재단일보 기준':'— 태블릿 현장 입력분 기준 (2026-10 이전 자료)')+'</span></div>';
+}
+function mesNum(v){ var n = parseFloat(v); return isNaN(n) ? 0 : n; }
+function mesFix(v, d){ var n = mesNum(v); return n.toLocaleString('ko-KR', {minimumFractionDigits:d, maximumFractionDigits:d}); }
+function mesKg(v){ return mesFix(v, 1); }
+function mesAvg(sum, cnt, d){ return cnt > 0 ? mesFix(sum/cnt, d) : '-'; }
+function mesProd(code){ return PRODUCTS[code] || { partNo:'-', partName:'-' }; }
+function mesCmp(a, b){ return String(a).localeCompare(String(b), 'ko', {numeric:true}); }
+function mesDateSort(list, key2){
+  return list.slice().sort(function(a,b){ if (a.work_date !== b.work_date) return a.work_date < b.work_date ? -1 : 1; return key2 ? mesCmp(a[key2]||'', b[key2]||'') : 0; });
+}
+
+/* ════════════════════ 재단 (MES: mes_cutting_raw) ════════════════════ */
+/* 컬럼: machine(호기) · batch_no · product_code · material · length_mm · thickness · weight_spec(g/EA) · q_first/q_mid/q_last(g) · box_count · total_qty(EA) · total_weight(kg) · scrap(g) · label_id · worker */
+async function renderMesCutting(rows){
+  var body = document.getElementById('rpBody');
+  if (!rows.length){ body.innerHTML = cutSrcBar() + '<div class="empty-msg">해당 기간에 업로드된 MES 재단일보가 없습니다. (MES 자료 페이지에서 업로드)</div>'; return; }
+  await loadProducts();
+  var byMach = {}, byProd = {}, byMat = {}, byWorker = {}, T = { qty:0, box:0, wt:0, scrap:0 };
+  rows.forEach(function(r){
+    var q = mesNum(r.total_qty), b = mesNum(r.box_count), w = mesNum(r.total_weight), sc = mesNum(r.scrap);
+    T.qty += q; T.box += b; T.wt += w; T.scrap += sc;
+    var m = r.machine || '(호기미지정)', p = r.product_code || '(사번없음)', mt = r.material || '(재질미지정)', wk = r.worker || '(미지정)';
+    if (!byMach[m]) byMach[m] = { qty:0, box:0, wt:0, scrap:0, cnt:0, prods:{}, workers:{}, rows:[] };
+    var M = byMach[m]; M.qty += q; M.box += b; M.wt += w; M.scrap += sc; M.cnt++; M.prods[p] = 1; M.workers[wk] = 1; M.rows.push(r);
+    if (!byProd[p]) byProd[p] = { qty:0, box:0, wt:0, scrap:0, cnt:0, machs:{}, mats:{}, specs:{}, workers:{}, rows:[] };
+    var P = byProd[p]; P.qty += q; P.box += b; P.wt += w; P.scrap += sc; P.cnt++; P.machs[m] = 1; P.mats[mt] = 1; P.workers[wk] = 1; P.rows.push(r);
+    var spec = [r.length_mm, r.thickness, r.weight_spec].map(function(v){ return v==null||v===''?'-':v; }).join('×');
+    P.specs[spec] = 1;
+    if (!byMat[mt]) byMat[mt] = { qty:0, box:0, wt:0, scrap:0, cnt:0, prods:{} };
+    byMat[mt].qty += q; byMat[mt].box += b; byMat[mt].wt += w; byMat[mt].scrap += sc; byMat[mt].cnt++; byMat[mt].prods[p] = 1;
+    if (!byWorker[wk]) byWorker[wk] = { qty:0, box:0, wt:0, scrap:0, cnt:0, days:{} };
+    byWorker[wk].qty += q; byWorker[wk].box += b; byWorker[wk].wt += w; byWorker[wk].scrap += sc; byWorker[wk].cnt++; byWorker[wk].days[r.work_date] = 1;
+  });
+  var machs = Object.keys(byMach).sort(mesCmp);
+  var prods = Object.keys(byProd).sort(function(a,b){ return byProd[b].qty - byProd[a].qty; });
+  var mats = Object.keys(byMat).sort(function(a,b){ return byMat[b].qty - byMat[a].qty; });
+  var workers = Object.keys(byWorker).sort(function(a,b){ return byWorker[b].qty - byWorker[a].qty; });
+  var scrapRate = T.wt > 0 ? mesFix(T.scrap/1000/(T.wt + T.scrap/1000)*100, 1) : '-';
+  var g = function(v){ return v==null||v===''?'-':mesFix(v, 1); };
+  /* 초/중/종 중량의 기준 대비 최대 편차(%) */
+  var devOf = function(r){
+    var sp = mesNum(r.weight_spec); if (!sp) return null;
+    var mx = 0; [r.q_first, r.q_mid, r.q_last].forEach(function(v){ if (v!=null && v!=='') mx = Math.max(mx, Math.abs(mesNum(v)-sp)/sp*100); });
+    return mx;
+  };
+  var devCell = function(r){ var d = devOf(r); if (d==null) return '<td>-</td>'; return '<td style="color:'+(d>=5?'#dc2626':(d>=3?'#d97706':'#666'))+'">'+mesFix(d,1)+'%</td>'; };
+
+  var h = cutSrcBar();
+  h += '<div class="sum-grid" style="grid-template-columns:repeat(6,1fr)">'
+    + '<div class="sum-card"><div class="n">'+num(T.qty)+'</div><div class="l">총 재단수량(EA)</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(T.box)+'</div><div class="l">총 BOX</div></div>'
+    + '<div class="sum-card"><div class="n">'+mesKg(T.wt)+'</div><div class="l">총중량(kg)</div></div>'
+    + '<div class="sum-card"><div class="n" style="color:'+(T.scrap>0?'#d97706':'#222')+'">'+mesKg(T.scrap/1000)+'</div><div class="l">자투리(kg) · '+scrapRate+'%</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(prods.length)+'</div><div class="l">품목(사번) 수</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(workers.length)+'</div><div class="l">작업자 · 호기 '+machs.length+'</div></div>'
+    + '</div>';
+
+  /* 1. 호기별 */
+  h += '<h2 class="sec">1. 호기별 재단 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 상세</span></h2>';
+  h += '<table class="rp"><tr><th style="width:130px">호기</th><th style="width:120px">작업자</th><th style="width:84px">재단수량</th><th style="width:60px">BOX</th><th style="width:84px">총중량(kg)</th><th style="width:84px">자투리(kg)</th><th style="width:50px">건수</th><th style="width:50px">품목</th><th style="width:26px"></th></tr>';
+  machs.forEach(function(m, i){
+    var M = byMach[m];
+    h += '<tr class="grp-row" onclick="toggleDet(\'xc'+i+'\')"><td class="left" style="font-weight:700">'+esc(m)+'</td><td style="font-size:11px">'+esc(Object.keys(M.workers).join(', '))+'</td>'
+      + '<td class="right" style="font-weight:700">'+num(M.qty)+'</td><td>'+num(M.box)+'</td><td class="right">'+mesKg(M.wt)+'</td>'
+      + '<td class="right" style="color:'+(M.scrap>0?'#d97706':'#999')+'">'+mesKg(M.scrap/1000)+'</td><td>'+num(M.cnt)+'</td><td>'+num(Object.keys(M.prods).length)+'</td><td class="arrow" id="ar-xc'+i+'">▼</td></tr>';
+    h += '<tr class="det-row" id="det-xc'+i+'"><td colspan="9"><table class="det"><tr><th style="width:78px">일자</th><th style="width:90px">Batch</th><th style="width:64px">사번</th><th>품명</th><th style="width:96px">재질</th><th style="width:88px">기장×두께×중량</th><th style="width:46px">BOX</th><th style="width:60px">수량</th><th style="width:66px">총중량</th><th style="width:60px">자투리(g)</th><th style="width:90px">LabelID</th><th style="width:60px">작업자</th></tr>';
+    mesDateSort(M.rows, 'batch_no').forEach(function(r){
+      h += '<tr><td>'+esc(r.work_date)+'</td><td style="font-size:10px">'+esc(r.batch_no||'-')+'</td><td>'+esc(r.product_code||'-')+'</td><td class="left">'+esc(mesProd(r.product_code).partName)+'</td><td class="left" style="font-size:10px">'+esc(r.material||'-')+'</td>'
+        + '<td style="font-size:10px">'+esc([r.length_mm, r.thickness, r.weight_spec].map(function(v){ return v==null||v===''?'-':v; }).join('×'))+'</td>'
+        + '<td>'+num(r.box_count)+'</td><td class="right">'+num(r.total_qty)+'</td><td class="right">'+mesKg(r.total_weight)+'</td><td class="right">'+num(r.scrap)+'</td><td style="font-size:10px">'+esc(r.label_id||'-')+'</td><td>'+esc(r.worker||'-')+'</td></tr>';
+    });
+    h += '</table></td></tr>';
+  });
+  h += '</table>';
+
+  /* 2. 품목별 */
+  h += '<h2 class="sec">2. 품목(사번)별 재단 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 상세(초/중/종 중량 편차 포함)</span></h2>';
+  h += '<table class="rp"><tr><th style="width:70px">사번</th><th style="width:104px">품번</th><th>품명</th><th style="width:110px">재질</th><th style="width:96px">기장×두께×중량</th><th style="width:110px">호기</th><th style="width:78px">재단수량</th><th style="width:52px">BOX</th><th style="width:76px">총중량(kg)</th><th style="width:72px">자투리(kg)</th><th style="width:44px">건수</th><th style="width:26px"></th></tr>';
+  prods.forEach(function(p, i){
+    var P = byProd[p], pr = mesProd(p);
+    h += '<tr class="grp-row" onclick="toggleDet(\'xp'+i+'\')"><td>'+esc(p)+'</td><td>'+esc(pr.partNo)+'</td><td class="left">'+esc(pr.partName)+'</td>'
+      + '<td class="left" style="font-size:11px">'+esc(Object.keys(P.mats).join(' · '))+'</td><td style="font-size:10px">'+esc(Object.keys(P.specs).join(' / '))+'</td>'
+      + '<td style="font-size:11px">'+esc(Object.keys(P.machs).sort(mesCmp).map(function(x){ return x.replace(/\(.*?\)/g,''); }).join(', '))+'</td>'
+      + '<td class="right" style="font-weight:700">'+num(P.qty)+'</td><td>'+num(P.box)+'</td><td class="right">'+mesKg(P.wt)+'</td>'
+      + '<td class="right" style="color:'+(P.scrap>0?'#d97706':'#999')+'">'+mesKg(P.scrap/1000)+'</td><td>'+num(P.cnt)+'</td><td class="arrow" id="ar-xp'+i+'">▼</td></tr>';
+    h += '<tr class="det-row" id="det-xp'+i+'"><td colspan="12"><table class="det"><tr><th style="width:78px">일자</th><th style="width:110px">호기</th><th style="width:90px">Batch</th><th style="width:56px">기준중량</th><th style="width:52px">초품</th><th style="width:52px">중품</th><th style="width:52px">종품</th><th style="width:60px">최대편차</th><th style="width:46px">BOX</th><th style="width:60px">수량</th><th style="width:66px">총중량</th><th style="width:60px">자투리(g)</th><th style="width:90px">LabelID</th><th>작업자</th></tr>';
+    mesDateSort(P.rows, 'machine').forEach(function(r){
+      h += '<tr><td>'+esc(r.work_date)+'</td><td class="left" style="font-size:10px">'+esc(r.machine||'-')+'</td><td style="font-size:10px">'+esc(r.batch_no||'-')+'</td>'
+        + '<td>'+g(r.weight_spec)+'</td><td>'+g(r.q_first)+'</td><td>'+g(r.q_mid)+'</td><td>'+g(r.q_last)+'</td>'+devCell(r)
+        + '<td>'+num(r.box_count)+'</td><td class="right">'+num(r.total_qty)+'</td><td class="right">'+mesKg(r.total_weight)+'</td><td class="right">'+num(r.scrap)+'</td><td style="font-size:10px">'+esc(r.label_id||'-')+'</td><td>'+esc(r.worker||'-')+'</td></tr>';
+    });
+    h += '</table></td></tr>';
+  });
+  h += '</table>';
+  h += '<div style="font-size:10.5px;color:#888;margin:4px 0 0">※ 최대편차 = 초·중·종품 중량 중 기준중량과 가장 멀리 떨어진 값의 비율 (3% 이상 주황, 5% 이상 빨강 — 참고용) · 자투리 원자료 단위 g, 카드·요약은 kg 환산</div>';
+
+  /* 3. 재질별 */
+  h += '<h2 class="sec">3. 재질별 실적</h2>';
+  h += '<table class="rp" style="max-width:760px"><tr><th>재질</th><th style="width:86px">재단수량</th><th style="width:60px">BOX</th><th style="width:84px">총중량(kg)</th><th style="width:84px">자투리(kg)</th><th style="width:56px">건수</th><th style="width:60px">품목 수</th></tr>';
+  mats.forEach(function(m){ var X = byMat[m];
+    h += '<tr><td class="left">'+esc(m)+'</td><td class="right">'+num(X.qty)+'</td><td>'+num(X.box)+'</td><td class="right">'+mesKg(X.wt)+'</td><td class="right" style="color:'+(X.scrap>0?'#d97706':'#999')+'">'+mesKg(X.scrap/1000)+'</td><td>'+num(X.cnt)+'</td><td>'+num(Object.keys(X.prods).length)+'</td></tr>'; });
+  h += '</table>';
+
+  /* 4. 작업자별 */
+  h += '<h2 class="sec">4. 작업자별 실적</h2>';
+  h += '<table class="rp" style="max-width:640px"><tr><th>작업자</th><th style="width:60px">근무일</th><th style="width:86px">재단수량</th><th style="width:60px">BOX</th><th style="width:84px">총중량(kg)</th><th style="width:84px">자투리(kg)</th><th style="width:56px">건수</th></tr>';
+  workers.forEach(function(w){ var X = byWorker[w];
+    h += '<tr><td>'+esc(w)+'</td><td>'+num(Object.keys(X.days).length)+'</td><td class="right">'+num(X.qty)+'</td><td>'+num(X.box)+'</td><td class="right">'+mesKg(X.wt)+'</td><td class="right">'+mesKg(X.scrap/1000)+'</td><td>'+num(X.cnt)+'</td></tr>'; });
+  h += '</table>';
+  body.innerHTML = h;
+
+  /* 엑셀 */
+  var r1 = function(v){ return Math.round(mesNum(v)*10)/10; };
+  var s1 = [['호기','작업자','재단수량','BOX','총중량(kg)','자투리(kg)','건수','품목수']];
+  machs.forEach(function(m){ var M = byMach[m]; s1.push([m, Object.keys(M.workers).join(', '), M.qty, M.box, r1(M.wt), r1(M.scrap/1000), M.cnt, Object.keys(M.prods).length]); });
+  var s2 = [['사번','품번','품명','재질','기장×두께×중량','호기','재단수량','BOX','총중량(kg)','자투리(kg)','건수']];
+  prods.forEach(function(p){ var P = byProd[p], pr = mesProd(p); s2.push([p, pr.partNo, pr.partName, Object.keys(P.mats).join(' · '), Object.keys(P.specs).join(' / '), Object.keys(P.machs).sort(mesCmp).join(', '), P.qty, P.box, r1(P.wt), r1(P.scrap/1000), P.cnt]); });
+  var s3 = [['재질','재단수량','BOX','총중량(kg)','자투리(kg)','건수','품목수']];
+  mats.forEach(function(m){ var X = byMat[m]; s3.push([m, X.qty, X.box, r1(X.wt), r1(X.scrap/1000), X.cnt, Object.keys(X.prods).length]); });
+  var s4 = [['작업자','근무일','재단수량','BOX','총중량(kg)','자투리(kg)','건수']];
+  workers.forEach(function(w){ var X = byWorker[w]; s4.push([w, Object.keys(X.days).length, X.qty, X.box, r1(X.wt), r1(X.scrap/1000), X.cnt]); });
+  var s5 = [['일자','호기','Batch','사번','품번','품명','재질','기장','두께','기준중량','초품','중품','종품','최대편차(%)','BOX','총수량','총중량(kg)','자투리(g)','LabelID','작업자']];
+  mesDateSort(rows, 'machine').forEach(function(r){ var pr = mesProd(r.product_code), d = devOf(r);
+    s5.push([r.work_date, r.machine||'', r.batch_no||'', r.product_code||'', pr.partNo==='-'?'':pr.partNo, pr.partName==='-'?'':pr.partName, r.material||'', r.length_mm, r.thickness, r.weight_spec, r.q_first, r.q_mid, r.q_last, d==null?'':r1(d), mesNum(r.box_count), mesNum(r.total_qty), mesNum(r.total_weight), mesNum(r.scrap), r.label_id||'', r.worker||'']); });
+  lastXlsx = { name:'cutting_mes', sheets:[ {n:'호기별',d:s1}, {n:'품목별',d:s2}, {n:'재질별',d:s3}, {n:'작업자별',d:s4}, {n:'상세내역',d:s5} ] };
+}
+
+/* ════════════════════ 혼련 (MES: mes_mixing_raw) ════════════════════ */
+/* 컬럼: batch_no · product_code · material · cmb_lot_no · cmb_name · batch_qty(내리수) · total_weight(kg) · kneader_min/temp(니다) · roller_min/temp(로라) · length_mm · thickness · scrap · worker · note */
+async function renderMesMixing(rows){
+  var body = document.getElementById('rpBody');
+  if (!rows.length){ body.innerHTML = '<div class="empty-msg">해당 기간에 업로드된 MES 혼련일보가 없습니다. (MES 자료 페이지에서 업로드)</div>'; return; }
+  await loadProducts();
+  var mk = function(){ return { bq:0, wt:0, scrap:0, cnt:0, kM:0, kMn:0, kT:0, kTn:0, rM:0, rMn:0, rT:0, rTn:0, prods:{}, cmbs:{}, lots:{}, mats:{}, workers:{}, days:{}, rows:[] }; };
+  var acc = function(X, r){
+    X.bq += mesNum(r.batch_qty); X.wt += mesNum(r.total_weight); X.scrap += mesNum(r.scrap); X.cnt++; X.rows.push(r);
+    if (r.kneader_min!=null && r.kneader_min!==''){ X.kM += mesNum(r.kneader_min); X.kMn++; }
+    if (r.kneader_temp!=null && r.kneader_temp!==''){ X.kT += mesNum(r.kneader_temp); X.kTn++; }
+    if (r.roller_min!=null && r.roller_min!==''){ X.rM += mesNum(r.roller_min); X.rMn++; }
+    if (r.roller_temp!=null && r.roller_temp!==''){ X.rT += mesNum(r.roller_temp); X.rTn++; }
+    X.prods[r.product_code||'(사번없음)'] = 1; if (r.cmb_name) X.cmbs[r.cmb_name] = 1; if (r.cmb_lot_no) X.lots[r.cmb_lot_no] = 1;
+    if (r.material) X.mats[r.material] = 1; if (r.worker) X.workers[r.worker] = 1; X.days[r.work_date] = 1;
+  };
+  var T = mk(), byProd = {}, byMat = {}, byCmb = {}, byWorker = {};
+  rows.forEach(function(r){
+    acc(T, r);
+    var p = r.product_code || '(사번없음)', mt = r.material || '(재질미지정)', cm = (r.cmb_name || '(CMB미지정)') + '|' + (r.cmb_lot_no || ''), wk = r.worker || '(미지정)';
+    if (!byProd[p]) byProd[p] = mk(); acc(byProd[p], r);
+    if (!byMat[mt]) byMat[mt] = mk(); acc(byMat[mt], r);
+    if (!byCmb[cm]) byCmb[cm] = mk(); acc(byCmb[cm], r);
+    if (!byWorker[wk]) byWorker[wk] = mk(); acc(byWorker[wk], r);
+  });
+  var prods = Object.keys(byProd).sort(function(a,b){ return byProd[b].wt - byProd[a].wt; });
+  var mats = Object.keys(byMat).sort(function(a,b){ return byMat[b].wt - byMat[a].wt; });
+  var cmbs = Object.keys(byCmb).sort(function(a,b){ return byCmb[b].wt - byCmb[a].wt; });
+  var workers = Object.keys(byWorker).sort(function(a,b){ return byWorker[b].wt - byWorker[a].wt; });
+  var cond = function(X){ return mesAvg(X.kM,X.kMn,0)+'분/'+mesAvg(X.kT,X.kTn,0)+'℃ · '+mesAvg(X.rM,X.rMn,0)+'분/'+mesAvg(X.rT,X.rTn,0)+'℃'; };
+  var v = function(x){ return x==null||x===''?'-':x; };
+
+  var h = '';
+  h += '<div class="sum-grid" style="grid-template-columns:repeat(6,1fr)">'
+    + '<div class="sum-card"><div class="n">'+num(T.bq)+'</div><div class="l">총 내리수</div></div>'
+    + '<div class="sum-card"><div class="n">'+mesKg(T.wt)+'</div><div class="l">총중량(kg)</div></div>'
+    + '<div class="sum-card"><div class="n" style="color:'+(T.scrap>0?'#d97706':'#222')+'">'+mesFix(T.scrap,1)+'</div><div class="l">자투리</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(prods.length)+'</div><div class="l">품목(사번) 수</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(Object.keys(T.cmbs).length)+'</div><div class="l">CMB 품명 · Lot '+num(Object.keys(T.lots).length)+'</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(workers.length)+'</div><div class="l">작업자 · '+num(T.cnt)+'건</div></div>'
+    + '</div>';
+
+  /* 1. 품목별 */
+  h += '<h2 class="sec">1. 품목(사번)별 혼련 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 상세 · 조건 = 니다 분/℃ · 로라 분/℃ 평균</span></h2>';
+  h += '<table class="rp"><tr><th style="width:70px">사번</th><th style="width:104px">품번</th><th>품명</th><th style="width:100px">재질</th><th style="width:120px">CMB 품명</th><th style="width:64px">내리수</th><th style="width:80px">총중량(kg)</th><th style="width:64px">자투리</th><th style="width:150px">혼련조건(평균)</th><th style="width:44px">건수</th><th style="width:26px"></th></tr>';
+  prods.forEach(function(p, i){
+    var P = byProd[p], pr = mesProd(p);
+    h += '<tr class="grp-row" onclick="toggleDet(\'xm'+i+'\')"><td>'+esc(p)+'</td><td>'+esc(pr.partNo)+'</td><td class="left">'+esc(pr.partName)+'</td>'
+      + '<td class="left" style="font-size:11px">'+esc(Object.keys(P.mats).join(' · ')||'-')+'</td><td class="left" style="font-size:11px">'+esc(Object.keys(P.cmbs).join(' · ')||'-')+'</td>'
+      + '<td class="right" style="font-weight:700">'+num(P.bq)+'</td><td class="right">'+mesKg(P.wt)+'</td><td class="right" style="color:'+(P.scrap>0?'#d97706':'#999')+'">'+mesFix(P.scrap,1)+'</td>'
+      + '<td style="font-size:11px">'+cond(P)+'</td><td>'+num(P.cnt)+'</td><td class="arrow" id="ar-xm'+i+'">▼</td></tr>';
+    h += '<tr class="det-row" id="det-xm'+i+'"><td colspan="11"><table class="det"><tr><th style="width:78px">일자</th><th style="width:90px">Batch</th><th style="width:100px">CMB LotNo</th><th style="width:56px">내리수</th><th style="width:66px">총중량</th><th style="width:60px">니다(분)</th><th style="width:56px">니다℃</th><th style="width:60px">로라(분)</th><th style="width:56px">로라℃</th><th style="width:76px">기장×두께</th><th style="width:56px">자투리</th><th style="width:60px">작업자</th><th>비고</th></tr>';
+    mesDateSort(P.rows, 'batch_no').forEach(function(r){
+      h += '<tr><td>'+esc(r.work_date)+'</td><td style="font-size:10px">'+esc(r.batch_no||'-')+'</td><td style="font-size:10px">'+esc(r.cmb_lot_no||'-')+'</td><td class="right">'+num(r.batch_qty)+'</td><td class="right">'+mesKg(r.total_weight)+'</td>'
+        + '<td>'+v(r.kneader_min)+'</td><td>'+v(r.kneader_temp)+'</td><td>'+v(r.roller_min)+'</td><td>'+v(r.roller_temp)+'</td><td style="font-size:10px">'+v(r.length_mm)+'×'+v(r.thickness)+'</td>'
+        + '<td class="right">'+mesFix(r.scrap,1)+'</td><td>'+esc(r.worker||'-')+'</td><td class="left" style="font-size:10px">'+esc(r.note||'')+'</td></tr>';
+    });
+    h += '</table></td></tr>';
+  });
+  h += '</table>';
+
+  /* 2. 재질별 */
+  h += '<h2 class="sec">2. 재질별 실적</h2>';
+  h += '<table class="rp" style="max-width:820px"><tr><th>재질</th><th style="width:70px">내리수</th><th style="width:86px">총중량(kg)</th><th style="width:70px">자투리</th><th style="width:160px">혼련조건(평균)</th><th style="width:56px">건수</th><th style="width:60px">품목 수</th></tr>';
+  mats.forEach(function(m){ var X = byMat[m];
+    h += '<tr><td class="left">'+esc(m)+'</td><td class="right">'+num(X.bq)+'</td><td class="right">'+mesKg(X.wt)+'</td><td class="right">'+mesFix(X.scrap,1)+'</td><td style="font-size:11px">'+cond(X)+'</td><td>'+num(X.cnt)+'</td><td>'+num(Object.keys(X.prods).length)+'</td></tr>'; });
+  h += '</table>';
+
+  /* 3. CMB별 (추적성) */
+  h += '<h2 class="sec">3. CMB(원료 배합) 사용 내역 <span style="font-weight:400;font-size:11px;color:#98a0b0">— CMB 품명 · LotNo별 어떤 품목에 투입됐는지</span></h2>';
+  h += '<table class="rp"><tr><th style="width:140px">CMB 품명</th><th style="width:110px">CMB LotNo</th><th>투입 품목(사번)</th><th style="width:70px">내리수</th><th style="width:86px">총중량(kg)</th><th style="width:56px">건수</th><th style="width:120px">사용일</th></tr>';
+  cmbs.forEach(function(c){ var X = byCmb[c], parts = c.split('|'), days = Object.keys(X.days).sort();
+    h += '<tr><td class="left">'+esc(parts[0])+'</td><td style="font-size:11px">'+esc(parts[1]||'-')+'</td><td class="left" style="font-size:11px">'+esc(Object.keys(X.prods).sort().join(', '))+'</td><td class="right">'+num(X.bq)+'</td><td class="right">'+mesKg(X.wt)+'</td><td>'+num(X.cnt)+'</td><td style="font-size:10px">'+esc(days.length>1 ? days[0].slice(5)+'~'+days[days.length-1].slice(5)+' ('+days.length+'일)' : days[0])+'</td></tr>'; });
+  h += '</table>';
+
+  /* 4. 작업자별 */
+  h += '<h2 class="sec">4. 작업자별 실적</h2>';
+  h += '<table class="rp" style="max-width:600px"><tr><th>작업자</th><th style="width:60px">근무일</th><th style="width:70px">내리수</th><th style="width:86px">총중량(kg)</th><th style="width:70px">자투리</th><th style="width:56px">건수</th><th style="width:60px">품목 수</th></tr>';
+  workers.forEach(function(w){ var X = byWorker[w];
+    h += '<tr><td>'+esc(w)+'</td><td>'+num(Object.keys(X.days).length)+'</td><td class="right">'+num(X.bq)+'</td><td class="right">'+mesKg(X.wt)+'</td><td class="right">'+mesFix(X.scrap,1)+'</td><td>'+num(X.cnt)+'</td><td>'+num(Object.keys(X.prods).length)+'</td></tr>'; });
+  h += '</table>';
+
+  /* 5. 비고 */
+  var notes = rows.filter(function(r){ return (r.note||'').trim(); });
+  if (notes.length){
+    h += '<h2 class="sec">5. 비고 / 특이사항</h2>';
+    h += '<table class="rp"><tr><th style="width:84px">일자</th><th style="width:70px">사번</th><th style="width:90px">Batch</th><th style="width:80px">작업자</th><th>내용</th></tr>';
+    mesDateSort(notes, 'batch_no').forEach(function(r){ h += '<tr><td>'+esc(r.work_date)+'</td><td>'+esc(r.product_code||'-')+'</td><td style="font-size:10px">'+esc(r.batch_no||'-')+'</td><td>'+esc(r.worker||'-')+'</td><td class="left">'+esc(r.note)+'</td></tr>'; });
+    h += '</table>';
+  }
+  body.innerHTML = h;
+
+  /* 엑셀 */
+  var r1 = function(x){ return Math.round(mesNum(x)*10)/10; };
+  var a = function(s,n){ return n>0 ? Math.round(s/n*10)/10 : ''; };
+  var s1 = [['사번','품번','품명','재질','CMB품명','내리수','총중량(kg)','자투리','니다(분)평균','니다℃평균','로라(분)평균','로라℃평균','건수']];
+  prods.forEach(function(p){ var P = byProd[p], pr = mesProd(p); s1.push([p, pr.partNo, pr.partName, Object.keys(P.mats).join(' · '), Object.keys(P.cmbs).join(' · '), P.bq, r1(P.wt), r1(P.scrap), a(P.kM,P.kMn), a(P.kT,P.kTn), a(P.rM,P.rMn), a(P.rT,P.rTn), P.cnt]); });
+  var s2 = [['재질','내리수','총중량(kg)','자투리','니다(분)평균','니다℃평균','로라(분)평균','로라℃평균','건수','품목수']];
+  mats.forEach(function(m){ var X = byMat[m]; s2.push([m, X.bq, r1(X.wt), r1(X.scrap), a(X.kM,X.kMn), a(X.kT,X.kTn), a(X.rM,X.rMn), a(X.rT,X.rTn), X.cnt, Object.keys(X.prods).length]); });
+  var s3 = [['CMB품명','CMB LotNo','투입품목','내리수','총중량(kg)','건수','사용일']];
+  cmbs.forEach(function(c){ var X = byCmb[c], parts = c.split('|'); s3.push([parts[0], parts[1]||'', Object.keys(X.prods).sort().join(', '), X.bq, r1(X.wt), X.cnt, Object.keys(X.days).sort().join(', ')]); });
+  var s4 = [['작업자','근무일','내리수','총중량(kg)','자투리','건수','품목수']];
+  workers.forEach(function(w){ var X = byWorker[w]; s4.push([w, Object.keys(X.days).length, X.bq, r1(X.wt), r1(X.scrap), X.cnt, Object.keys(X.prods).length]); });
+  var s5 = [['일자','Batch','사번','품번','품명','재질','CMB LotNo','CMB품명','내리수','총중량(kg)','니다(분)','니다℃','로라(분)','로라℃','기장','두께','자투리','작업자','비고']];
+  mesDateSort(rows, 'batch_no').forEach(function(r){ var pr = mesProd(r.product_code);
+    s5.push([r.work_date, r.batch_no||'', r.product_code||'', pr.partNo==='-'?'':pr.partNo, pr.partName==='-'?'':pr.partName, r.material||'', r.cmb_lot_no||'', r.cmb_name||'', mesNum(r.batch_qty), mesNum(r.total_weight), r.kneader_min, r.kneader_temp, r.roller_min, r.roller_temp, r.length_mm, r.thickness, mesNum(r.scrap), r.worker||'', r.note||'']); });
+  lastXlsx = { name:'mixing_mes', sheets:[ {n:'품목별',d:s1}, {n:'재질별',d:s2}, {n:'CMB별',d:s3}, {n:'작업자별',d:s4}, {n:'상세내역',d:s5} ] };
+}
+
+/* ════════════════════ 평량 (MES: mes_weighing_raw) ════════════════════ */
+/* 컬럼: machine · product_code · material(원료명 / 소계 행은 '[▶뱃지계]') · batch_qty(내리수 — 소계 행에만) · item_name · weight_kg
+   구조: 품목(사번)마다 원료 행 N개 + 뱃지계 소계 행 1개(내리수·뱃지 총중량). 뱃지 = 일자|호기|사번 단위. */
+var MES_SUB = '[▶뱃지계]';
+async function renderMesWeighing(rows){
+  var body = document.getElementById('rpBody');
+  if (!rows.length){ body.innerHTML = '<div class="empty-msg">해당 기간에 업로드된 MES 평량일보가 없습니다. (MES 자료 페이지에서 업로드)</div>'; return; }
+  await loadProducts();
+  var subs = rows.filter(function(r){ return r.material === MES_SUB; });
+  var ings = rows.filter(function(r){ return r.material !== MES_SUB; });
+  var byBatch = {}, byMach = {}, byProd = {}, byMat = {};
+  var bkey = function(r){ return [r.work_date, r.machine||'', r.product_code||''].join('|'); };
+  rows.forEach(function(r){
+    var k = bkey(r);
+    if (!byBatch[k]) byBatch[k] = { date:r.work_date, mach:r.machine||'(호기미지정)', code:r.product_code||'(사번없음)', name:'', subN:0, bq:0, subWt:0, ingN:0, ingWt:0, ings:[] };
+    var B = byBatch[k];
+    if (r.material === MES_SUB){ B.subN++; B.bq += mesNum(r.batch_qty); B.subWt += mesNum(r.weight_kg); if (r.item_name && !B.name) B.name = r.item_name; }
+    else { B.ingN++; B.ingWt += mesNum(r.weight_kg); B.ings.push(r); if (!B.name && r.item_name) B.name = r.item_name; }
+  });
+  var batches = Object.keys(byBatch).map(function(k){ return byBatch[k]; });
+  var T = { subN:0, bq:0, subWt:0, ingWt:0, ingN:ings.length };
+  batches.forEach(function(B){
+    T.subN += B.subN; T.bq += B.bq; T.subWt += B.subWt; T.ingWt += B.ingWt;
+    if (!byMach[B.mach]) byMach[B.mach] = { subN:0, bq:0, subWt:0, ingN:0, ingWt:0, prods:{}, days:{}, batches:[] };
+    var M = byMach[B.mach]; M.subN += B.subN; M.bq += B.bq; M.subWt += B.subWt; M.ingN += B.ingN; M.ingWt += B.ingWt; M.prods[B.code] = 1; M.days[B.date] = 1; M.batches.push(B);
+    if (!byProd[B.code]) byProd[B.code] = { name:B.name, subN:0, bq:0, subWt:0, ingN:0, ingWt:0, machs:{}, mats:{}, days:{}, batches:[] };
+    var P = byProd[B.code]; if (!P.name && B.name) P.name = B.name;
+    P.subN += B.subN; P.bq += B.bq; P.subWt += B.subWt; P.ingN += B.ingN; P.ingWt += B.ingWt; P.machs[B.mach] = 1; P.days[B.date] = 1; P.batches.push(B);
+    B.ings.forEach(function(r){ P.mats[r.material||'(원료미지정)'] = 1; });
+  });
+  ings.forEach(function(r){
+    var m = r.material || '(원료미지정)';
+    if (!byMat[m]) byMat[m] = { wt:0, cnt:0, prods:{}, days:{} };
+    byMat[m].wt += mesNum(r.weight_kg); byMat[m].cnt++; byMat[m].prods[r.product_code||'(사번없음)'] = 1; byMat[m].days[r.work_date] = 1;
+  });
+  var machs = Object.keys(byMach).sort(mesCmp);
+  var prods = Object.keys(byProd).sort(function(a,b){ return byProd[b].subWt - byProd[a].subWt || byProd[b].ingWt - byProd[a].ingWt; });
+  var mats = Object.keys(byMat).sort(function(a,b){ return byMat[b].wt - byMat[a].wt; });
+  var noSub = batches.filter(function(B){ return B.subN === 0; }).length;
+  var pname = function(code, fallback){ var pr = mesProd(code); return pr.partName !== '-' ? pr.partName : (fallback || '-'); };
+
+  var h = '';
+  h += '<div class="sum-grid" style="grid-template-columns:repeat(6,1fr)">'
+    + '<div class="sum-card"><div class="n">'+num(T.subN)+'</div><div class="l">뱃지(소계) 건수</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(T.bq)+'</div><div class="l">총 내리수</div></div>'
+    + '<div class="sum-card"><div class="n">'+mesKg(T.subWt)+'</div><div class="l">뱃지 총중량(kg)</div></div>'
+    + '<div class="sum-card"><div class="n">'+mesKg(T.ingWt)+'</div><div class="l">원료 투입 합계(kg) · '+num(T.ingN)+'행</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(prods.length)+'</div><div class="l">품목(사번) 수</div></div>'
+    + '<div class="sum-card"><div class="n">'+num(mats.length)+'</div><div class="l">원료 종류 · 호기 '+machs.length+'</div></div>'
+    + '</div>';
+  if (noSub) h += '<div class="lot-warn" style="background:#fffbeb;border-color:#fde68a;color:#92400e">ⓘ 뱃지계 소계 행이 없는 품목·일자 '+num(noSub)+'건 — 내리수·뱃지중량이 집계되지 않습니다 (MES 엑셀 원본 확인)</div>';
+
+  /* 1. 호기별 */
+  h += '<h2 class="sec">1. 호기별 평량 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 일자·품목별 뱃지</span></h2>';
+  h += '<table class="rp"><tr><th style="width:130px">호기</th><th style="width:60px">작업일</th><th style="width:70px">뱃지 수</th><th style="width:70px">내리수</th><th style="width:96px">뱃지 총중량(kg)</th><th style="width:96px">원료 투입(kg)</th><th style="width:60px">원료행</th><th style="width:60px">품목</th><th style="width:26px"></th></tr>';
+  machs.forEach(function(m, i){
+    var M = byMach[m];
+    h += '<tr class="grp-row" onclick="toggleDet(\'xw'+i+'\')"><td class="left" style="font-weight:700">'+esc(m)+'</td><td>'+num(Object.keys(M.days).length)+'</td><td>'+num(M.subN)+'</td><td class="right" style="font-weight:700">'+num(M.bq)+'</td><td class="right">'+mesKg(M.subWt)+'</td><td class="right">'+mesKg(M.ingWt)+'</td><td>'+num(M.ingN)+'</td><td>'+num(Object.keys(M.prods).length)+'</td><td class="arrow" id="ar-xw'+i+'">▼</td></tr>';
+    h += '<tr class="det-row" id="det-xw'+i+'"><td colspan="9"><table class="det"><tr><th style="width:78px">일자</th><th style="width:70px">사번</th><th>품명</th><th style="width:60px">내리수</th><th style="width:90px">뱃지중량(kg)</th><th style="width:60px">원료 수</th><th style="width:90px">원료합(kg)</th></tr>';
+    M.batches.sort(function(a,b){ return a.date!==b.date ? (a.date<b.date?-1:1) : mesCmp(a.code,b.code); }).forEach(function(B){
+      h += '<tr><td>'+esc(B.date)+'</td><td>'+esc(B.code)+'</td><td class="left">'+esc(pname(B.code, B.name))+'</td><td class="right">'+(B.subN?num(B.bq):'<span style="color:#dc2626">소계없음</span>')+'</td><td class="right">'+mesKg(B.subWt)+'</td><td>'+num(B.ingN)+'</td><td class="right">'+mesKg(B.ingWt)+'</td></tr>';
+    });
+    h += '</table></td></tr>';
+  });
+  h += '</table>';
+
+  /* 2. 품목별 */
+  h += '<h2 class="sec">2. 품목(사번)별 평량 실적 <span style="font-weight:400;font-size:11px;color:#98a0b0">— 행 클릭 시 원료 배합 상세</span></h2>';
+  h += '<table class="rp"><tr><th style="width:70px">사번</th><th style="width:104px">품번</th><th>품명</th><th style="width:110px">호기</th><th style="width:60px">작업일</th><th style="width:60px">뱃지 수</th><th style="width:66px">내리수</th><th style="width:92px">뱃지 총중량(kg)</th><th style="width:92px">원료 투입(kg)</th><th style="width:60px">원료 종류</th><th style="width:26px"></th></tr>';
+  prods.forEach(function(p, i){
+    var P = byProd[p];
+    h += '<tr class="grp-row" onclick="toggleDet(\'xq'+i+'\')"><td>'+esc(p)+'</td><td>'+esc(mesProd(p).partNo)+'</td><td class="left">'+esc(pname(p, P.name))+'</td>'
+      + '<td style="font-size:11px">'+esc(Object.keys(P.machs).sort(mesCmp).map(function(x){ return x.replace(/\(.*?\)/g,''); }).join(', '))+'</td><td>'+num(Object.keys(P.days).length)+'</td><td>'+num(P.subN)+'</td>'
+      + '<td class="right" style="font-weight:700">'+num(P.bq)+'</td><td class="right">'+mesKg(P.subWt)+'</td><td class="right">'+mesKg(P.ingWt)+'</td><td>'+num(Object.keys(P.mats).length)+'</td><td class="arrow" id="ar-xq'+i+'">▼</td></tr>';
+    h += '<tr class="det-row" id="det-xq'+i+'"><td colspan="11"><table class="det"><tr><th style="width:78px">일자</th><th style="width:120px">호기</th><th>원료(재질)</th><th style="width:150px">품명</th><th style="width:60px">내리수</th><th style="width:90px">중량(kg)</th></tr>';
+    P.batches.sort(function(a,b){ return a.date!==b.date ? (a.date<b.date?-1:1) : mesCmp(a.mach,b.mach); }).forEach(function(B){
+      B.ings.forEach(function(r){ h += '<tr><td>'+esc(B.date)+'</td><td class="left" style="font-size:10px">'+esc(B.mach)+'</td><td class="left">'+esc(r.material||'-')+'</td><td class="left" style="font-size:10px">'+esc(r.item_name||'')+'</td><td></td><td class="right">'+mesKg(r.weight_kg)+'</td></tr>'; });
+      h += '<tr style="background:#e2e8f0;font-weight:700"><td>'+esc(B.date)+'</td><td class="left" style="font-size:10px">'+esc(B.mach)+'</td><td class="left">▶ 뱃지계'+(B.subN?'':' <span style="color:#dc2626;font-weight:400">(소계 행 없음)</span>')+'</td><td class="left" style="font-size:10px">'+esc(B.name||'')+'</td><td class="right">'+(B.subN?num(B.bq):'-')+'</td><td class="right">'+(B.subN?mesKg(B.subWt):'-')+' <span style="font-weight:400;color:#777;font-size:10px">(원료합 '+mesKg(B.ingWt)+')</span></td></tr>';
+    });
+    h += '</table></td></tr>';
+  });
+  h += '</table>';
+  h += '<div style="font-size:10.5px;color:#888;margin:4px 0 0">※ 뱃지 총중량 = MES 뱃지계 소계 행의 중량, 원료 투입 = 원료 행 중량 합 (두 값의 관계는 MES 원본 기준 그대로 표시)</div>';
+
+  /* 3. 원료별 */
+  h += '<h2 class="sec">3. 원료(재질)별 사용량</h2>';
+  h += '<table class="rp" style="max-width:820px"><tr><th>원료(재질)</th><th style="width:96px">사용 중량(kg)</th><th style="width:60px">비중</th><th style="width:60px">사용 건</th><th style="width:60px">작업일</th><th>투입 품목(사번)</th></tr>';
+  mats.forEach(function(m){ var X = byMat[m];
+    h += '<tr><td class="left">'+esc(m)+'</td><td class="right" style="font-weight:700">'+mesKg(X.wt)+'</td><td>'+(T.ingWt>0?mesFix(X.wt/T.ingWt*100,1)+'%':'-')+'</td><td>'+num(X.cnt)+'</td><td>'+num(Object.keys(X.days).length)+'</td><td class="left" style="font-size:11px">'+esc(Object.keys(X.prods).sort().join(', '))+'</td></tr>'; });
+  h += '</table>';
+  body.innerHTML = h;
+
+  /* 엑셀 */
+  var r1 = function(x){ return Math.round(mesNum(x)*10)/10; };
+  var s1 = [['호기','작업일수','뱃지수','내리수','뱃지총중량(kg)','원료투입(kg)','원료행','품목수']];
+  machs.forEach(function(m){ var M = byMach[m]; s1.push([m, Object.keys(M.days).length, M.subN, M.bq, r1(M.subWt), r1(M.ingWt), M.ingN, Object.keys(M.prods).length]); });
+  var s2 = [['사번','품번','품명','호기','작업일수','뱃지수','내리수','뱃지총중량(kg)','원료투입(kg)','원료종류']];
+  prods.forEach(function(p){ var P = byProd[p]; s2.push([p, mesProd(p).partNo==='-'?'':mesProd(p).partNo, pname(p, P.name), Object.keys(P.machs).sort(mesCmp).join(', '), Object.keys(P.days).length, P.subN, P.bq, r1(P.subWt), r1(P.ingWt), Object.keys(P.mats).length]); });
+  var s3 = [['원료(재질)','사용중량(kg)','비중(%)','사용건','작업일수','투입품목']];
+  mats.forEach(function(m){ var X = byMat[m]; s3.push([m, r1(X.wt), T.ingWt>0?r1(X.wt/T.ingWt*100):'', X.cnt, Object.keys(X.days).length, Object.keys(X.prods).sort().join(', ')]); });
+  var s4 = [['일자','호기','사번','품명','구분','원료(재질)','내리수','중량(kg)']];
+  batches.sort(function(a,b){ return a.date!==b.date ? (a.date<b.date?-1:1) : (mesCmp(a.mach,b.mach) || mesCmp(a.code,b.code)); }).forEach(function(B){
+    B.ings.forEach(function(r){ s4.push([B.date, B.mach, B.code, r.item_name||'', '원료', r.material||'', '', mesNum(r.weight_kg)]); });
+    s4.push([B.date, B.mach, B.code, B.name||'', '뱃지계', '', B.subN?B.bq:'', B.subN?r1(B.subWt):'']);
+  });
+  lastXlsx = { name:'weighing_mes', sheets:[ {n:'호기별',d:s1}, {n:'품목별',d:s2}, {n:'원료별',d:s3}, {n:'상세내역',d:s4} ] };
 }
 
 /* ════════════════════ 성형 (molding) ════════════════════ */

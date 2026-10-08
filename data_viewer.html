@@ -146,6 +146,14 @@ th.sortable.desc::after { content:'▼'; color:#243bb2; }
     <button class="process-tab" data-process="조립" onclick="switchProcess('조립')">🔩 조립</button>
     <button class="process-tab" data-process="사상" onclick="switchProcess('사상')">🪚 사상</button>
   </div>
+  <!-- MES 원자료 탭 (mes_data.html 업로드분 — 읽기 전용) -->
+  <div class="process-tabs" style="margin-top:-8px;background:#f8f9fc">
+    <span style="flex:0 0 auto;padding:12px 16px;font-size:12px;font-weight:700;color:#64748b;border-right:1px solid #e5e5e5">📥 MES 원자료</span>
+    <button class="process-tab" data-process="MES재단" onclick="switchProcess('MES재단')">✂️ 재단(MES)</button>
+    <button class="process-tab" data-process="MES혼련" onclick="switchProcess('MES혼련')">🧪 혼련(MES)</button>
+    <button class="process-tab" data-process="MES평량" onclick="switchProcess('MES평량')">⚖️ 평량(MES)</button>
+    <span style="flex:1 1 auto;padding:12px 16px;font-size:11px;color:#94a3b8;text-align:right">MES 자료 페이지에서 업로드한 재단·혼련·평량 일보 · 수정/삭제는 재업로드로</span>
+  </div>
 
   <!-- 필터 -->
   <div class="card">
@@ -685,7 +693,7 @@ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentProcess = 'all';
 let unifiedView = false;
-let cachedData = { 포장: [], 검사: [], 'CMB': [], 재단: [], 재단점검: [], 도포: [], '2차가류': [], '2차가류점검': [], 쇼트: [], 사상: [] };
+let cachedData = { 포장: [], 검사: [], 'CMB': [], 재단: [], 재단점검: [], 도포: [], '2차가류': [], '2차가류점검': [], 쇼트: [], 사상: [], 'MES재단': [], 'MES혼련': [], 'MES평량': [] };
 let PRODUCTS = {};
 let myInfo = null;
 let showDeleted = false;
@@ -1142,6 +1150,11 @@ async function loadData() {
     cachedData.사상 = data || [];
   }
 
+  // MES 원자료 (해당 탭에서만 — 전체 탭에는 포함하지 않음)
+  if (isMesTab(currentProcess)) {
+    cachedData[currentProcess] = await loadMesRows(currentProcess, start, end, fSabun, fWorker, fEquip);
+  }
+
   render();
 }
 
@@ -1226,6 +1239,12 @@ function render() {
     renderAssemblyTable(cachedData.조립);
   } else if (currentProcess === '사상') {
     renderSasangTable(cachedData.사상);
+  } else if (currentProcess === 'MES재단') {
+    renderMesCuttingTable(cachedData['MES재단']);
+  } else if (currentProcess === 'MES혼련') {
+    renderMesMixingTable(cachedData['MES혼련']);
+  } else if (currentProcess === 'MES평량') {
+    renderMesWeighingTable(cachedData['MES평량']);
   }
 }
 
@@ -1258,6 +1277,7 @@ function renderStats() {
   const asm = cachedData.조립 || [];
   const sas = cachedData.사상 || [];
 
+  if (isMesTab(currentProcess)) { renderMesStats(statsEl, currentProcess); return; }
   if (currentProcess === 'all') {
     const totalCount = pkg.length + ins.length + cmb.length + cut.length + coat.length + pc.length + shot.length + mold.length + asm.length + sas.length;
     const totalQty = pkg.reduce((s,r)=>s+(r.quantity||0),0);
@@ -2898,6 +2918,162 @@ async function deleteSasang(id) {
 }
 
 // ── 엑셀 다운로드 ──────────────────────────────
+// ═══ MES 원자료 탭 (재단·혼련·평량 — mes_*_raw, 읽기 전용) ═══
+// · 데이터 교체/삭제는 MES 자료 페이지(mes_data.html)에서 같은 날짜 재업로드로 처리 → 이 탭은 수정·삭제 버튼 없음
+// · mes 테이블엔 deleted_at/created_at 없음 → 삭제 표시 토글 무관, 정렬은 work_date desc + id
+const MES_TABS = {
+  'MES재단': { table:'mes_cutting_raw',  worker:'worker', machine:'machine' },
+  'MES혼련': { table:'mes_mixing_raw',   worker:'worker', machine:null },
+  'MES평량': { table:'mes_weighing_raw', worker:null,     machine:'machine' }
+};
+const MES_SUB = '[▶뱃지계]';
+function isMesTab(p){ return !!MES_TABS[p]; }
+function mesN(v){ var n = parseFloat(v); return isNaN(n) ? 0 : n; }
+function mesC(v){ return (v == null || v === '') ? '-' : String(v); }
+function mesF(v, d){ return mesN(v).toLocaleString('ko-KR', { minimumFractionDigits:d, maximumFractionDigits:d }); }
+async function loadMesRows(p, start, end, fSabun, fWorker, fEquip) {
+  const cfg = MES_TABS[p];
+  let all = [], from = 0, step = 1000;
+  while (true) {
+    let q = db.from(cfg.table).select('*').gte('work_date', start).lte('work_date', end);
+    if (fSabun) q = q.ilike('product_code', `%${fSabun}%`);
+    if (fWorker && cfg.worker) q = q.ilike(cfg.worker, `%${fWorker}%`);
+    if (fEquip && cfg.machine) q = q.ilike(cfg.machine, `%${fEquip}%`);
+    const { data, error } = await q.order('work_date', { ascending:false }).order('id', { ascending:true }).range(from, from + step - 1);
+    if (error) { showToast('MES 조회 실패: ' + error.message); break; }
+    all = all.concat(data || []);
+    if (!data || data.length < step) break;
+    from += step;
+  }
+  return all;
+}
+function mesEmpty(label){
+  document.getElementById('resultArea').innerHTML = '<div class="card"><div style="padding:2rem;text-align:center;color:#aaa;font-size:13px">조회된 ' + label + ' MES 자료가 없어요.<br><span style="font-size:11px">MES 자료(재단·혼련·평량) 페이지에서 업로드한 날짜만 조회됩니다.</span></div></div>';
+}
+function mesHead(cnt, note){
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;font-size:12px;color:#666;border-bottom:1px solid #eee"><span>총 <b>' + cnt + '</b>건' + (note ? ' · ' + note : '') + '</span><span style="font-size:11px;color:#999">MES 원자료 (수정·삭제는 MES 자료 페이지에서 재업로드)</span></div>';
+}
+
+function renderMesCuttingTable(data) {
+  if (!data.length) { mesEmpty('재단'); return; }
+  data = applySortIfNeeded(data);
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card" style="padding:0">${mesHead(data.length)}<div class="table-wrap"><table><thead><tr>
+      <th>NO</th>${makeSortTh('일자','work_date')}${makeSortTh('호기','machine')}${makeSortTh('BatchNo','batch_no')}${makeSortTh('사번','product_code')}<th>품번</th><th>품명</th>${makeSortTh('재질','material')}
+      ${makeSortTh('기장','length_mm')}${makeSortTh('두께','thickness')}${makeSortTh('중량','weight_spec')}<th>초품</th><th>중품</th><th>종품</th>
+      ${makeSortTh('박스','box_count','style="text-align:right"')}${makeSortTh('총수량','total_qty','style="text-align:right"')}${makeSortTh('총중량(kg)','total_weight','style="text-align:right"')}${makeSortTh('자투리(g)','scrap','style="text-align:right"')}
+      ${makeSortTh('LabelID','label_id')}${makeSortTh('작업자','worker')}
+    </tr></thead><tbody>
+    ${data.map((r, i) => {
+      const prod = PRODUCTS[r.product_code] || {};
+      const sp = mesN(r.weight_spec);
+      const dv = v => { if (!sp || v == null || v === '') return ''; const d = Math.abs(mesN(v) - sp) / sp * 100; return d >= 5 ? 'color:#dc2626;font-weight:600' : (d >= 3 ? 'color:#d97706' : ''); };
+      return `<tr>
+        <td>${i+1}</td><td>${r.work_date||''}</td><td style="font-size:11px">${mesC(r.machine)}</td><td style="font-size:11px">${mesC(r.batch_no)}</td>
+        <td style="font-weight:600">${mesC(r.product_code)}</td><td style="font-size:11px">${prod.partNo||'-'}</td><td style="font-size:11px">${prod.partName||'-'}</td><td style="font-size:11px">${mesC(r.material)}</td>
+        <td>${mesC(r.length_mm)}</td><td>${mesC(r.thickness)}</td><td>${mesC(r.weight_spec)}</td>
+        <td style="${dv(r.q_first)}">${mesC(r.q_first)}</td><td style="${dv(r.q_mid)}">${mesC(r.q_mid)}</td><td style="${dv(r.q_last)}">${mesC(r.q_last)}</td>
+        <td style="text-align:right">${mesC(r.box_count)}</td><td style="text-align:right;font-weight:600">${mesN(r.total_qty).toLocaleString()}</td>
+        <td style="text-align:right">${mesC(r.total_weight)}</td><td style="text-align:right;color:${mesN(r.scrap)>0?'#d97706':'#999'}">${mesN(r.scrap).toLocaleString()}</td>
+        <td style="font-size:11px;color:#777">${mesC(r.label_id)}</td><td>${mesC(r.worker)}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table></div></div>`;
+}
+
+function renderMesMixingTable(data) {
+  if (!data.length) { mesEmpty('혼련'); return; }
+  data = applySortIfNeeded(data);
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card" style="padding:0">${mesHead(data.length)}<div class="table-wrap"><table><thead><tr>
+      <th>NO</th>${makeSortTh('일자','work_date')}${makeSortTh('BatchNo','batch_no')}${makeSortTh('사번','product_code')}<th>품번</th><th>품명</th>${makeSortTh('재질','material')}
+      ${makeSortTh('CMB LotNo','cmb_lot_no')}${makeSortTh('CMB 품명','cmb_name')}${makeSortTh('내리수','batch_qty','style="text-align:right"')}${makeSortTh('총중량(kg)','total_weight','style="text-align:right"')}
+      ${makeSortTh('니다(분)','kneader_min')}${makeSortTh('니다℃','kneader_temp')}${makeSortTh('로라(분)','roller_min')}${makeSortTh('로라℃','roller_temp')}
+      ${makeSortTh('기장','length_mm')}${makeSortTh('두께','thickness')}${makeSortTh('자투리','scrap','style="text-align:right"')}${makeSortTh('작업자','worker')}<th>비고</th>
+    </tr></thead><tbody>
+    ${data.map((r, i) => {
+      const prod = PRODUCTS[r.product_code] || {};
+      return `<tr>
+        <td>${i+1}</td><td>${r.work_date||''}</td><td style="font-size:11px">${mesC(r.batch_no)}</td>
+        <td style="font-weight:600">${mesC(r.product_code)}</td><td style="font-size:11px">${prod.partNo||'-'}</td><td style="font-size:11px">${prod.partName||'-'}</td><td style="font-size:11px">${mesC(r.material)}</td>
+        <td style="font-size:11px">${mesC(r.cmb_lot_no)}</td><td style="font-size:11px">${mesC(r.cmb_name)}</td>
+        <td style="text-align:right;font-weight:600">${mesC(r.batch_qty)}</td><td style="text-align:right">${mesC(r.total_weight)}</td>
+        <td>${mesC(r.kneader_min)}</td><td>${mesC(r.kneader_temp)}</td><td>${mesC(r.roller_min)}</td><td>${mesC(r.roller_temp)}</td>
+        <td>${mesC(r.length_mm)}</td><td>${mesC(r.thickness)}</td><td style="text-align:right;color:${mesN(r.scrap)>0?'#d97706':'#999'}">${mesC(r.scrap)}</td>
+        <td>${mesC(r.worker)}</td><td style="font-size:11px;max-width:200px" title="${(r.note||'').replace(/"/g,'&quot;')}">${r.note||'-'}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table></div></div>`;
+}
+
+function renderMesWeighingTable(data) {
+  if (!data.length) { mesEmpty('평량'); return; }
+  data = applySortIfNeeded(data);
+  const subN = data.filter(r => r.material === MES_SUB).length;
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card" style="padding:0">${mesHead(data.length - subN, subN ? '뱃지계 소계 ' + subN + '건(회색)' : '')}<div class="table-wrap"><table><thead><tr>
+      <th>NO</th>${makeSortTh('일자','work_date')}${makeSortTh('호기','machine')}${makeSortTh('사번','product_code')}<th>품번</th>${makeSortTh('원료(재질)','material')}${makeSortTh('품명','item_name')}
+      ${makeSortTh('내리수','batch_qty','style="text-align:right"')}${makeSortTh('중량(kg)','weight_kg','style="text-align:right"')}
+    </tr></thead><tbody>
+    ${data.map((r, i) => {
+      const prod = PRODUCTS[r.product_code] || {};
+      const sub = r.material === MES_SUB;
+      return `<tr style="${sub ? 'background:#e2e8f0;font-weight:700' : ''}">
+        <td>${i+1}</td><td>${r.work_date||''}</td><td style="font-size:11px">${mesC(r.machine)}</td>
+        <td style="font-weight:600">${mesC(r.product_code)}</td><td style="font-size:11px">${prod.partNo||'-'}</td>
+        <td>${sub ? '▶ 뱃지계' : mesC(r.material)}</td><td style="font-size:11px">${mesC(r.item_name)}</td>
+        <td style="text-align:right">${mesC(r.batch_qty)}</td><td style="text-align:right">${mesC(r.weight_kg)}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table></div></div>`;
+}
+
+function renderMesStats(statsEl, p) {
+  const rows = cachedData[p] || [];
+  const days = new Set(rows.map(r => r.work_date).filter(Boolean)).size;
+  const prods = new Set(rows.map(r => r.product_code).filter(Boolean)).size;
+  const period = `<div class="stat-card"><div class="stat-icon">📅</div><div class="stat-label">업로드 일수</div><div class="stat-num" style="font-size:14px">${days} <span class="stat-unit">일</span></div></div>`;
+  if (p === 'MES재단') {
+    const qty = rows.reduce((s,r)=>s+mesN(r.total_qty),0), box = rows.reduce((s,r)=>s+mesN(r.box_count),0), scrap = rows.reduce((s,r)=>s+mesN(r.scrap),0);
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-icon">✂️</div><div class="stat-label">MES 재단 건수</div><div class="stat-num blue">${rows.length} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🔢</div><div class="stat-label">총 재단수량</div><div class="stat-num green">${qty.toLocaleString()} <span class="stat-unit">EA</span> <span style="font-size:11px;color:#888">· BOX ${box.toLocaleString()}</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🗑️</div><div class="stat-label">자투리</div><div class="stat-num orange">${mesF(scrap/1000,1)} <span class="stat-unit">kg</span></div></div>
+      <div class="stat-card"><div class="stat-icon">📦</div><div class="stat-label">품목 수 / 일수</div><div class="stat-num">${prods} <span class="stat-unit">종</span> <span style="font-size:12px;color:#888">/ ${days}일</span></div></div>`;
+  } else if (p === 'MES혼련') {
+    const bq = rows.reduce((s,r)=>s+mesN(r.batch_qty),0), wt = rows.reduce((s,r)=>s+mesN(r.total_weight),0);
+    const cmbs = new Set(rows.map(r => r.cmb_lot_no).filter(Boolean)).size;
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-icon">🧪</div><div class="stat-label">MES 혼련 건수</div><div class="stat-num blue">${rows.length} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🔢</div><div class="stat-label">총 내리수</div><div class="stat-num green">${bq.toLocaleString()} <span class="stat-unit">회</span></div></div>
+      <div class="stat-card"><div class="stat-icon">⚖️</div><div class="stat-label">총중량</div><div class="stat-num">${mesF(wt,1)} <span class="stat-unit">kg</span></div></div>
+      <div class="stat-card"><div class="stat-icon">📦</div><div class="stat-label">품목 / CMB Lot</div><div class="stat-num">${prods} <span class="stat-unit">종</span> <span style="font-size:12px;color:#888">/ ${cmbs} Lot · ${days}일</span></div></div>`;
+  } else {
+    const subs = rows.filter(r => r.material === MES_SUB), ings = rows.filter(r => r.material !== MES_SUB);
+    const bq = subs.reduce((s,r)=>s+mesN(r.batch_qty),0), swt = subs.reduce((s,r)=>s+mesN(r.weight_kg),0), iwt = ings.reduce((s,r)=>s+mesN(r.weight_kg),0);
+    statsEl.innerHTML = `
+      <div class="stat-card"><div class="stat-icon">⚖️</div><div class="stat-label">원료 행 / 뱃지계</div><div class="stat-num blue">${ings.length} <span class="stat-unit">행</span> <span style="font-size:12px;color:#888">/ ${subs.length}건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">🔢</div><div class="stat-label">총 내리수</div><div class="stat-num green">${bq.toLocaleString()} <span class="stat-unit">회</span></div></div>
+      <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-label">뱃지 총중량 / 원료 투입</div><div class="stat-num">${mesF(swt,1)} <span class="stat-unit">kg</span> <span style="font-size:12px;color:#888">/ ${mesF(iwt,1)} kg</span></div></div>
+      <div class="stat-card"><div class="stat-icon">📦</div><div class="stat-label">품목 수 / 일수</div><div class="stat-num">${prods} <span class="stat-unit">종</span> <span style="font-size:12px;color:#888">/ ${days}일</span></div></div>`;
+  }
+}
+
+function mesExcelRows(p) {
+  const rows = cachedData[p] || [];
+  if (p === 'MES재단') return rows.map((r, i) => { const prod = PRODUCTS[r.product_code] || {}; return {
+    'NO': i+1, '일자': r.work_date||'', '호기': r.machine||'', 'BatchNo': r.batch_no||'', '사번': r.product_code||'', '품번': prod.partNo||'', '품명': prod.partName||'', '재질': r.material||'',
+    '기장': r.length_mm, '두께': r.thickness, '중량': r.weight_spec, '초품': r.q_first, '중품': r.q_mid, '종품': r.q_last,
+    '박스': mesN(r.box_count), '총수량': mesN(r.total_qty), '총중량(kg)': mesN(r.total_weight), '자투리(g)': mesN(r.scrap), 'LabelID': r.label_id||'', '작업자': r.worker||'' }; });
+  if (p === 'MES혼련') return rows.map((r, i) => { const prod = PRODUCTS[r.product_code] || {}; return {
+    'NO': i+1, '일자': r.work_date||'', 'BatchNo': r.batch_no||'', '사번': r.product_code||'', '품번': prod.partNo||'', '품명': prod.partName||'', '재질': r.material||'',
+    'CMB LotNo': r.cmb_lot_no||'', 'CMB 품명': r.cmb_name||'', '내리수': mesN(r.batch_qty), '총중량(kg)': mesN(r.total_weight),
+    '니다(분)': r.kneader_min, '니다℃': r.kneader_temp, '로라(분)': r.roller_min, '로라℃': r.roller_temp, '기장': r.length_mm, '두께': r.thickness, '자투리': mesN(r.scrap), '작업자': r.worker||'', '비고': r.note||'' }; });
+  return rows.map((r, i) => { const prod = PRODUCTS[r.product_code] || {}; return {
+    'NO': i+1, '일자': r.work_date||'', '호기': r.machine||'', '사번': r.product_code||'', '품번': prod.partNo||'', '구분': r.material === MES_SUB ? '뱃지계' : '원료',
+    '원료(재질)': r.material === MES_SUB ? '' : (r.material||''), '품명': r.item_name||'', '내리수': r.batch_qty, '중량(kg)': mesN(r.weight_kg) }; });
+}
+
 function downloadExcel() {
   const wb = XLSX.utils.book_new();
   let added = 0;
@@ -3248,6 +3424,13 @@ function downloadExcel() {
     }));
     const ws = XLSX.utils.json_to_sheet(sasRows);
     XLSX.utils.book_append_sheet(wb, ws, '사상 작업일지');
+    added++;
+  }
+
+  // MES 원자료
+  if (isMesTab(currentProcess) && (cachedData[currentProcess]||[]).length > 0) {
+    const ws = XLSX.utils.json_to_sheet(mesExcelRows(currentProcess));
+    XLSX.utils.book_append_sheet(wb, ws, currentProcess.replace('MES','') + ' MES원자료');
     added++;
   }
 
