@@ -571,6 +571,35 @@ th.sortable.desc::after { content:'▼'; color:#243bb2; }
   </div>
 </div>
 
+<!-- 사상 수정 모달 -->
+<div class="modal-overlay" id="editSasangModal">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-title">🪚 사상 작업일지 수정</div>
+    <div class="modal-sub" id="editSasangMeta">-</div>
+    <input type="hidden" id="esas_id" />
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field"><span class="modal-label">작업일</span><input class="modal-input" type="date" id="esas_work_date" /></div>
+      <div class="modal-field"><span class="modal-label">근무</span><select class="modal-input" id="esas_shift_type"><option value="주간">주간</option><option value="야간">야간</option></select></div>
+      <div class="modal-field"><span class="modal-label">설비</span><input class="modal-input" id="esas_equipment_no" /></div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field"><span class="modal-label">사번</span><input class="modal-input" id="esas_sabun" /></div>
+      <div class="modal-field"><span class="modal-label">제품명</span><input class="modal-input" id="esas_product_name" /></div>
+      <div class="modal-field"><span class="modal-label">방식</span><select class="modal-input" id="esas_work_method"><option value="수사상">수사상</option><option value="자동사상">자동사상</option></select></div>
+    </div>
+    <div class="modal-grid modal-grid-3">
+      <div class="modal-field"><span class="modal-label">성형LOT</span><input class="modal-input" id="esas_lot_no" /></div>
+      <div class="modal-field"><span class="modal-label">사상수량</span><input class="modal-input" type="number" id="esas_production_qty" /></div>
+      <div class="modal-field"><span class="modal-label">불량수량</span><input class="modal-input" type="number" id="esas_defect_qty" /></div>
+    </div>
+    <div class="modal-field"><span class="modal-label">비고</span><input class="modal-input" id="esas_note" /></div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal('editSasangModal')">취소</button>
+      <button class="btn-modal-save" id="esas_save_btn" onclick="saveEditSasang()">저장</button>
+    </div>
+  </div>
+</div>
+
 <!-- 성형 수정 모달 -->
 <div class="modal-overlay" id="editMoldingModal">
   <div class="modal-box" style="max-width:780px">
@@ -2904,10 +2933,62 @@ function renderSasangTable(data) {
         <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${r.defect_qty||0}</td>
         <td style="min-width:80px">${r.worker_name||''}</td><td style="font-size:11px">${r.note||''}</td>
         <td style="font-size:11px;color:#999">${fmtDatetime(r.created_at)}</td>
-        <td>${del ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : (() => { const canEdit = canEditDelete(r); const reason = canEdit ? '' : getCannotEditReason(r); return `<div class="row-actions"><button class="btn-row btn-row-del" ${canEdit ? `onclick="deleteSasang('${r.id}')">삭제` : `disabled title="${reason}">삭제`}</button></div>`; })()}</td>
+        <td>${del ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : (() => { const canEdit = canEditDelete(r); const reason = canEdit ? '' : getCannotEditReason(r); return `<div class="row-actions"><button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditSasang(${JSON.stringify(r).replace(/'/g, "&#39;")})'>수정` : `disabled title="${reason}">수정`}</button><button class="btn-row btn-row-del" ${canEdit ? `onclick="deleteSasang('${r.id}')">삭제` : `disabled title="${reason}">삭제`}</button></div>`; })()}</td>
       </tr>`;
     }).join('')}
     </tbody></table></div></div>`;
+}
+
+// ── 사상 수정 ──────────────────────────────
+// · sasang_reports에는 modified_at/modified_by 컬럼이 있는지 확인되지 않아 보내지 않음 (없으면 저장 자체가 실패)
+// · 변경 전/후는 logAudit(audit_logs)로 기록 — 포털은 로그인 상태라 기록됨
+// · id는 문자열/숫자 어느 쪽이든 그대로 사용 (deleteSasang과 동일)
+let editingSasangBefore = null;
+function openEditSasang(r) {
+  editingSasangBefore = JSON.parse(JSON.stringify(r));
+  document.getElementById('esas_id').value = r.id;
+  document.getElementById('esas_work_date').value = r.work_date || '';
+  document.getElementById('esas_shift_type').value = r.shift_type || '주간';
+  document.getElementById('esas_equipment_no').value = r.equipment_no || '';
+  document.getElementById('esas_sabun').value = r.sabun || '';
+  document.getElementById('esas_product_name').value = r.product_name || '';
+  var m = document.getElementById('esas_work_method');
+  m.value = r.work_method || '수사상';
+  if (m.value !== (r.work_method || '수사상')) {   // 목록에 없는 옛 값 보존
+    var o = document.createElement('option'); o.value = r.work_method; o.textContent = r.work_method; m.appendChild(o); m.value = r.work_method;
+  }
+  document.getElementById('esas_lot_no').value = r.lot_no || '';
+  document.getElementById('esas_production_qty').value = (r.production_qty == null ? '' : r.production_qty);
+  document.getElementById('esas_defect_qty').value = r.defect_qty || 0;
+  document.getElementById('esas_note').value = r.note || '';
+  document.getElementById('editSasangMeta').textContent = '설비: ' + (r.equipment_no||'-') + ' · 작업자: ' + (r.worker_name||'-');
+  document.getElementById('editSasangModal').classList.add('open');
+}
+
+async function saveEditSasang() {
+  var id = document.getElementById('esas_id').value;
+  var after = {
+    work_date: document.getElementById('esas_work_date').value,
+    shift_type: document.getElementById('esas_shift_type').value,
+    equipment_no: document.getElementById('esas_equipment_no').value.trim(),
+    sabun: document.getElementById('esas_sabun').value.trim(),
+    product_name: document.getElementById('esas_product_name').value.trim() || null,
+    work_method: document.getElementById('esas_work_method').value,
+    lot_no: document.getElementById('esas_lot_no').value.trim() || null,
+    production_qty: (function(v){ v = parseInt(v); return isNaN(v) ? null : v; })(document.getElementById('esas_production_qty').value),
+    defect_qty: parseInt(document.getElementById('esas_defect_qty').value) || 0,
+    note: document.getElementById('esas_note').value.trim() || null
+  };
+  if (!after.work_date) { showToast('작업일을 입력해 주세요'); return; }
+  if (!after.sabun) { showToast('사번은 필수예요'); return; }
+  var btn = document.getElementById('esas_save_btn'); btn.disabled = true;
+  var { error } = await db.from('sasang_reports').update(after).eq('id', id);
+  btn.disabled = false;
+  if (error) { showToast('저장 실패: ' + error.message); return; }
+  try { await logAudit('update', 'sasang_reports', id, editingSasangBefore, after, null); } catch(e) {}
+  showToast('수정 완료 ✓');
+  closeModal('editSasangModal');
+  loadData();
 }
 
 async function deleteSasang(id) {
