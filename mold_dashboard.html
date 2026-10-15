@@ -147,7 +147,7 @@ table.dt tr:hover { background:#f8fafc; }
         <div id="repairCard" class="card-list"><div class="loading">로딩 중...</div></div>
     </div>
     <div class="card">
-        <h4><span>📋</span> 최근 상태 변경 이력</h4>
+        <h4 style="display:flex;align-items:center;justify-content:space-between;"><span><span>📋</span> 최근 상태 변경 이력</span><button onclick="switchTab('status');var t=document.querySelector('.tabs');if(t)t.scrollIntoView({behavior:'smooth'});" style="border:none;background:none;color:#243bb2;font-size:12px;font-weight:600;cursor:pointer;">전체 보기 →</button></h4>
         <div id="historyCard" class="card-list"><div class="loading">로딩 중...</div></div>
     </div>
 </div>
@@ -171,6 +171,7 @@ table.dt tr:hover { background:#f8fafc; }
     <div class="tab active" onclick="switchTab('damage')">🔴 손상 이력 <span class="badge-count" id="damagePendingCount" style="display:none;">0</span></div>
     <div class="tab" onclick="switchTab('cleaning')">🧹 세척 이력</div>
     <div class="tab" onclick="switchTab('repair')">🔧 수리 이력</div>
+    <div class="tab" onclick="switchTab('status')">📋 상태변경 이력</div>
 </div>
 
 <!-- 손상 이력 탭 -->
@@ -212,14 +213,7 @@ table.dt tr:hover { background:#f8fafc; }
             <div class="hist-stat-card"><div class="num" id="clnInspect" style="color:#16a34a;">-</div><div class="label">순회검사</div></div>
             <div class="hist-stat-card"><div class="num" id="clnChange" style="color:#f59e0b;">-</div><div class="label">금형교체</div></div>
         </div>
-        <!-- 기간 필터 -->
-        <div class="period-filter" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
-            <button class="period-btn active" onclick="setClnPeriod('month','this')">당월</button>
-            <button class="period-btn" onclick="setClnPeriod('month','prev')">전월</button>
-            <button class="period-btn" onclick="setClnPeriod('months',3)">3개월</button>
-            <button class="period-btn" onclick="setClnPeriod('months',6)">6개월</button>
-            <button class="period-btn" onclick="setClnPeriod('all')">전체</button>
-        </div>
+        <!-- (2026-10-15) 탭 내부 기간 버튼 제거 — 상단 '기간' 조회와 이중 적용되던 문제 해결, 기간은 상단에서만 -->
         <!-- 검색 + 버튼 -->
         <div class="toolbar">
             <input type="text" class="search-input" id="clnSearch" placeholder="사번, 접수자, 세척내용 검색...">
@@ -230,16 +224,18 @@ table.dt tr:hover { background:#f8fafc; }
         <!-- 마이그레이션 영역 -->
         <div id="clnMigrationArea" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:12px;">
             <div style="font-size:13px;font-weight:600;margin-bottom:8px;">📂 과거 세척 데이터 엑셀 일괄 등록</div>
-            <p style="font-size:12px;color:#64748b;margin-bottom:10px;">엑셀 컬럼 순서: 접수날짜, 접수사번, 접수자, 세척기준, 세척내용, 완료날짜, 완료자, 비고 (첫 행은 헤더)</p>
+            <p style="font-size:12px;color:#64748b;margin-bottom:10px;">컬럼 순서: 접수날짜, 접수사번, 접수자, 세척기준, 세척내용, 완료날짜, 완료자, 비고 — 맨 앞에 NO. 열이 있어도, 제목·헤더 줄이 여러 줄이어도 자동으로 건너뜁니다. 시트가 여러 개면 가장 최신 데이터 시트를 추천하며, 아래에서 바꿀 수 있어요.</p>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 <label style="padding:7px 14px;background:#243bb2;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">
                     📂 파일 선택
                     <input type="file" id="clnMigFile" accept=".xlsx,.xls,.csv" onchange="parseClnMigration(this)" style="display:none;">
                 </label>
                 <span id="clnMigFileName" style="font-size:12px;color:#64748b;"></span>
-                <button id="clnMigSubmitBtn" style="display:none;padding:7px 14px;background:#16a34a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;" onclick="submitClnMigration()">일괄 등록</button>
+                <select id="clnMigSheet" onchange="clnReparse()" style="display:none;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;"></select>
+                <button id="clnMigSubmitBtn" disabled style="padding:7px 14px;background:#16a34a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;opacity:.5;" onclick="submitClnMigration()">⬆ 일괄 등록</button>
                 <span id="clnMigInfo" style="font-size:12px;color:#64748b;"></span>
             </div>
+            <div id="clnMigPreview" style="margin-top:10px;"></div>
         </div>
         <!-- 테이블 -->
         <div style="overflow-x:auto;">
@@ -273,6 +269,23 @@ table.dt tr:hover { background:#f8fafc; }
             <input type="text" class="search-input" id="repSearch" placeholder="사번, 수리업체, 수리내용 검색...">
             <button class="btn-primary" onclick="openRepairModal()">+ 수리 등록</button>
             <button class="btn-success" onclick="downloadRepairExcel()">📥 엑셀</button>
+            <button class="btn-outline" onclick="toggleRepMigration()" style="border:1px solid #94a3b8;background:#fff;color:#475569;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">📂 과거 데이터 등록</button>
+        </div>
+        <!-- 수리 과거 데이터 마이그레이션 (2026-10-15) -->
+        <div id="repMigrationArea" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:12px;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">📂 과거 수리 데이터 엑셀 일괄 등록</div>
+            <p style="font-size:12px;color:#64748b;margin-bottom:10px;">컬럼 순서: 시작일, 사번, 수리유형(수리/오버홀/부품교체/기타), 수리내용, 수리업체, 비용, 완료일, 상태(완료/수리중) — 맨 앞 NO. 열과 제목·헤더 줄은 자동으로 건너뜁니다. 금형 대장에 없는 사번은 등록에서 제외되고 목록으로 알려드려요.</p>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <label style="padding:7px 14px;background:#243bb2;color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">
+                    📂 파일 선택
+                    <input type="file" id="repMigFile" accept=".xlsx,.xls,.csv" onchange="parseRepMigration(this)" style="display:none;">
+                </label>
+                <span id="repMigFileName" style="font-size:12px;color:#64748b;"></span>
+                <select id="repMigSheet" onchange="repReparse()" style="display:none;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;"></select>
+                <button id="repMigSubmitBtn" disabled style="padding:7px 14px;background:#16a34a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;opacity:.5;" onclick="submitRepMigration()">⬆ 일괄 등록</button>
+                <span id="repMigInfo" style="font-size:12px;color:#64748b;"></span>
+            </div>
+            <div id="repMigPreview" style="margin-top:10px;"></div>
         </div>
         <table class="dt">
             <thead><tr>
@@ -280,6 +293,29 @@ table.dt tr:hover { background:#f8fafc; }
             </tr></thead>
             <tbody id="repBody"><tr><td colspan="9" class="empty-msg">로딩 중...</td></tr></tbody>
         </table>
+    </div>
+</div>
+
+<!-- ==================== 상태변경 이력 탭 (2026-10-15) ==================== -->
+<div class="tab-content" id="tab-status">
+    <div style="padding:16px 0;">
+        <div class="hist-stat-row">
+            <div class="hist-stat-card"><div class="num" id="stTotal" style="color:#243bb2;">-</div><div class="label">기간 내 변경</div></div>
+            <div class="hist-stat-card"><div class="num" id="stToRepair" style="color:#f59e0b;">-</div><div class="label">수리중 전환</div></div>
+            <div class="hist-stat-card"><div class="num" id="stToUse" style="color:#ef4444;">-</div><div class="label">사용중 전환</div></div>
+            <div class="hist-stat-card"><div class="num" id="stToStore" style="color:#16a34a;">-</div><div class="label">보관중 전환</div></div>
+        </div>
+        <div class="toolbar">
+            <input type="text" class="search-input" id="stSearch" placeholder="사번, 금형코드, 상태, 사유 검색...">
+            <button class="btn-success" onclick="downloadStatusExcel()">📥 엑셀</button>
+        </div>
+        <table class="dt">
+            <thead><tr>
+                <th>변경일시</th><th>사번</th><th>금형코드</th><th>변경 전</th><th>변경 후</th><th>사유</th>
+            </tr></thead>
+            <tbody id="stBody"><tr><td colspan="6" class="empty-msg">로딩 중...</td></tr></tbody>
+        </table>
+        <div id="stNote" style="font-size:11px;color:#94a3b8;margin-top:8px;">· 기간은 상단 '기간' 조회를 따릅니다 · 시간은 이 컴퓨터 시간대 기준</div>
     </div>
 </div>
 
@@ -479,7 +515,14 @@ async function loadHistoryData() {
         repQ += '&start_date=lte.' + endVal;
     }
 
+    // 상태변경 이력: created_at은 UTC 저장 → 한국 날짜 경계를 UTC로 환산해 조회
+    var stQ = 'select=*,molds(product_code,mold_code)&order=created_at.desc&limit=1000';
+    if (startVal) stQ += '&created_at=gte.' + encodeURIComponent(new Date(startVal + 'T00:00:00+09:00').toISOString());
+    if (endVal) stQ += '&created_at=lte.' + encodeURIComponent(new Date(endVal + 'T23:59:59+09:00').toISOString());
+
     try {
+        statusData = await sf('mold_status_logs', stQ);
+        if (!Array.isArray(statusData)) statusData = [];
         damageData = await sf('mold_damage_logs', dmgQ);
         cleanData = await sf('mold_cleaning_logs', clnQ);
         repairData = await sf('mold_maintenance', repQ);
@@ -493,7 +536,7 @@ async function loadHistoryData() {
         }
         equipmentList = Object.keys(equipSet).sort();
         buildDropdowns();
-        renderDamage(); renderClean(); renderRepair();
+        renderDamage(); renderClean(); renderRepair(); renderStatus();
     } catch(e) { showToast('이력 데이터 로드 실패: '+e.message,'error'); }
 }
 
@@ -588,6 +631,7 @@ function switchTab(name) {
     if (name==='damage') { tabs[0].classList.add('active'); document.getElementById('tab-damage').classList.add('active'); }
     if (name==='cleaning') { tabs[1].classList.add('active'); document.getElementById('tab-cleaning').classList.add('active'); }
     if (name==='repair') { tabs[2].classList.add('active'); document.getElementById('tab-repair').classList.add('active'); }
+    if (name==='status') { tabs[3].classList.add('active'); document.getElementById('tab-status').classList.add('active'); }
 }
 
 // =============================================
@@ -762,47 +806,15 @@ async function completeDamage(id) {
 // =============================================
 // 세척 이력 (개편)
 // =============================================
-var clnPeriod = 'month_this';
 var clnSortCol = 0;
 var clnSortDir = 'desc';
 var clnMigData = [];
-
-function setClnPeriod(type, val) {
-    clnPeriod = type + '_' + (val||'');
-    // 버튼 active
-    var btns = document.querySelectorAll('.period-btn');
-    for (var i=0; i<btns.length; i++) btns[i].classList.remove('active');
-    if (event && event.target) event.target.classList.add('active');
-    renderClean();
-}
-
-function getClnDateRange() {
-    var now = new Date();
-    var y = now.getFullYear(), m = now.getMonth();
-    if (clnPeriod === 'month_this') {
-        return { from: y+'-'+String(m+1).padStart(2,'0')+'-01', to: '9999-12-31' };
-    } else if (clnPeriod === 'month_prev') {
-        var pm = m === 0 ? 11 : m-1;
-        var py = m === 0 ? y-1 : y;
-        var lastDay = new Date(py, pm+1, 0).getDate();
-        return { from: py+'-'+String(pm+1).padStart(2,'0')+'-01', to: py+'-'+String(pm+1).padStart(2,'0')+'-'+lastDay };
-    } else if (clnPeriod === 'months_3') {
-        var d = new Date(y, m-3, 1);
-        return { from: d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01', to: '9999-12-31' };
-    } else if (clnPeriod === 'months_6') {
-        var d = new Date(y, m-6, 1);
-        return { from: d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01', to: '9999-12-31' };
-    }
-    return { from: '0000-01-01', to: '9999-12-31' };
-}
+// (2026-10-15) setClnPeriod/getClnDateRange 제거 — 기간은 상단 조회로 일원화
 
 function renderClean() {
     var keyword = (document.getElementById('clnSearch').value||'').toUpperCase();
-    var range = getClnDateRange();
 
     var filtered = cleanData.filter(function(c) {
-        var dt = c.request_date || '';
-        if (dt < range.from || dt > range.to) return false;
         if (!keyword) return true;
         var s = ((c.product_code||'')+(c.requester||'')+(c.cleaning_method||'')+(c.cleaning_reason||'')).toUpperCase();
         return s.indexOf(keyword)!==-1;
@@ -926,102 +938,152 @@ function toggleClnMigration() {
     el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
+// ═══ 과거 데이터 엑셀 일괄 등록 — 공용 엔진 (2026-10-15 개편) ═══
+// · 기존: 첫 시트만 읽고, 첫 행만 헤더로 건너뜀 → 지침서 시트가 첫 장인 관리대장에서 0건 파싱
+// · 개편: 모든 시트를 시험 파싱해 "가장 최신 날짜" 시트를 추천(드롭다운으로 변경 가능),
+//         제목·헤더 줄 수와 무관하게 날짜+사번이 읽히는 행만 수집, 실패 사유 통계 표시
+function mlParseDate(v) {
+    if (v === null || v === undefined || v === '') return '';
+    if (typeof v === 'number') { var d = XLSX.SSF.parse_date_code(v); return d ? d.y+'-'+('0'+d.m).slice(-2)+'-'+('0'+d.d).slice(-2) : ''; }
+    if (v instanceof Date && !isNaN(v.getTime())) { return v.getFullYear()+'-'+('0'+(v.getMonth()+1)).slice(-2)+'-'+('0'+v.getDate()).slice(-2); }
+    var t = String(v).trim().split(/\s+/)[0];
+    var m = t.match(/^(\d{2}|\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})\.?$/);
+    if (!m) return '';
+    var y = m[1].length === 2 ? '20'+m[1] : m[1];
+    return y+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+}
+// 2000~2099년 날짜로 읽히는 값인지 (NO. 열의 작은 숫자는 1900년대 날짜로 환산되므로 걸러짐)
+function mlPlausibleDate(v) {
+    var d = mlParseDate(v);
+    return (d >= '2000-01-01' && d <= '2099-12-31') ? d : '';
+}
+// 시트 1장 파싱. spec = { build: function(get, dateStr, code) -> record }
+function mlParseSheet(ws, spec) {
+    var json = XLSX.utils.sheet_to_json(ws, {defval:'', header:1});
+    var out = { rows: [], scanned: 0, headerish: 0, failDate: 0, failCode: 0, failSamples: [] };
+    for (var i=0; i<json.length; i++) {
+        var row = json[i];
+        if (!row || String(row.join('')).trim() === '') continue;
+        out.scanned++;
+        // NO. 열 자동 감지: 1열이 날짜로 안 읽히고 2열이 날짜로 읽히면 한 칸 밀어서 해석
+        var offset = mlPlausibleDate(row[0]) ? 0 : (mlPlausibleDate(row[1]) ? 1 : 0);
+        var get = function(k){ return row[offset+k]; };
+        var dateStr = mlPlausibleDate(get(0));
+        if (!dateStr) {
+            if (/[가-힣A-Za-z]/.test(String(get(0)))) { out.headerish++; }   // 제목/헤더 줄
+            else { out.failDate++; if (out.failSamples.length<3) out.failSamples.push((i+1)+'행: 날짜 "'+String(get(0)).substring(0,16)+'" 인식 실패'); }
+            continue;
+        }
+        var code = String(get(1)===null||get(1)===undefined?'':get(1)).trim();
+        if (!code) { out.failCode++; if (out.failSamples.length<3) out.failSamples.push((i+1)+'행: 사번 비어 있음'); continue; }
+        out.rows.push(spec.build(get, dateStr, code));
+    }
+    return out;
+}
+// 시트 추천: 파싱된 행의 최신 날짜가 가장 늦은 시트 (같으면 행 수 많은 쪽)
+function mlPickSheet(wb, spec, dateField) {
+    var best = null, bestKey = '';
+    for (var i=0; i<wb.SheetNames.length; i++) {
+        var name = wb.SheetNames[i];
+        var ws = wb.Sheets[name];
+        if (!ws) continue;   // 차트 시트 등
+        var r = mlParseSheet(ws, spec);
+        if (r.rows.length === 0) continue;
+        var maxD = '';
+        for (var k=0; k<r.rows.length; k++) { var d = r.rows[k][dateField]; if (d > maxD) maxD = d; }
+        var key = maxD + '|' + ('000000'+r.rows.length).slice(-6);
+        if (key > bestKey) { bestKey = key; best = name; }
+    }
+    return best;
+}
+function mlStatText(r) {
+    var t = '등록 가능 ' + r.rows.length + '건 (읽은 행 ' + r.scanned + ' · 제목/헤더 ' + r.headerish
+        + (r.failDate ? ' · 날짜 인식 실패 ' + r.failDate : '') + (r.failCode ? ' · 사번 없음 ' + r.failCode : '') + ')';
+    if (r.rows.length === 0 && r.failSamples.length) t += ' — ' + r.failSamples.join(' / ');
+    return t;
+}
+function mlPreviewHtml(rows, cols, extraNote) {
+    if (!rows.length) return '';
+    var h = '<div style="font-size:12px;color:#475569;margin-bottom:4px;">미리보기 (앞 5건) — 열이 제대로 매칭됐는지 확인 후 등록하세요</div>'
+        + '<table class="dt" style="font-size:12px;"><thead><tr>';
+    for (var c=0; c<cols.length; c++) h += '<th>'+cols[c][0]+'</th>';
+    h += '</tr></thead><tbody>';
+    for (var i=0; i<Math.min(rows.length,5); i++) {
+        h += '<tr>';
+        for (var c=0; c<cols.length; c++) { var v = rows[i][cols[c][1]]; h += '<td>'+(v===null||v===undefined?'':v)+'</td>'; }
+        h += '</tr>';
+    }
+    h += '</tbody></table>';
+    if (extraNote) h += '<div style="font-size:12px;color:#dc2626;margin-top:6px;">'+extraNote+'</div>';
+    return h;
+}
+function mlSetBtn(id, enabled) {
+    var b = document.getElementById(id);
+    b.disabled = !enabled;
+    b.style.opacity = enabled ? '1' : '.5';
+}
+
+// ── 세척 과거 등록 ──
+var clnWb = null;
+var CLN_SPEC = { build: function(get, dateStr, code) { return {
+    request_date: dateStr, product_code: code,
+    requester: String(get(2)||'').trim()||null,
+    cleaning_reason: String(get(3)||'').trim()||null,
+    cleaning_method: String(get(4)||'').trim()||null,
+    complete_date: mlPlausibleDate(get(5))||null,
+    completed_by: String(get(6)||'').trim()||null,
+    note: String(get(7)||'').trim()||null }; } };
+var CLN_COLS = [['접수일','request_date'],['사번','product_code'],['접수자','requester'],['세척기준','cleaning_reason'],['세척내용','cleaning_method'],['완료일','complete_date'],['완료자','completed_by']];
+
 function parseClnMigration(input) {
     var file = input.files[0];
     if (!file) return;
     document.getElementById('clnMigFileName').textContent = file.name;
-
     var reader = new FileReader();
     reader.onload = function(e) {
         try {
-            var wb = XLSX.read(e.target.result, {type:'array'});
-            var ws = wb.Sheets[wb.SheetNames[0]];
-            var json = XLSX.utils.sheet_to_json(ws, {defval:'', header:1});
-
-            // 첫 행이 헤더인지 확인 후 스킵
-            var startRow = 0;
-            if (json.length > 0) {
-                var first = String(json[0][0]||'');
-                if (first === 'NO.' || first === 'NO' || first === 'no' || first.indexOf('날짜') !== -1 || first.indexOf('접수') !== -1 || isNaN(Number(first))) {
-                    startRow = 1;
-                }
-                // NO. 컬럼이 숫자인 경우 (NO, 접수날짜, ...) 두번째 행부터
-                if (json.length > 1 && !isNaN(Number(json[1][0]))) {
-                    // 헤더 행이 있는 구조
-                }
+            clnWb = XLSX.read(e.target.result, {type:'array'});
+            var sel = document.getElementById('clnMigSheet');
+            sel.innerHTML = '';
+            for (var i=0; i<clnWb.SheetNames.length; i++) {
+                if (!clnWb.Sheets[clnWb.SheetNames[i]]) continue;
+                var o = document.createElement('option'); o.value = clnWb.SheetNames[i]; o.textContent = '시트: ' + clnWb.SheetNames[i];
+                sel.appendChild(o);
             }
-
-            clnMigData = [];
-            for (var i=startRow; i<json.length; i++) {
-                var row = json[i];
-                if (!row || row.length < 2) continue;
-
-                // NO 컬럼이 첫 번째인 경우 스킵 (엑셀 양식에 따라)
-                var offset = 0;
-                if (row.length >= 8 && !isNaN(Number(row[0])) && String(row[0]).length <= 5) {
-                    offset = 1; // NO 컬럼 건너뛰기
-                }
-
-                var dateVal = row[offset+0];
-                var productCode = String(row[offset+1]||'').trim();
-                if (!dateVal || !productCode) continue;
-
-                // 날짜 처리
-                var dateStr = '';
-                if (typeof dateVal === 'number') {
-                    var d = XLSX.SSF.parse_date_code(dateVal);
-                    if (d) dateStr = d.y+'-'+('0'+d.m).slice(-2)+'-'+('0'+d.d).slice(-2);
-                } else {
-                    dateStr = String(dateVal).trim();
-                    if (dateStr.indexOf('.') !== -1) {
-                        var parts = dateStr.split('.');
-                        if (parts.length >= 3) {
-                            var yr = parts[0].length === 2 ? '20'+parts[0] : parts[0];
-                            dateStr = yr+'-'+('0'+parts[1]).slice(-2)+'-'+('0'+parts[2]).slice(-2);
-                        }
-                    }
-                }
-                if (dateStr.length < 8) continue;
-
-                var completeDateVal = row[offset+5];
-                var completeDateStr = '';
-                if (completeDateVal) {
-                    if (typeof completeDateVal === 'number') {
-                        var d2 = XLSX.SSF.parse_date_code(completeDateVal);
-                        if (d2) completeDateStr = d2.y+'-'+('0'+d2.m).slice(-2)+'-'+('0'+d2.d).slice(-2);
-                    } else {
-                        completeDateStr = String(completeDateVal).trim().substring(0,10);
-                    }
-                }
-
-                clnMigData.push({
-                    request_date: dateStr.substring(0,10),
-                    product_code: productCode,
-                    requester: String(row[offset+2]||'').trim()||null,
-                    cleaning_reason: String(row[offset+3]||'').trim()||null,
-                    cleaning_method: String(row[offset+4]||'').trim()||null,
-                    complete_date: completeDateStr||null,
-                    completed_by: String(row[offset+6]||'').trim()||null,
-                    note: String(row[offset+7]||'').trim()||null
-                });
-            }
-
-            document.getElementById('clnMigInfo').textContent = clnMigData.length + '건 파싱 완료';
-            document.getElementById('clnMigInfo').style.color = '#16a34a';
-            if (clnMigData.length > 0) {
-                document.getElementById('clnMigSubmitBtn').style.display = 'inline-block';
-            }
+            var best = mlPickSheet(clnWb, CLN_SPEC, 'request_date');
+            if (best) sel.value = best;
+            sel.style.display = clnWb.SheetNames.length > 1 ? 'inline-block' : 'none';
+            clnReparse();
         } catch(ex) {
-            document.getElementById('clnMigInfo').textContent = '파싱 실패: ' + ex.message;
+            document.getElementById('clnMigInfo').textContent = '파일 읽기 실패: ' + ex.message;
             document.getElementById('clnMigInfo').style.color = '#dc2626';
         }
     };
     reader.readAsArrayBuffer(file);
 }
 
+function clnReparse() {
+    if (!clnWb) return;
+    var name = document.getElementById('clnMigSheet').value || clnWb.SheetNames[0];
+    var r = mlParseSheet(clnWb.Sheets[name], CLN_SPEC);
+    clnMigData = r.rows;
+    var info = document.getElementById('clnMigInfo');
+    info.textContent = mlStatText(r);
+    info.style.color = r.rows.length > 0 ? '#16a34a' : '#dc2626';
+    document.getElementById('clnMigPreview').innerHTML = mlPreviewHtml(r.rows, CLN_COLS);
+    mlSetBtn('clnMigSubmitBtn', r.rows.length > 0);
+}
+
 async function submitClnMigration() {
     if (clnMigData.length === 0) return;
-    if (!confirm(clnMigData.length + '건을 일괄 등록하시겠습니까?\n(중복 체크 없이 전부 등록됩니다)')) return;
+    // 같은 기간에 이미 등록된 건수 사전 확인 (재업로드 중복 방지 경고)
+    var ds = clnMigData.map(function(r){return r.request_date;}).sort();
+    var dupNote = '';
+    try {
+        var exist = await sf('mold_cleaning_logs','select=id&request_date=gte.'+ds[0]+'&request_date=lte.'+ds[ds.length-1]+'&limit=1000');
+        if (Array.isArray(exist) && exist.length > 0) dupNote = '\n\n⚠ 이 기간('+ds[0]+'~'+ds[ds.length-1]+')에 이미 '+exist.length+'건이 등록되어 있어요.\n같은 파일을 두 번 올리면 그대로 중복됩니다!';
+    } catch(e) {}
+    if (!confirm(clnMigData.length + '건을 일괄 등록하시겠습니까?\n기간: ' + ds[0] + ' ~ ' + ds[ds.length-1] + dupNote)) return;
 
     var total = clnMigData.length;
     var success = 0, fail = 0;
@@ -1062,14 +1124,184 @@ async function submitClnMigration() {
     if (fail > 0) msg += ', ' + fail + '건 실패';
     showToast(msg, fail > 0 ? 'error' : 'success');
 
-    clnMigData = [];
-    document.getElementById('clnMigSubmitBtn').style.display = 'none';
+    clnMigData = []; clnWb = null;
+    mlSetBtn('clnMigSubmitBtn', false);
+    document.getElementById('clnMigSheet').style.display = 'none';
+    document.getElementById('clnMigPreview').innerHTML = '';
     document.getElementById('clnMigFileName').textContent = '';
     document.getElementById('clnMigFile').value = '';
     document.getElementById('clnMigInfo').textContent = msg;
 
     await loadHistoryData();
 }
+
+// ── 수리 과거 등록 (2026-10-15, 세척과 같은 엔진) ──
+var repWb = null, repMigData = [], repMigSkipped = [];
+var REP_TYPE_MAP = {'수리':'repair','오버홀':'overhaul','부품교체':'part_replace','부품 교체':'part_replace','기타':'other'};
+var REP_SPEC = { build: function(get, dateStr, code) {
+    var endD = mlPlausibleDate(get(6)) || null;
+    var stTxt = String(get(7)||'').trim();
+    return {
+        _product_code: code,                  // 금형 대장 매칭용 (등록 전 제거)
+        start_date: dateStr,
+        maintenance_type: REP_TYPE_MAP[String(get(2)||'').trim()] || 'repair',
+        description: String(get(3)||'').trim()||null,
+        vendor: String(get(4)||'').trim()||null,
+        cost: (function(v){ v = parseFloat(String(v).replace(/,/g,'')); return isNaN(v) ? null : v; })(get(5)),
+        end_date: endD,
+        repair_status: (stTxt.indexOf('완료') > -1 || endD) ? 'completed' : 'in_progress'
+    }; } };
+var REP_COLS = [['시작일','start_date'],['사번','_product_code'],['유형','maintenance_type'],['수리내용','description'],['업체','vendor'],['비용','cost'],['완료일','end_date'],['상태','repair_status']];
+
+function toggleRepMigration() {
+    var el = document.getElementById('repMigrationArea');
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function parseRepMigration(input) {
+    var file = input.files[0];
+    if (!file) return;
+    document.getElementById('repMigFileName').textContent = file.name;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            repWb = XLSX.read(e.target.result, {type:'array'});
+            var sel = document.getElementById('repMigSheet');
+            sel.innerHTML = '';
+            for (var i=0; i<repWb.SheetNames.length; i++) {
+                if (!repWb.Sheets[repWb.SheetNames[i]]) continue;
+                var o = document.createElement('option'); o.value = repWb.SheetNames[i]; o.textContent = '시트: ' + repWb.SheetNames[i];
+                sel.appendChild(o);
+            }
+            var best = mlPickSheet(repWb, REP_SPEC, 'start_date');
+            if (best) sel.value = best;
+            sel.style.display = repWb.SheetNames.length > 1 ? 'inline-block' : 'none';
+            repReparse();
+        } catch(ex) {
+            document.getElementById('repMigInfo').textContent = '파일 읽기 실패: ' + ex.message;
+            document.getElementById('repMigInfo').style.color = '#dc2626';
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function repReparse() {
+    if (!repWb) return;
+    var name = document.getElementById('repMigSheet').value || repWb.SheetNames[0];
+    var r = mlParseSheet(repWb.Sheets[name], REP_SPEC);
+    // 금형 대장 매칭: mold_maintenance는 사번 없이 금형 id로만 연결되므로, 대장에 없는 사번은 제외
+    repMigData = []; repMigSkipped = [];
+    for (var i=0; i<r.rows.length; i++) {
+        var row = r.rows[i];
+        var mold = moldsData.find(function(m){ return m.product_code === row._product_code; });
+        if (mold) { row.mold_id = mold.id; repMigData.push(row); }
+        else if (repMigSkipped.indexOf(row._product_code) === -1) repMigSkipped.push(row._product_code);
+    }
+    var info = document.getElementById('repMigInfo');
+    info.textContent = mlStatText(r) + (repMigSkipped.length ? ' / 대장에 없는 사번 ' + repMigSkipped.length + '종 제외' : '');
+    info.style.color = repMigData.length > 0 ? '#16a34a' : '#dc2626';
+    var warn = repMigSkipped.length ? '⚠ 금형 대장에 없어 제외되는 사번: ' + repMigSkipped.join(', ') + ' — 먼저 금형을 등록하면 포함할 수 있어요.' : '';
+    document.getElementById('repMigPreview').innerHTML = mlPreviewHtml(repMigData, REP_COLS, warn) || (warn ? '<div style="font-size:12px;color:#dc2626;">'+warn+'</div>' : '');
+    mlSetBtn('repMigSubmitBtn', repMigData.length > 0);
+}
+
+async function submitRepMigration() {
+    if (repMigData.length === 0) return;
+    var ds = repMigData.map(function(r){return r.start_date;}).sort();
+    var dupNote = '';
+    try {
+        var exist = await sf('mold_maintenance','select=id&start_date=gte.'+ds[0]+'&start_date=lte.'+ds[ds.length-1]+'&limit=1000');
+        if (Array.isArray(exist) && exist.length > 0) dupNote = '\n\n⚠ 이 기간('+ds[0]+'~'+ds[ds.length-1]+')에 이미 '+exist.length+'건이 등록되어 있어요.\n같은 파일을 두 번 올리면 그대로 중복됩니다!';
+    } catch(e) {}
+    if (!confirm(repMigData.length + '건을 일괄 등록하시겠습니까?\n기간: ' + ds[0] + ' ~ ' + ds[ds.length-1]
+        + (repMigSkipped.length ? '\n(대장에 없는 사번 ' + repMigSkipped.length + '종은 제외)' : '') + dupNote)) return;
+
+    var rows = repMigData.map(function(r){ var c = {}; for (var k in r) { if (k !== '_product_code') c[k] = r[k]; } return c; });
+    var total = rows.length, success = 0, fail = 0, batchSize = 50;
+    for (var i=0; i<total; i+=batchSize) {
+        var batch = rows.slice(i, i+batchSize);
+        try {
+            var resp = await fetch(SU+'/rest/v1/mold_maintenance', { method:'POST', headers: supaHeaders(), body: JSON.stringify(batch) });
+            if (resp.ok) success += batch.length;
+            else { fail += batch.length; console.error('배치 실패:', await resp.text()); }
+        } catch(e) { fail += batch.length; console.error('배치 오류:', e); }
+        document.getElementById('repMigInfo').textContent = '진행 중... ' + Math.min(i+batchSize, total) + '/' + total;
+    }
+    var msg = success + '건 등록 완료';
+    if (fail > 0) msg += ', ' + fail + '건 실패';
+    showToast(msg, fail > 0 ? 'error' : 'success');
+    repMigData = []; repMigSkipped = []; repWb = null;
+    mlSetBtn('repMigSubmitBtn', false);
+    document.getElementById('repMigSheet').style.display = 'none';
+    document.getElementById('repMigPreview').innerHTML = '';
+    document.getElementById('repMigFileName').textContent = '';
+    document.getElementById('repMigFile').value = '';
+    document.getElementById('repMigInfo').textContent = msg;
+    await loadHistoryData();
+}
+
+// ── 상태변경 이력 탭 (2026-10-15) ──
+var statusData = [];
+var ST_LABEL = {'stored':'보관중','in_use':'사용중','repairing':'수리중','retired':'사용X'};
+function stFmtTime(iso) {
+    if (!iso) return '-';
+    var d = new Date(iso);   // UTC 저장분이 이 컴퓨터(한국) 시간으로 변환됨
+    return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+}
+function renderStatus() {
+    var body = document.getElementById('stBody');
+    if (!body) return;
+    var keyword = (document.getElementById('stSearch').value||'').toUpperCase();
+    var filtered = statusData.filter(function(l) {
+        if (!keyword) return true;
+        var sab = l.molds ? (l.molds.product_code||'') : '';
+        var mc = l.molds ? (l.molds.mold_code||'') : '';
+        var sTxt = (sab + mc + (ST_LABEL[l.prev_status]||l.prev_status||'') + (ST_LABEL[l.new_status]||l.new_status||'') + (l.reason||'')).toUpperCase();
+        return sTxt.indexOf(keyword) !== -1;
+    });
+    var toRep=0, toUse=0, toStore=0;
+    for (var i=0; i<statusData.length; i++) {
+        if (statusData[i].new_status === 'repairing') toRep++;
+        else if (statusData[i].new_status === 'in_use') toUse++;
+        else if (statusData[i].new_status === 'stored') toStore++;
+    }
+    document.getElementById('stTotal').textContent = statusData.length;
+    document.getElementById('stToRepair').textContent = toRep;
+    document.getElementById('stToUse').textContent = toUse;
+    document.getElementById('stToStore').textContent = toStore;
+
+    var h = '';
+    if (filtered.length === 0) { h = '<tr><td colspan="6" class="empty-msg">데이터가 없습니다</td></tr>'; }
+    else {
+        for (var i=0; i<filtered.length; i++) {
+            var l = filtered[i];
+            var nc = l.new_status === 'in_use' ? '#ef4444' : (l.new_status === 'repairing' ? '#f59e0b' : '#16a34a');
+            h += '<tr>'
+                + '<td style="white-space:nowrap;">' + stFmtTime(l.created_at) + '</td>'
+                + '<td><strong>' + (l.molds && l.molds.product_code ? l.molds.product_code : '-') + '</strong></td>'
+                + '<td>' + (l.molds && l.molds.mold_code ? l.molds.mold_code : '-') + '</td>'
+                + '<td>' + (ST_LABEL[l.prev_status] || l.prev_status || '(없음)') + '</td>'
+                + '<td style="color:'+nc+';font-weight:600;">' + (ST_LABEL[l.new_status] || l.new_status || '-') + '</td>'
+                + '<td style="font-size:12px;">' + (l.reason || '-') + '</td>'
+                + '</tr>';
+        }
+    }
+    body.innerHTML = h;
+    var note = document.getElementById('stNote');
+    if (note) note.textContent = '· 기간은 상단 \'기간\' 조회를 따릅니다 · 시간은 이 컴퓨터 시간대 기준' + (statusData.length >= 1000 ? ' · ⚠ 1,000건 초과 — 기간을 좁혀 조회하세요' : '');
+}
+
+function downloadStatusExcel() {
+    if (statusData.length === 0) { showToast('다운로드할 데이터가 없어요.','error'); return; }
+    var data = statusData.map(function(l) {
+        return {'변경일시': stFmtTime(l.created_at), '사번': l.molds ? (l.molds.product_code||'') : '', '금형코드': l.molds ? (l.molds.mold_code||'') : '',
+                '변경 전': ST_LABEL[l.prev_status]||l.prev_status||'', '변경 후': ST_LABEL[l.new_status]||l.new_status||'', '사유': l.reason||''};
+    });
+    var ws = XLSX.utils.json_to_sheet(data); var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '상태변경이력');
+    XLSX.writeFile(wb, '금형상태변경이력_' + new Date().toISOString().split('T')[0].replace(/-/g,'') + '.xlsx');
+}
+
 
 // =============================================
 // 수리 이력
@@ -1119,6 +1351,7 @@ function renderRepair() {
     document.getElementById('repBody').innerHTML=html;
 }
 document.getElementById('repSearch').addEventListener('input', renderRepair);
+document.getElementById('stSearch').addEventListener('input', renderStatus);
 
 function openRepairModal() {
     document.getElementById('rEditId').value='';
@@ -1210,6 +1443,7 @@ function handleHash() {
     if (h === 'damage') switchTab('damage');
     else if (h === 'cleaning') switchTab('cleaning');
     else if (h === 'repair') switchTab('repair');
+    else if (h === 'status') switchTab('status');
 }
 
 // =============================================
