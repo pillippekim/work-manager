@@ -41,6 +41,26 @@ th.cond-last{background:#eef7ef}
 .tag-old{display:inline-block;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:4px;font-size:10px;padding:1px 5px;margin-left:4px;vertical-align:middle}
 .tag-change{display:inline-block;background:#fff7ed;color:#d97706;border:1px solid #fdba74;border-radius:4px;font-size:11px;padding:1px 6px;font-weight:700}
 .face-tag{display:inline-block;border-radius:4px;font-size:11px;padding:1px 6px;font-weight:700}
+/* ── 보기/수정/삭제 (2026-10-15 추가) ── */
+.row-actions{display:flex;gap:4px;justify-content:center}
+.btn-row{border:none;border-radius:5px;font-size:11px;font-weight:600;padding:4px 8px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn-row-view{background:#eef2ff;color:#243bb2}
+.btn-row-edit{background:#fef3c7;color:#92400e}
+.btn-row-del{background:#fee2e2;color:#dc2626}
+.mcm-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9000;display:none;align-items:center;justify-content:center;padding:20px}
+.mcm-overlay.open{display:flex}
+.mcm-box{background:#fff;border-radius:14px;max-width:640px;width:100%;max-height:88vh;overflow-y:auto;padding:22px 24px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.mcm-title{font-size:16px;font-weight:700;color:#1e293b;margin-bottom:4px}
+.mcm-sub{font-size:12px;color:#64748b;margin-bottom:14px}
+.mcm-table{width:100%;border-collapse:collapse;margin-bottom:12px}
+.mcm-table th{background:#f8fafc;font-size:12px;padding:6px 8px;border:1px solid #e2e8f0}
+.mcm-table td{padding:5px 6px;border:1px solid #e2e8f0;text-align:center;font-size:13px}
+.mcm-table input{width:72px;padding:5px 6px;border:1px solid #d1d5db;border-radius:5px;font-size:13px;text-align:center;font-family:inherit;outline:none}
+.mcm-table input:focus{border-color:#243bb2}
+.mcm-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.mcm-cancel{background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.mcm-save{background:#243bb2;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.mcm-save:disabled{opacity:.5}
 </style>
 </head>
 <body>
@@ -103,6 +123,19 @@ th.cond-last{background:#eef7ef}
   </div>
 </div>
 
+<!-- 보기/수정 모달 (2026-10-15) -->
+<div class="mcm-overlay" id="condModal">
+  <div class="mcm-box">
+    <div class="mcm-title" id="cm_title">성형조건</div>
+    <div class="mcm-sub" id="cm_meta">-</div>
+    <div id="cm_body"></div>
+    <div class="mcm-btns">
+      <button class="mcm-cancel" onclick="closeCondModal()">닫기</button>
+      <button class="mcm-save" id="cm_save" onclick="saveEditCond()" style="display:none">저장</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -122,11 +155,14 @@ let viewRows = [];                                   // 현재 화면(헤더 필
 let sortState = { key: null, dir: 1 };               // 헤더 클릭 정렬 상태
 const INIT_DIR = { work_date: -1 };                  // 첫 클릭 시 내림차순이 자연스러운 컬럼
 let colFilters = { shift:'', equip:'', face:'', sabun:'', pname:'', stage:'', worker:'' };
+let me = null;             // 로그인 사용자 (변경이력 기록용)
+let editingCond = null;    // 수정 중인 행 {row, suffix}
 const FACE_COLORS = { ga:'#fff3cd', na:'#dbeafe', da:'#d4edda' };
 
 async function init() {
   const user = await checkAuth();
   if (!user) return;
+  me = user;
   document.getElementById('authCheckOverlay').style.display = 'none';
   document.getElementById('userInfo') && (document.getElementById('userInfo').textContent = user.name || '');
   const today = new Date();
@@ -231,6 +267,7 @@ function buildDispRows() {
     } catch(e) {}
 
     const base = {
+      id: r.id,
       work_date: r.work_date || '', shift: r.shift_type || '', equip: r.equipment_no || '',
       work_type: r.work_type || '표준', sabun: r.sabun || '',
       pname: r.product_name || PRODUCTS[r.sabun] || '',
@@ -373,7 +410,7 @@ function renderTable() {
       <tr>
         <th>NO</th>${sTh('work_date','작업일')}${sTh('shift','근무')}${sTh('equip','설비')}${hasFace ? sTh('face','면') : ''}${sTh('sabun','사번')}${sTh('pname','재질')}${sTh('stage','구분')}
         ${sTh('standard','기준','cond-std',sub)}${sTh('first','초품','cond-first',sub)}${sTh('middle','중품','cond-middle',sub)}${sTh('last','종품','cond-last',sub)}
-        ${sTh('worker','작업자')}
+        ${sTh('worker','작업자')}<th>작업</th>
       </tr>
       <tr class="filter-row">
         <th></th><th></th>
@@ -385,6 +422,7 @@ function renderTable() {
         <th><select onchange="setColFilter('stage',this.value)"><option value="">전체</option><option value="pre"${colFilters.stage==='pre' ? ' selected' : ''}>교체 전</option><option value="after"${colFilters.stage==='after' ? ' selected' : ''}>교체 후</option></select></th>
         <th></th><th></th><th></th><th></th>
         <th><select onchange="setColFilter('worker',this.value)">${opts(uniq('worker'), colFilters.worker)}</select></th>
+        <th></th>
       </tr>
       </thead>
       <tbody id="condTbody"></tbody>
@@ -414,13 +452,136 @@ function applyView() {
       ${stageTd}
       ${condCellHtml(c.standard)}${condCellHtml(c.first)}${condCellHtml(c.middle)}${condCellHtml(c.last)}
       <td style="font-size:12px">${x.worker || '-'}</td>
+      <td><div class="row-actions"><button class="btn-row btn-row-view" onclick="viewCond(${i})">보기</button><button class="btn-row btn-row-edit" onclick="openEditCond(${i})">수정</button><button class="btn-row btn-row-del" onclick="deleteCondRecord(${i})">삭제</button></div></td>
     </tr>`;
-  }).join('') || `<tr><td colspan="${hasFace ? 13 : 12}" style="text-align:center;color:#aaa;padding:24px">필터 조건에 맞는 행이 없어요.</td></tr>`;
+  }).join('') || `<tr><td colspan="${hasFace ? 14 : 13}" style="text-align:center;color:#aaa;padding:24px">필터 조건에 맞는 행이 없어요.</td></tr>`;
   const vc = document.getElementById('viewCount');
   if (vc) vc.textContent = `표시 ${viewRows.length}행 / 전체 ${dispRows.length}행` + (viewRows.length !== dispRows.length ? ' — 필터 적용 중 (엑셀도 표시된 행만 저장)' : '');
   document.querySelectorAll('.s-arr').forEach(el => {
     el.textContent = (el.dataset.k === sortState.key) ? (sortState.dir === 1 ? '▲' : '▼') : '';
   });
+}
+
+// ═══ 보기/수정/삭제 (2026-10-15) ═══
+// · 조건 데이터는 molding_reports.note(JSON) 안에 있고, 제출 시 같은 제출의 모든 행에 복사됨
+//   → 수정은 "같은 날·근무·설비" 전체 행의 note에 동일 반영 (합의: 2026-10-15)
+// · 삭제 = 작업일지 기록 자체 소프트삭제 (data_viewer 성형 탭과 동일, 중복 제출 정리 용도)
+// · 변경이력은 audit_logs에 data_viewer와 같은 컬럼(changed_by_*)으로 기록.
+//   record_id 타입이 맞지 않아 실패하면 reason에 id를 적어 재시도(이력 유실 방지).
+async function logCondAudit(action, recordId, before, after, reason) {
+  const payload = {
+    table_name: 'molding_reports', action,
+    changed_by_emp_code: me?.emp_code || null, changed_by_name: me?.name || '-',
+    changed_by_dept: me?.department || '', before_data: before, after_data: after,
+    reason: reason || null
+  };
+  let r = await db.from('audit_logs').insert({ ...payload, record_id: recordId });
+  if (r.error) r = await db.from('audit_logs').insert({ ...payload, record_id: null, reason: ((reason || '') + ' record_id=' + recordId).trim() });
+  return !r.error;
+}
+
+function condModalMeta(x) {
+  return `${x.work_date} · ${x.shift} · ${x.equip}` + (x.face !== 'single' ? ` · ${FACE_LABELS[x.face]||x.face}` : '')
+    + ` · 사번 ${x.sabun}` + (x.pname ? ` · ${x.pname}` : '') + ` · ${x.stage === 'after' ? '🔄 교체 후' : '교체 전'}`;
+}
+
+function condValueTable(cond, editable) {
+  const c = cond || {};
+  const cell = (key, fld, v) => editable
+    ? `<td><input id="cme_${key}_${fld}" value="${String(v ?? '').replace(/"/g,'&quot;')}" /></td>`
+    : `<td>${(v === '' || v == null) ? '<span style="color:#cbd5e1">·</span>' : v}</td>`;
+  return `<table class="mcm-table"><thead><tr><th></th><th>압력<br><span style="font-weight:400;color:#94a3b8">kgf/cm²</span></th><th>상판온도<br><span style="font-weight:400;color:#94a3b8">℃</span></th><th>하판온도<br><span style="font-weight:400;color:#94a3b8">℃</span></th></tr></thead><tbody>
+    ${TYPES.map(([key,label]) => { const v = c[key] || {p:'',u:'',l:''};
+      return `<tr><th>${label}</th>${cell(key,'p',v.p)}${cell(key,'u',v.u)}${cell(key,'l',v.l)}</tr>`; }).join('')}
+  </tbody></table>`;
+}
+
+function viewCond(i) {
+  const x = viewRows[i]; if (!x) return;
+  const rec = allData.find(r => r.id === x.id);
+  let noteText = '';
+  try { noteText = JSON.parse(rec.note).text || ''; } catch(e) { noteText = rec?.note || ''; }
+  document.getElementById('cm_title').textContent = '👁 성형조건 보기';
+  document.getElementById('cm_meta').textContent = condModalMeta(x);
+  document.getElementById('cm_body').innerHTML = condValueTable(x.cond, false)
+    + (x.old ? '<div style="font-size:12px;color:#92400e;background:#fff7ed;border-radius:6px;padding:8px 10px;margin-bottom:8px">구버전 단일기록 — 조건 세분화 이전 방식의 데이터로, 기준 열에만 값이 있어요.</div>' : '')
+    + `<div style="font-size:12px;color:#475569"><b>비고</b>: ${noteText || '-'}</div>`
+    + `<div style="font-size:12px;color:#475569;margin-top:4px"><b>작업자</b>: ${x.worker || '-'}</div>`;
+  document.getElementById('cm_save').style.display = 'none';
+  document.getElementById('condModal').classList.add('open');
+}
+
+function openEditCond(i) {
+  const x = viewRows[i]; if (!x) return;
+  if (x.old) { showToast('구버전 단일기록은 여기서 수정할 수 없어요. [데이터조회 및 추출] 성형 탭에서 수정해 주세요.'); return; }
+  const rec = allData.find(r => r.id === x.id);
+  if (!rec) { showToast('기록을 찾을 수 없어요. 다시 조회해 주세요.'); return; }
+  try { JSON.parse(rec.note); } catch(e) { showToast('이 기록의 비고 형식이 달라 수정할 수 없어요.'); return; }
+  editingCond = { row: x, suffix: x.stage === 'after' ? '_c' : '' };
+  document.getElementById('cm_title').textContent = '✏️ 성형조건 수정';
+  document.getElementById('cm_meta').textContent = condModalMeta(x);
+  document.getElementById('cm_body').innerHTML = condValueTable(x.cond, true)
+    + `<div style="font-size:12px;color:#64748b;background:#f8fafc;border-radius:6px;padding:8px 10px">저장하면 <b>같은 날·근무·설비의 모든 행</b>에 똑같이 반영돼요. (조건은 제출 시 모든 행에 복사되는 구조라, 행마다 다르게 두면 화면마다 값이 어긋나요)</div>`;
+  document.getElementById('cm_save').style.display = '';
+  document.getElementById('condModal').classList.add('open');
+}
+
+async function saveEditCond() {
+  if (!editingCond) return;
+  const { row, suffix } = editingCond;
+  const newCond = {};
+  TYPES.forEach(([key]) => {
+    newCond[key] = {
+      pressure: document.getElementById('cme_' + key + '_p').value.trim(),
+      upper: document.getElementById('cme_' + key + '_u').value.trim(),
+      lower: document.getElementById('cme_' + key + '_l').value.trim()
+    };
+  });
+  const btn = document.getElementById('cm_save'); btn.disabled = true;
+  // 같은 날·근무·설비 전체 행 조회 → note JSON의 해당 면 조건 교체
+  const { data: group, error: qErr } = await db.from('molding_reports')
+    .select('id, note')
+    .eq('work_date', row.work_date).eq('shift_type', row.shift).eq('equipment_no', row.equip)
+    .is('deleted_at', null);
+  if (qErr) { btn.disabled = false; showToast('조회 실패: ' + qErr.message); return; }
+  let okCnt = 0, skipCnt = 0, failCnt = 0, beforeCond = null;
+  for (const g of (group || [])) {
+    let n;
+    try { n = JSON.parse(g.note); } catch(e) { skipCnt++; continue; }   // 구버전/비JSON 행은 건드리지 않음
+    if (!n || typeof n !== 'object') { skipCnt++; continue; }
+    n.conditions = n.conditions || {};
+    TYPES.forEach(([key]) => {
+      const bucket = key + suffix;
+      n.conditions[bucket] = n.conditions[bucket] || {};
+      n.conditions[bucket][row.face] = { pressure: newCond[key].pressure, upper: newCond[key].upper, lower: newCond[key].lower };
+    });
+    if (g.id === row.id) beforeCond = row.cond;
+    const { error } = await db.from('molding_reports').update({ note: JSON.stringify(n) }).eq('id', g.id);
+    if (error) failCnt++; else okCnt++;
+  }
+  btn.disabled = false;
+  if (okCnt === 0) { showToast('저장하지 못했어요.' + (failCnt ? ' (오류 ' + failCnt + '건)' : '')); return; }
+  try { await logCondAudit('update', row.id, { face: row.face, stage: row.stage || 'pre', cond: beforeCond }, { face: row.face, stage: row.stage || 'pre', cond: newCond, applied_rows: okCnt }, '성형조건 수정(' + okCnt + '행 반영)'); } catch(e) {}
+  showToast('✓ 조건 수정 완료 — ' + okCnt + '행 반영' + (skipCnt ? ' (구버전 ' + skipCnt + '행 제외)' : '') + (failCnt ? ' / 실패 ' + failCnt + '행' : ''));
+  closeCondModal();
+  loadData();
+}
+
+async function deleteCondRecord(i) {
+  const x = viewRows[i]; if (!x) return;
+  if (!confirm('이 성형 작업일지 기록을 삭제할까요?\n\n' + condModalMeta(x)
+    + '\n\n※ 조건만이 아니라 이 행의 생산 실적까지 함께 삭제돼요. (중복 제출 정리 용도)\n삭제된 기록은 [데이터조회 및 추출] 성형 탭의 "삭제 포함"에서 확인할 수 있어요.')) return;
+  const rec = allData.find(r => r.id === x.id);
+  const { error } = await db.from('molding_reports').update({ deleted_at: new Date().toISOString() }).eq('id', x.id);
+  if (error) { showToast('삭제 실패: ' + error.message); return; }
+  try { await logCondAudit('delete', x.id, rec || null, null, '성형조건 조회에서 삭제'); } catch(e) {}
+  showToast('✓ 삭제 완료');
+  loadData();
+}
+
+function closeCondModal() {
+  document.getElementById('condModal').classList.remove('open');
+  editingCond = null;
 }
 
 function downloadExcel() {
