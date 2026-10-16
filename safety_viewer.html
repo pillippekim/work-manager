@@ -465,6 +465,7 @@ async function logSvAudit(action, table, recordId, before, after, reason) {
   };
   let r = await db.from('audit_logs').insert({ ...payload, record_id: recordId });
   if (r.error) r = await db.from('audit_logs').insert({ ...payload, record_id: null, reason: ((reason || '') + ' record_id=' + recordId).trim() });
+  window._lastAuditErr = r.error ? r.error.message : null;   // 실패 원인을 알림창에 그대로 노출
   return !r.error;
 }
 
@@ -488,11 +489,12 @@ function openEditSafety(i) {
 }
 
 async function saveEditSafety() {
+  try {
   const r = editingSafety; if (!r) return;
   const btn = document.getElementById('svm_save'); btn.disabled = true;
   // 최신 원본을 다시 읽어 그 위에 반영 (수정 사이에 바뀐 다른 설비 블록 보존)
   const { data: rec, error: qErr } = await db.from(r._table).select('*').eq('id', r.id).single();
-  if (qErr || !rec) { btn.disabled = false; showToast('원본 조회 실패: ' + (qErr?.message || '없음')); return; }
+  if (qErr || !rec) { btn.disabled = false; alert('[저장 중단] 원본 조회 실패\n' + (qErr?.message || '기록 없음')); return; }
 
   const curCd = r.check_data || {};
   const newVals = {};
@@ -526,16 +528,18 @@ async function saveEditSafety() {
 
   const { data: updRows, error } = await db.from(r._table).update(upd).eq('id', r.id).select('id');
   btn.disabled = false;
-  if (error) { showToast('저장 실패: ' + error.message); return; }
-  if (!updRows || updRows.length === 0) { showToast('저장되지 않았어요 — 이 테이블의 수정 권한 정책이 없을 수 있어요. (보안 점검 필요)'); return; }
+  if (error) { alert('[저장 실패] ' + error.message); return; }
+  if (!updRows || updRows.length === 0) { alert('[저장 안 됨] 이 테이블(' + r._table + ')에 수정 권한 정책이 없어 0건 처리됐어요.\n관리자에게 정책 추가를 요청해 주세요.'); return; }
   try { await logSvAudit('update', r._table, r.id, { equipment: r.equipment_no, eqKey: r._eqKey || null, check_data: beforeScope }, { check_data: upd.check_data, remarks: remarksVal }, '설비점검 수정'); } catch(e) {}
   showToast('✓ 수정 완료');
   closeSafetyModal();
   loadData();
+  } catch(ex) { var b=document.getElementById('svm_save'); if(b) b.disabled=false; alert('[저장 오류] ' + (ex && ex.message ? ex.message : ex)); console.error(ex); }
 }
 
 async function deleteSafety(i) {
-  const r = viewRows[i]; if (!r) return;
+  try {
+  const r = viewRows[i]; if (!r) { alert('행 정보를 찾지 못했어요. 새로고침 후 다시 시도해 주세요.'); return; }
   const siblings = allData.filter(x => x._table === r._table && x.id === r.id);
   const eqNames = [...new Set(siblings.map(x => x.equipment_no || '-'))];
   let msg = '이 점검 기록을 삭제할까요?\n\n' + svMeta(r);
@@ -545,14 +549,15 @@ async function deleteSafety(i) {
 
   // 1) 원본 확보 → 2) 변경이력 기록 (실패 시 삭제 중단) → 3) 삭제
   const { data: rec, error: qErr } = await db.from(r._table).select('*').eq('id', r.id).single();
-  if (qErr || !rec) { showToast('원본 조회 실패로 삭제를 중단했어요.'); return; }
+  if (qErr || !rec) { alert('[삭제 중단] 원본 조회 실패\n' + (qErr ? qErr.message : '기록 없음') + '\n(이 메시지를 관리자에게 전달해 주세요)'); return; }
   const audited = await logSvAudit('delete', r._table, r.id, rec, null, '설비점검 조회에서 완전 삭제');
-  if (!audited) { showToast('변경이력 기록에 실패해 삭제를 중단했어요. (이력 없이 완전 삭제는 위험)'); return; }
+  if (audited !== true) { alert('[삭제 중단] 변경이력 기록 실패\n' + (window._lastAuditErr || '원인 미상') + '\n(이력 없이 완전 삭제는 위험해 중단했어요. 이 메시지를 관리자에게 전달해 주세요)'); return; }
   const { data: delRows, error } = await db.from(r._table).delete().eq('id', r.id).select('id');
-  if (error) { showToast('삭제 실패: ' + error.message); return; }
-  if (!delRows || delRows.length === 0) { showToast('삭제되지 않았어요 — 이 테이블의 삭제 권한 정책이 없을 수 있어요. (보안 점검 필요)'); return; }
+  if (error) { alert('[삭제 실패] ' + error.message + '\n(이 메시지를 관리자에게 전달해 주세요)'); return; }
+  if (!delRows || delRows.length === 0) { alert('[삭제 안 됨] 이 테이블(' + r._table + ')에 삭제 권한 정책이 없어 0건 처리됐어요.\n관리자에게 정책 추가를 요청해 주세요.'); return; }
   showToast('✓ 삭제 완료');
   loadData();
+  } catch(ex) { alert('[삭제 오류] ' + (ex && ex.message ? ex.message : ex) + '\n(이 메시지를 관리자에게 전달해 주세요)'); console.error(ex); }
 }
 
 function closeSafetyModal() {
