@@ -266,7 +266,7 @@ function initSidebar() {
                     '<a class="nav-link' + masterActive + '" href="master_data.html"><span class="n-icon">🗂️</span>기준정보 관리</a>' +
                     '<a class="nav-link' + usersActive + '" href="users.html"><span class="n-icon">👥</span>사용자 관리</a>' +
                     '<a class="nav-link' + permActive + '" href="permissions.html"><span class="n-icon">🔐</span>권한 관리</a>' +
-                    '<a class="nav-link" href="' + PM + 'audit.html"><span class="n-icon">📋</span>변경 이력</a>' +
+                    '<a class="nav-link" href="audit.html"><span class="n-icon">📋</span>변경 이력</a>' +
                 '</div>' +
             '</div>' +
         '</div>' +

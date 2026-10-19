@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>변경 이력 - HKHT</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="common.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth_guard.js"></script>
+<style>
+/* ── audit(변경 이력) 고유 스타일 — project-moon audit.html에서 이식(2026-10-19) ── */
+.container{max-width:1400px}
+
+
+.filter-bar { display: flex; gap: 10px; margin-bottom: 1rem; align-items: end; flex-wrap: wrap; }
+.filter-group { display: flex; flex-direction: column; gap: 4px; }
+.filter-label { font-size: 11px; color: #888; }
+.filter-input { font-size: 13px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px 12px; outline: none; font-family: inherit; color: #111; min-width: 140px; }
+.btn-search { font-size: 13px; padding: 9px 18px; border-radius: 8px; background: #243bb2; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { font-size: 12px; font-weight: 500; color: #888; padding: 9px 12px; background: #f9f9f9; border-bottom: 1px solid #eee; text-align: left; white-space: nowrap; position: sticky; top: 0; z-index: 10; }
+td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+tr:hover td { background: #fafafa; }
+
+.action-tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+.action-create { background: #f0fdf4; color: #16a34a; }
+.action-update { background: #eff6ff; color: #243bb2; }
+.action-delete { background: #fef2f2; color: #dc2626; }
+.action-restore { background: #fef3c7; color: #d97706; }
+
+.diff-item { font-size: 11px; margin: 2px 0; padding: 4px 8px; border-radius: 4px; background: #f9f9f9; font-family: monospace; }
+.diff-key { color: #555; font-weight: 600; }
+.diff-old { color: #dc2626; text-decoration: line-through; }
+.diff-arrow { color: #aaa; margin: 0 4px; }
+.diff-new { color: #16a34a; font-weight: 500; }
+
+.btn-detail { font-size: 11px; padding: 4px 10px; border-radius: 6px; background: #eff6ff; color: #243bb2; border: none; cursor: pointer; font-family: inherit; }
+.btn-detail:hover { background: #dbeafe; }
+
+.empty { text-align: center; color: #aaa; padding: 3rem 1rem; }
+
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; padding: 1rem; }
+.modal-overlay.open { display: flex; }
+.modal-box { background: white; border-radius: 12px; padding: 1.5rem; width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto; }
+.modal-title { font-size: 16px; font-weight: 600; color: #111; margin-bottom: 1rem; }
+.json-block { background: #f5f5f5; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 11px; color: #333; max-height: 300px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+.btn-modal-close { font-size: 13px; padding: 9px 18px; border-radius: 8px; background: #243bb2; color: white; border: none; cursor: pointer; font-family: inherit; font-weight: 500; }
+</style>
+</head>
+<body>
+
+<!-- 권한 체크 로딩 화면 -->
+<div id="authCheckOverlay" style="position:fixed;inset:0;background:#f1f3f9;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="width:36px;height:36px;border:3px solid #e5e5e5;border-top-color:#243bb2;border-radius:50%;animation:authSpin 0.8s linear infinite"></div>
+  <div style="font-size:13px;color:#888;font-family:inherit">권한 확인 중...</div>
+  <style>@keyframes authSpin { to { transform: rotate(360deg); } }</style>
+</div>
+
+<!-- WM 레이아웃 -->
+<div id="top-header" class="top-header"></div>
+<nav id="sidebar-nav" class="sidebar"></nav>
+
+<div class="main">
+
+<div class="page-header">
+    <div class="header-row">
+      <div>
+        <h1>📋 변경 이력</h1>
+        <div class="sub">수정·삭제가 누가 언제 무엇을 바꿨는지 자동 기록된 감사 이력 조회 (삭제 전 원본 보존)</div>
+      </div>
+    </div>
+  </div>
+
+<div class="container">
+
+  <div class="card">
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label class="filter-label">시작일</label>
+        <input class="filter-input" type="date" id="startDate" />
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">종료일</label>
+        <input class="filter-input" type="date" id="endDate" />
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">테이블</label>
+        <select class="filter-input" id="filterTable">
+          <option value="">전체</option>
+          <optgroup label="작업일지">
+            <option value="molding_reports">성형</option><option value="sasang_reports">사상</option>
+            <option value="assembly_reports">조립</option><option value="packaging_reports">포장</option>
+            <option value="inspection_reports">검사</option><option value="cmb_reports">혼련</option>
+            <option value="cutting_reports">재단</option><option value="coating_reports">도포</option>
+            <option value="postcure_reports">2차가류</option><option value="shot_reports">쇼트</option>
+          </optgroup>
+          <optgroup label="설비점검">
+            <option value="molding_safety_check">성형</option><option value="sasang_safety_check">사상</option>
+            <option value="assembly_safety_check">조립</option><option value="cmb_safety_check">혼련</option>
+            <option value="cutting_safety_check">재단</option><option value="coating_safety_check">도포</option>
+            <option value="postcure_safety_check">2차가류</option><option value="shot_safety_check">쇼트</option>
+          </optgroup>
+          <optgroup label="기타">
+            <option value="users">사용자</option><option value="products">제품</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">작업</label>
+        <select class="filter-input" id="filterAction">
+          <option value="">전체</option>
+          <option value="update">수정</option>
+          <option value="delete">삭제</option>
+          <option value="restore">복구</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">변경자 (이름/입사코드)</label>
+        <input class="filter-input" type="text" id="filterUser" placeholder="검색" />
+      </div>
+      <button class="btn-search" onclick="loadAudit()">🔍 조회</button>
+    </div>
+  </div>
+
+  <div class="card" style="padding:0;overflow:auto;max-height:75vh">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:140px">변경 시각</th>
+          <th style="width:80px">작업</th>
+          <th style="width:130px">테이블</th>
+          <th style="width:80px">레코드 ID</th>
+          <th style="width:140px">변경자</th>
+          <th style="width:100px">부서</th>
+          <th>변경 내용</th>
+          <th style="width:80px">상세</th>
+        </tr>
+      </thead>
+      <tbody id="auditBody">
+        <tr><td colspan="8" class="empty">조회 버튼을 눌러주세요.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 상세 모달 -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal-box">
+    <div class="modal-title">📋 변경 상세</div>
+    <div id="detailMeta" style="font-size:13px;color:#555;margin-bottom:1rem;line-height:1.7"></div>
+    <div style="font-size:12px;color:#888;font-weight:500;margin-bottom:6px">변경 전</div>
+    <div class="json-block" id="beforeJson">-</div>
+    <div style="font-size:12px;color:#888;font-weight:500;margin: 1rem 0 6px">변경 후</div>
+    <div class="json-block" id="afterJson">-</div>
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+      <button class="btn-modal-close" onclick="document.getElementById('detailModal').classList.remove('open')">닫기</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const TABLE_LABELS = {
+  'packaging_reports':'포장 작업일지','inspection_reports':'검사 작업일지','molding_reports':'성형 작업일지',
+  'sasang_reports':'사상 작업일지','assembly_reports':'조립 작업일지','cmb_reports':'혼련 작업일지',
+  'cutting_reports':'재단 작업일지','coating_reports':'도포 작업일지','postcure_reports':'2차가류 작업일지','shot_reports':'쇼트 작업일지',
+  'molding_safety_check':'성형 설비점검','sasang_safety_check':'사상 설비점검','assembly_safety_check':'조립 설비점검',
+  'cmb_safety_check':'혼련 설비점검','cutting_safety_check':'재단 설비점검','coating_safety_check':'도포 설비점검',
+  'postcure_safety_check':'2차가류 설비점검','shot_safety_check':'쇼트 설비점검',
+  'users':'사용자','products':'제품','workers':'작업자','notices':'공지',
+  'mold_damage_logs':'금형 손상이력','mold_cleaning_logs':'금형 세척이력','mold_maintenance':'금형 수리이력','mold_status_logs':'금형 상태변경'
+};
+
+const ACTION_LABELS = {
+  'create': '생성',
+  'update': '수정',
+  'delete': '삭제',
+  'restore': '복구'
+};
+
+const FIELD_LABELS = {
+  'work_date': '작업일',
+  'worker_id': '사번',
+  'worker_name': '작업자',
+  'quantity': '포장수량',
+  'inspect_qty': '검사수량',
+  'pass_qty': '합격수량',
+  'fail_qty': '불합격수량',
+  'defect_type': '불량유형',
+  'defect_memo': '불량메모',
+  'lot_nos': '성형LOT',
+  'note': '비고',
+  'remarks': '특이사항',
+  'deleted_at': '삭제일시',
+  'deleted_reason': '삭제사유'
+};
+
+function fmtDatetime(s) {
+  if (!s) return '-';
+  const d = new Date(s);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+async function init() {
+  const user = await checkAuth();
+  if (!user) return;
+  document.getElementById('authCheckOverlay').style.display = 'none';
+  const ui = document.getElementById('userInfo'); if (ui) ui.textContent = user.name || '';
+  const today = new Date();
+  const lastWeek = new Date();
+  lastWeek.setDate(today.getDate() - 7);
+  document.getElementById('startDate').value = lastWeek.toISOString().slice(0,10);
+  document.getElementById('endDate').value = today.toISOString().slice(0,10);
+  loadAudit();
+}
+
+async function loadAudit() {
+  const start = document.getElementById('startDate').value;
+  const end = document.getElementById('endDate').value;
+  const table = document.getElementById('filterTable').value;
+  const action = document.getElementById('filterAction').value;
+  const user = document.getElementById('filterUser').value.trim();
+
+  let q = db.from('audit_logs').select('*');
+  if (start) q = q.gte('changed_at', start + 'T00:00:00');
+  if (end)   q = q.lte('changed_at', end + 'T23:59:59');
+  if (table) q = q.eq('table_name', table);
+  if (action) q = q.eq('action', action);
+  if (user) q = q.or(`changed_by_name.ilike.%${user}%,changed_by_emp_code.ilike.%${user}%`);
+
+  const { data, error } = await q.order('changed_at', { ascending: false }).limit(500);
+
+  const tbody = document.getElementById('auditBody');
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty">오류: ${error.message}</td></tr>`;
+    return;
+  }
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">조건에 맞는 이력이 없어요.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.map(log => {
+    const diffHtml = renderDiff(log);
+    return `<tr>
+      <td style="font-size:11px;color:#555">${fmtDatetime(log.changed_at)}</td>
+      <td><span class="action-tag action-${log.action}">${ACTION_LABELS[log.action] || log.action}</span></td>
+      <td style="font-size:12px">${TABLE_LABELS[log.table_name] || log.table_name}</td>
+      <td style="font-size:12px;color:#888">#${log.record_id}</td>
+      <td style="font-size:12px">${log.changed_by_name || '-'}<br><span style="color:#aaa;font-size:10px">${log.changed_by_emp_code || ''}</span></td>
+      <td style="font-size:11px;color:#888">${log.changed_by_dept || '-'}</td>
+      <td>${diffHtml}</td>
+      <td><button class="btn-detail" onclick='showDetail(${JSON.stringify(log).replace(/'/g, "&#39;")})'>상세</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderDiff(log) {
+  if (log.action === 'delete') {
+    return `<div style="font-size:11px;color:#dc2626">사유: ${log.reason || '-'}</div>`;
+  }
+  if (log.action === 'create') {
+    return '<div style="font-size:11px;color:#16a34a">신규 입력</div>';
+  }
+  if (log.action === 'restore') {
+    return '<div style="font-size:11px;color:#d97706">데이터 복구</div>';
+  }
+  // update
+  if (!log.before_data || !log.after_data) return '-';
+  const before = log.before_data;
+  const after = log.after_data;
+  const changes = [];
+  for (const key in after) {
+    if (key === 'modified_at' || key === 'modified_by') continue;
+    const b = JSON.stringify(before[key] ?? '');
+    const a = JSON.stringify(after[key] ?? '');
+    if (b !== a) {
+      changes.push(`<div class="diff-item"><span class="diff-key">${FIELD_LABELS[key] || key}:</span> <span class="diff-old">${b}</span><span class="diff-arrow">→</span><span class="diff-new">${a}</span></div>`);
+    }
+  }
+  return changes.length ? changes.slice(0, 5).join('') + (changes.length > 5 ? `<div style="font-size:10px;color:#aaa;margin-top:2px">... 외 ${changes.length-5}개 항목</div>` : '') : '-';
+}
+
+function showDetail(log) {
+  document.getElementById('detailMeta').innerHTML = `
+    <div><strong>변경 시각:</strong> ${fmtDatetime(log.changed_at)}</div>
+    <div><strong>작업:</strong> ${ACTION_LABELS[log.action]}</div>
+    <div><strong>테이블:</strong> ${TABLE_LABELS[log.table_name]} (ID: ${log.record_id})</div>
+    <div><strong>변경자:</strong> ${log.changed_by_name} (${log.changed_by_emp_code}) · ${log.changed_by_dept || '-'}</div>
+    ${log.reason ? `<div><strong>사유:</strong> ${log.reason}</div>` : ''}
+  `;
+  document.getElementById('beforeJson').textContent = log.before_data ? JSON.stringify(log.before_data, null, 2) : '-';
+  document.getElementById('afterJson').textContent = log.after_data ? JSON.stringify(log.after_data, null, 2) : '-';
+  document.getElementById('detailModal').classList.add('open');
+}
+
+init();
+</script>
+</div><!-- main -->
+<script src="sidebar.js"></script>
+</body>
+</html>
