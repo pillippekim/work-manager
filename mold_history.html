@@ -115,39 +115,12 @@ table.dt tr:hover { background:#f8fafc; }
 
 <!-- 탭 -->
 <div class="tabs">
-    <div class="tab active" onclick="switchTab('damage')">🔴 손상 이력 <span class="badge-count" id="damagePendingCount" style="display:none;">0</span></div>
+    <!-- (2026-10-19 통폐합) 손상 이력 탭을 수리 이력으로 흡수 — 손상은 수리 유형 '현장손상'으로 접수 -->
+    <div class="tab active" onclick="switchTab('repair')">🔧 수리 이력 <span class="badge-count" id="repPendingCount" style="display:none;">0</span></div>
     <div class="tab" onclick="switchTab('cleaning')">🧹 세척 이력</div>
-    <div class="tab" onclick="switchTab('repair')">🔧 수리 이력</div>
 </div>
 
 <div class="container">
-
-<!-- ==================== 손상 이력 탭 ==================== -->
-<div class="tab-content active" id="tab-damage">
-    <div class="stat-row">
-        <div class="stat-card"><div class="num" id="dmgTotal" style="color:#243bb2;">-</div><div class="label">전체</div></div>
-        <div class="stat-card"><div class="num" id="dmgPending" style="color:#dc2626;">-</div><div class="label">미조치</div></div>
-        <div class="stat-card"><div class="num" id="dmgProgress" style="color:#f59e0b;">-</div><div class="label">조치중</div></div>
-        <div class="stat-card"><div class="num" id="dmgDone" style="color:#16a34a;">-</div><div class="label">완료</div></div>
-    </div>
-    <div class="toolbar">
-        <input type="text" class="search-input" id="dmgSearch" placeholder="사번, 작업자, 손상내용 검색...">
-        <select class="filter-select" id="dmgFilter">
-            <option value="">전체 상태</option>
-            <option value="pending">미조치</option>
-            <option value="in_progress">조치중</option>
-            <option value="completed">완료</option>
-        </select>
-        <button class="btn-primary" onclick="openDamageModal()">+ 손상 등록</button>
-        <button class="btn-success" onclick="downloadDamageExcel()">📥 엑셀</button>
-    </div>
-    <table class="dt">
-        <thead><tr>
-            <th>날짜</th><th>사번</th><th>설비</th><th>작업자</th><th>손상내용</th><th>조치내용</th><th>상태</th><th>관리</th>
-        </tr></thead>
-        <tbody id="dmgBody"><tr><td colspan="8" class="empty-msg">로딩 중...</td></tr></tbody>
-    </table>
-</div>
 
 <!-- ==================== 세척 이력 탭 ==================== -->
 <div class="tab-content" id="tab-cleaning">
@@ -169,51 +142,26 @@ table.dt tr:hover { background:#f8fafc; }
 </div>
 
 <!-- ==================== 수리 이력 탭 ==================== -->
-<div class="tab-content" id="tab-repair">
+<div class="tab-content active" id="tab-repair">
     <div class="stat-row">
         <div class="stat-card"><div class="num" id="repTotal" style="color:#243bb2;">-</div><div class="label">전체</div></div>
+        <div class="stat-card"><div class="num" id="repPending" style="color:#dc2626;">-</div><div class="label">접수(미조치)</div></div>
         <div class="stat-card"><div class="num" id="repProgress" style="color:#f59e0b;">-</div><div class="label">수리중</div></div>
         <div class="stat-card"><div class="num" id="repDone" style="color:#16a34a;">-</div><div class="label">완료</div></div>
     </div>
     <div class="toolbar">
         <input type="text" class="search-input" id="repSearch" placeholder="사번, 수리업체, 수리내용 검색...">
-        <button class="btn-primary" onclick="openRepairModal()">+ 수리 등록</button>
+        <button class="btn-primary" onclick="openRepairModal()">+ 수리/손상 접수</button>
         <button class="btn-success" onclick="downloadRepairExcel()">📥 엑셀</button>
     </div>
     <table class="dt">
         <thead><tr>
-            <th>시작일</th><th>사번</th><th>금형코드</th><th>수리유형</th><th>수리내용</th><th>수리업체</th><th>완료일</th><th>상태</th><th>관리</th>
+            <th>시작일</th><th>사번</th><th>금형코드</th><th>유형</th><th>내용</th><th>설비</th><th>작업자</th><th>업체</th><th>완료일</th><th>상태</th><th>관리</th>
         </tr></thead>
-        <tbody id="repBody"><tr><td colspan="9" class="empty-msg">로딩 중...</td></tr></tbody>
+        <tbody id="repBody"><tr><td colspan="11" class="empty-msg">로딩 중...</td></tr></tbody>
     </table>
 </div>
 
-</div>
-
-<!-- 손상 등록 모달 -->
-<div class="modal-overlay" id="damageModal">
-    <div class="modal-content">
-        <h3><span id="dmgModalTitle">손상 등록</span><button class="modal-close" onclick="closeDamageModal()">✕</button></h3>
-        <div class="form-row">
-            <div class="form-group"><label>사번 *</label><input type="text" id="dProductCode" placeholder="502264"></div>
-            <div class="form-group"><label>발생일 *</label><input type="date" id="dDate"></div>
-        </div>
-        <div class="form-row">
-            <div class="form-group"><label>설비명</label><select id="dEquipment"><option value="">-- 설비 선택 --</option></select></div>
-            <div class="form-group"><label>작업자</label><select id="dWorker"><option value="">-- 작업자 선택 --</option></select></div>
-        </div>
-        <div class="form-group"><label>손상 내용 *</label><textarea id="dDamageDesc" rows="2" placeholder="하금형 손상 발생"></textarea></div>
-        <div class="form-group"><label>조치 내용</label><textarea id="dActionDesc" rows="2" placeholder="금형 수정"></textarea></div>
-        <div class="form-row">
-            <div class="form-group"><label>조치 상태</label>
-                <select id="dStatus"><option value="pending">미조치</option><option value="in_progress">조치중</option><option value="completed">완료</option></select>
-            </div>
-            <div class="form-group"><label>확인자</label><select id="dConfirmed"><option value="">-- 확인자 선택 --</option></select></div>
-        </div>
-        <div class="form-group"><label>비고</label><input type="text" id="dNote"></div>
-        <input type="hidden" id="dEditId" value="">
-        <button class="btn-submit" onclick="submitDamage()">등록</button>
-    </div>
 </div>
 
 <!-- 세척 등록 모달 -->
@@ -242,28 +190,37 @@ table.dt tr:hover { background:#f8fafc; }
     </div>
 </div>
 
-<!-- 수리 등록 모달 -->
+<!-- 수리/손상 접수 모달 (2026-10-19 통폐합) -->
 <div class="modal-overlay" id="repairModal">
     <div class="modal-content">
-        <h3><span>수리 등록</span><button class="modal-close" onclick="closeRepairModal()">✕</button></h3>
+        <h3><span id="rModalTitle">수리/손상 접수</span><button class="modal-close" onclick="closeRepairModal()">✕</button></h3>
         <div class="form-row">
             <div class="form-group"><label>사번 *</label><input type="text" id="rProductCode" placeholder="502264"></div>
-            <div class="form-group"><label>수리 시작일 *</label><input type="date" id="rStartDate"></div>
+            <div class="form-group"><label>시작일(발생일) *</label><input type="date" id="rStartDate"></div>
         </div>
-        <div class="form-group"><label>수리 유형</label>
-            <select id="rType"><option value="repair">수리</option><option value="overhaul">오버홀</option><option value="part_replace">부품 교체</option><option value="other">기타</option></select>
+        <div class="form-row">
+            <div class="form-group"><label>유형</label>
+                <select id="rType"><option value="field_damage">현장손상</option><option value="repair">수리</option><option value="overhaul">오버홀</option><option value="part_replace">부품 교체</option><option value="other">기타</option></select>
+            </div>
+            <div class="form-group"><label>상태</label>
+                <select id="rStatus"><option value="pending">접수(미조치)</option><option value="in_progress">수리중</option><option value="completed">완료</option></select>
+            </div>
         </div>
-        <div class="form-group"><label>수리 내용 *</label><textarea id="rDesc" rows="2" placeholder="수리 내용 입력"></textarea></div>
+        <div class="form-group"><label>내용 (손상/수리) *</label><textarea id="rDesc" rows="2" placeholder="예: 하금형 손상 발생 / 코어 교체"></textarea></div>
+        <div class="form-row">
+            <div class="form-group"><label>설비명</label><select id="rEquipment"><option value="">-- 설비 선택 --</option></select></div>
+            <div class="form-group"><label>작업자</label><select id="rWorker"><option value="">-- 작업자 선택 --</option></select></div>
+        </div>
         <div class="form-row">
             <div class="form-group"><label>수리 업체</label><input type="text" id="rVendor" placeholder="수리 업체명"></div>
             <div class="form-group"><label>비용 (원)</label><input type="number" id="rCost" min="0"></div>
         </div>
         <div class="form-row">
             <div class="form-group"><label>완료일</label><input type="date" id="rEndDate"></div>
-            <div class="form-group"><label>수리 상태</label>
-                <select id="rStatus"><option value="in_progress">수리중</option><option value="completed">완료</option></select>
-            </div>
+            <div class="form-group"><label>확인자</label><select id="rConfirmed"><option value="">-- 확인자 선택 --</option></select></div>
         </div>
+        <div class="form-group"><label>비고</label><input type="text" id="rNote"></div>
+        <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">· 접수/수리중으로 저장하면 이 사번의 금형이 자동으로 <b>수리중</b>이 되고, 완료 처리 시 <b>보관중</b>으로 복귀합니다 (상태변경 이력 자동 기록)</div>
         <input type="hidden" id="rEditId" value="">
         <button class="btn-submit" onclick="submitRepair()">등록</button>
     </div>
@@ -275,7 +232,7 @@ table.dt tr:hover { background:#f8fafc; }
 var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
 
-var damageData=[], cleanData=[], repairData=[], moldsData=[], workersData=[], equipmentList=[];
+var cleanData=[], repairData=[], moldsData=[], workersData=[], equipmentList=[];
 
 function supaHeaders() { return {'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=representation'}; }
 
@@ -300,8 +257,8 @@ async function supaDelete(t,id) {
 // =============================================
 function buildDropdowns() {
     // 작업자 드롭다운 (성형 공정 작업자)
-    var workerSel = document.getElementById('dWorker');
-    var confirmedSel = document.getElementById('dConfirmed');
+    var workerSel = document.getElementById('rWorker');
+    var confirmedSel = document.getElementById('rConfirmed');
     // 기존 옵션 유지 (첫 번째 기본 옵션)
     while(workerSel.options.length > 1) workerSel.remove(1);
     while(confirmedSel.options.length > 1) confirmedSel.remove(1);
@@ -323,7 +280,7 @@ function buildDropdowns() {
     }
 
     // 설비 드롭다운 (성형 설비 목록)
-    var equipSel = document.getElementById('dEquipment');
+    var equipSel = document.getElementById('rEquipment');
     while(equipSel.options.length > 1) equipSel.remove(1);
 
     for(var i=0; i<equipmentList.length; i++) {
@@ -342,9 +299,8 @@ function switchTab(name) {
     var contents = document.querySelectorAll('.tab-content');
     for(var i=0;i<tabs.length;i++) tabs[i].classList.remove('active');
     for(var i=0;i<contents.length;i++) contents[i].classList.remove('active');
-    if(name==='damage') { tabs[0].classList.add('active'); document.getElementById('tab-damage').classList.add('active'); }
+    if(name==='repair') { tabs[0].classList.add('active'); document.getElementById('tab-repair').classList.add('active'); }
     if(name==='cleaning') { tabs[1].classList.add('active'); document.getElementById('tab-cleaning').classList.add('active'); }
-    if(name==='repair') { tabs[2].classList.add('active'); document.getElementById('tab-repair').classList.add('active'); }
 }
 
 // =============================================
@@ -352,7 +308,6 @@ function switchTab(name) {
 // =============================================
 async function loadAll() {
     try {
-        damageData = await supaFetch('mold_damage_logs','order=damage_date.desc');
         cleanData = await supaFetch('mold_cleaning_logs','order=request_date.desc');
         repairData = await supaFetch('mold_maintenance','order=start_date.desc');
         moldsData = await supaFetch('molds','select=id,mold_code,product_code&limit=1000');
@@ -370,135 +325,11 @@ async function loadAll() {
         equipmentList = Object.keys(equipSet).sort();
 
         buildDropdowns();
-        renderDamage(); renderClean(); renderRepair();
+        renderClean(); renderRepair();
     } catch(e) { showToast('데이터 로드 실패: '+e.message,'error'); }
 }
 
-// =============================================
-// 손상 이력
-// =============================================
-function renderDamage() {
-    var keyword = (document.getElementById('dmgSearch').value||'').toUpperCase();
-    var filter = document.getElementById('dmgFilter').value;
-    var filtered = damageData.filter(function(d) {
-        if(filter && d.action_status !== filter) return false;
-        if(keyword) {
-            var s = ((d.product_code||'')+(d.worker_name||'')+(d.damage_desc||'')+(d.equipment_name||'')).toUpperCase();
-            if(s.indexOf(keyword)===-1) return false;
-        }
-        return true;
-    });
-    var pending=0, progress=0, done=0;
-    for(var i=0;i<damageData.length;i++) {
-        if(damageData[i].action_status==='pending') pending++;
-        else if(damageData[i].action_status==='in_progress') progress++;
-        else done++;
-    }
-    document.getElementById('dmgTotal').textContent = damageData.length;
-    document.getElementById('dmgPending').textContent = pending;
-    document.getElementById('dmgProgress').textContent = progress;
-    document.getElementById('dmgDone').textContent = done;
-    var badge = document.getElementById('damagePendingCount');
-    if(pending>0) { badge.textContent=pending; badge.style.display='inline-block'; }
-    else { badge.style.display='none'; }
-
-    var html='';
-    if(filtered.length===0) { html='<tr><td colspan="8" class="empty-msg">데이터가 없습니다</td></tr>'; }
-    else {
-        for(var i=0;i<filtered.length;i++) {
-            var d=filtered[i];
-            var statusText='미조치', badgeCls='badge-pending';
-            if(d.action_status==='in_progress') { statusText='조치중'; badgeCls='badge-progress'; }
-            if(d.action_status==='completed') { statusText='완료'; badgeCls='badge-completed'; }
-            html+='<tr>'
-                +'<td>'+(d.damage_date||'-')+'</td>'
-                +'<td><strong>'+(d.product_code||'-')+'</strong></td>'
-                +'<td>'+(d.equipment_name||'-')+'</td>'
-                +'<td>'+(d.worker_name||'-')+'</td>'
-                +'<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(d.damage_desc||'')+'">'+(d.damage_desc||'-')+'</td>'
-                +'<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(d.action_desc||'-')+'</td>'
-                +'<td><span class="badge '+badgeCls+'">'+statusText+'</span></td>'
-                +'<td>';
-            if(d.action_status!=='completed') {
-                html+='<button class="btn-sm btn-complete" onclick="completeDamage('+d.id+')">✅ 완료</button> ';
-            }
-            html+='<button class="btn-sm btn-edit" onclick="editDamage('+d.id+')">✏️</button>';
-            html+='</td></tr>';
-        }
-    }
-    document.getElementById('dmgBody').innerHTML=html;
-}
-
-document.getElementById('dmgSearch').addEventListener('input', renderDamage);
-document.getElementById('dmgFilter').addEventListener('change', renderDamage);
-
-function openDamageModal() {
-    document.getElementById('dmgModalTitle').textContent='손상 등록';
-    document.getElementById('dEditId').value='';
-    document.getElementById('dProductCode').value='';
-    document.getElementById('dDate').value=new Date().toISOString().split('T')[0];
-    document.getElementById('dEquipment').value='';
-    document.getElementById('dWorker').value='';
-    document.getElementById('dDamageDesc').value='';
-    document.getElementById('dActionDesc').value='';
-    document.getElementById('dStatus').value='pending';
-    document.getElementById('dConfirmed').value='';
-    document.getElementById('dNote').value='';
-    document.getElementById('damageModal').classList.add('show');
-}
-function closeDamageModal() { document.getElementById('damageModal').classList.remove('show'); }
-
-function editDamage(id) {
-    var d = damageData.find(function(x){return x.id===id;});
-    if(!d) return;
-    document.getElementById('dmgModalTitle').textContent='손상 수정';
-    document.getElementById('dEditId').value=d.id;
-    document.getElementById('dProductCode').value=d.product_code||'';
-    document.getElementById('dDate').value=d.damage_date||'';
-    document.getElementById('dEquipment').value=d.equipment_name||'';
-    document.getElementById('dWorker').value=d.worker_name||'';
-    document.getElementById('dDamageDesc').value=d.damage_desc||'';
-    document.getElementById('dActionDesc').value=d.action_desc||'';
-    document.getElementById('dStatus').value=d.action_status||'pending';
-    document.getElementById('dConfirmed').value=d.confirmed_by||'';
-    document.getElementById('dNote').value=d.note||'';
-    document.getElementById('damageModal').classList.add('show');
-}
-
-async function submitDamage() {
-    var pc=document.getElementById('dProductCode').value.trim();
-    var dd=document.getElementById('dDate').value;
-    var desc=document.getElementById('dDamageDesc').value.trim();
-    if(!pc||!dd||!desc) { showToast('사번, 발생일, 손상내용은 필수입니다','error'); return; }
-    var mold = moldsData.find(function(m){return m.product_code===pc;});
-    var data = {
-        product_code:pc, damage_date:dd,
-        mold_id: mold ? mold.id : null,
-        equipment_name:document.getElementById('dEquipment').value.trim()||null,
-        worker_name:document.getElementById('dWorker').value.trim()||null,
-        damage_desc:desc,
-        action_desc:document.getElementById('dActionDesc').value.trim()||null,
-        action_status:document.getElementById('dStatus').value,
-        confirmed_by:document.getElementById('dConfirmed').value.trim()||null,
-        note:document.getElementById('dNote').value.trim()
-    };
-    var editId=document.getElementById('dEditId').value;
-    try {
-        if(editId) { await supaUpdate('mold_damage_logs',editId,data); showToast('손상 이력 수정 완료','success'); }
-        else { await supaInsert('mold_damage_logs',data); showToast('손상 등록 완료 — 금형 상태가 자동으로 수리중으로 변경됩니다','success'); }
-        closeDamageModal(); await loadAll();
-    } catch(e) { showToast('저장 실패: '+e.message,'error'); }
-}
-
-async function completeDamage(id) {
-    if(!confirm('이 손상건을 조치 완료 처리하시겠습니까?\n금형 상태가 보관중으로 자동 복귀됩니다.')) return;
-    try {
-        await supaUpdate('mold_damage_logs',id,{action_status:'completed'});
-        showToast('조치 완료 처리됨 — 금형 상태가 보관중으로 복귀합니다','success');
-        await loadAll();
-    } catch(e) { showToast('처리 실패','error'); }
-}
-
+// (2026-10-19 통폐합) 손상 이력 함수 제거 — 수리 탭 '현장손상' 유형으로 흡수
 // =============================================
 // 세척 이력
 // =============================================
@@ -577,40 +408,49 @@ function renderRepair() {
     var keyword = (document.getElementById('repSearch').value||'').toUpperCase();
     var filtered = repairData.filter(function(r) {
         if(!keyword) return true;
-        var s = ((r.description||'')+(r.vendor||'')).toUpperCase();
-        return s.indexOf(keyword)!==-1;
+        var mold = moldsData.find(function(m){return m.id===r.mold_id;});
+        var s2 = ((r.product_code||(mold?mold.product_code:''))+(r.description||'')+(r.vendor||'')+(r.equipment_name||'')+(r.worker_name||'')).toUpperCase();
+        return s2.indexOf(keyword)!==-1;
     });
-    var prog=0, done=0;
+    var pend=0, prog=0, done=0;
     for(var i=0;i<repairData.length;i++) {
-        if(repairData[i].repair_status==='completed') done++; else prog++;
+        if(repairData[i].repair_status==='completed') done++;
+        else if(repairData[i].repair_status==='pending') pend++;
+        else prog++;
     }
     document.getElementById('repTotal').textContent = repairData.length;
+    document.getElementById('repPending').textContent = pend;
     document.getElementById('repProgress').textContent = prog;
     document.getElementById('repDone').textContent = done;
+    var badge = document.getElementById('repPendingCount');
+    if(badge) { if(pend>0) { badge.textContent=pend; badge.style.display='inline-block'; } else badge.style.display='none'; }
 
+    var typeKo = {'field_damage':'현장손상','repair':'수리','overhaul':'오버홀','part_replace':'부품교체','other':'기타'};
     var html='';
-    if(filtered.length===0) { html='<tr><td colspan="9" class="empty-msg">데이터가 없습니다</td></tr>'; }
+    if(filtered.length===0) { html='<tr><td colspan="11" class="empty-msg">데이터가 없습니다</td></tr>'; }
     else {
         for(var i=0;i<filtered.length;i++) {
             var r=filtered[i];
-            // mold_id로 금형 정보 찾기
             var mold = moldsData.find(function(m){return m.id===r.mold_id;});
-            var typeKo = {'repair':'수리','overhaul':'오버홀','part_replace':'부품교체','other':'기타'};
-            var statusText = r.repair_status==='completed' ? '완료' : '수리중';
-            var badgeCls = r.repair_status==='completed' ? 'badge-completed' : 'badge-progress';
+            var sabun = r.product_code || (mold?mold.product_code:'-');
+            var st = r.repair_status==='completed' ? ['완료','badge-completed'] : (r.repair_status==='pending' ? ['접수','badge-pending'] : ['수리중','badge-progress']);
+            var typeStyle = r.maintenance_type==='field_damage' ? 'color:#dc2626;font-weight:600;' : '';
             html+='<tr>'
                 +'<td>'+(r.start_date||'-')+'</td>'
-                +'<td><strong>'+(mold?mold.product_code:'-')+'</strong></td>'
+                +'<td><strong>'+sabun+'</strong></td>'
                 +'<td>'+(mold?mold.mold_code:'-')+'</td>'
-                +'<td>'+(typeKo[r.maintenance_type]||r.maintenance_type||'-')+'</td>'
-                +'<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(r.description||'-')+'</td>'
+                +'<td style="'+typeStyle+'">'+(typeKo[r.maintenance_type]||r.maintenance_type||'-')+'</td>'
+                +'<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(r.description||'')+'">'+(r.description||'-')+'</td>'
+                +'<td>'+(r.equipment_name||'-')+'</td>'
+                +'<td>'+(r.worker_name||'-')+'</td>'
                 +'<td>'+(r.vendor||'-')+'</td>'
                 +'<td>'+(r.end_date||'-')+'</td>'
-                +'<td><span class="badge '+badgeCls+'">'+statusText+'</span></td>'
+                +'<td><span class="badge '+st[1]+'">'+st[0]+'</span></td>'
                 +'<td>';
             if(r.repair_status!=='completed') {
-                html+='<button class="btn-sm btn-complete" onclick="completeRepair('+r.id+')">✅ 완료</button>';
+                html+='<button class="btn-sm btn-complete" onclick="completeRepair('+r.id+')">✅ 완료</button> ';
             }
+            html+='<button class="btn-sm btn-edit" onclick="editRepair('+r.id+')">✏️</button>';
             html+='</td></tr>';
         }
     }
@@ -619,38 +459,75 @@ function renderRepair() {
 document.getElementById('repSearch').addEventListener('input', renderRepair);
 
 function openRepairModal() {
+    document.getElementById('rModalTitle').textContent='수리/손상 접수';
     document.getElementById('rEditId').value='';
     document.getElementById('rProductCode').value='';
     document.getElementById('rStartDate').value=new Date().toISOString().split('T')[0];
-    document.getElementById('rType').value='repair';
+    document.getElementById('rType').value='field_damage';
+    document.getElementById('rStatus').value='pending';
     document.getElementById('rDesc').value='';
+    document.getElementById('rEquipment').value='';
+    document.getElementById('rWorker').value='';
     document.getElementById('rVendor').value='';
     document.getElementById('rCost').value='';
     document.getElementById('rEndDate').value='';
-    document.getElementById('rStatus').value='in_progress';
+    document.getElementById('rConfirmed').value='';
+    document.getElementById('rNote').value='';
     document.getElementById('repairModal').classList.add('show');
 }
 function closeRepairModal() { document.getElementById('repairModal').classList.remove('show'); }
+
+function editRepair(id) {
+    var r = repairData.find(function(x){return x.id===id;});
+    if(!r) return;
+    var mold = moldsData.find(function(m){return m.id===r.mold_id;});
+    document.getElementById('rModalTitle').textContent='수리 이력 수정';
+    document.getElementById('rEditId').value=r.id;
+    document.getElementById('rProductCode').value=r.product_code||(mold?mold.product_code:'');
+    document.getElementById('rStartDate').value=r.start_date||'';
+    document.getElementById('rType').value=r.maintenance_type||'repair';
+    document.getElementById('rStatus').value=r.repair_status||'in_progress';
+    document.getElementById('rDesc').value=r.description||'';
+    document.getElementById('rEquipment').value=r.equipment_name||'';
+    document.getElementById('rWorker').value=r.worker_name||'';
+    document.getElementById('rVendor').value=r.vendor||'';
+    document.getElementById('rCost').value=(r.cost==null?'':r.cost);
+    document.getElementById('rEndDate').value=r.end_date||'';
+    document.getElementById('rConfirmed').value=r.confirmed_by||'';
+    document.getElementById('rNote').value=r.note||'';
+    document.getElementById('repairModal').classList.add('show');
+}
 
 async function submitRepair() {
     var pc=document.getElementById('rProductCode').value.trim();
     var sd=document.getElementById('rStartDate').value;
     var desc=document.getElementById('rDesc').value.trim();
-    if(!pc||!sd||!desc) { showToast('사번, 시작일, 수리내용은 필수입니다','error'); return; }
+    if(!pc||!sd||!desc) { showToast('사번, 시작일, 내용은 필수입니다','error'); return; }
     var mold = moldsData.find(function(m){return m.product_code===pc;});
+    if(!mold) { showToast('금형 대장에 없는 사번(' + pc + ')이에요. [금형 상세관리]에서 금형을 먼저 등록해 주세요.','error'); return; }
     var data = {
-        mold_id: mold ? mold.id : null,
+        mold_id: mold.id,
+        product_code: pc,
         maintenance_type:document.getElementById('rType').value,
         description:desc,
+        equipment_name:document.getElementById('rEquipment').value.trim()||null,
+        worker_name:document.getElementById('rWorker').value.trim()||null,
         vendor:document.getElementById('rVendor').value.trim()||null,
         cost:parseFloat(document.getElementById('rCost').value)||null,
         start_date:sd,
         end_date:document.getElementById('rEndDate').value||null,
-        repair_status:document.getElementById('rStatus').value
+        repair_status:document.getElementById('rStatus').value,
+        confirmed_by:document.getElementById('rConfirmed').value.trim()||null,
+        note:document.getElementById('rNote').value.trim()||null
     };
+    var editId=document.getElementById('rEditId').value;
     try {
-        await supaInsert('mold_maintenance',data);
-        showToast('수리 이력 등록 완료','success');
+        if(editId) { await supaUpdate('mold_maintenance',editId,data); showToast('수리 이력 수정 완료','success'); }
+        else {
+            data.created_by_name = window._meName || null;
+            await supaInsert('mold_maintenance',data);
+            showToast(data.repair_status==='completed' ? '수리 이력 등록 완료' : '접수 완료 — 금형 상태가 자동으로 수리중이 됩니다','success');
+        }
         closeRepairModal(); await loadAll();
     } catch(e) { showToast('저장 실패: '+e.message,'error'); }
 }
@@ -667,14 +544,6 @@ async function completeRepair(id) {
 // =============================================
 // 엑셀 다운로드
 // =============================================
-function downloadDamageExcel() {
-    var data = damageData.map(function(d) {
-        var st = {'pending':'미조치','in_progress':'조치중','completed':'완료'};
-        return {'발생일':d.damage_date,'사번':d.product_code,'설비명':d.equipment_name||'','작업자':d.worker_name||'','손상내용':d.damage_desc||'','조치내용':d.action_desc||'','상태':st[d.action_status]||'','확인':d.confirmed_by||'','비고':d.note||''};
-    });
-    var ws=XLSX.utils.json_to_sheet(data); var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'손상이력');
-    XLSX.writeFile(wb,'금형손상이력_'+new Date().toISOString().split('T')[0].replace(/-/g,'')+'.xlsx');
-}
 function downloadCleanExcel() {
     var data = cleanData.map(function(c) {
         return {'접수일':c.request_date,'사번':c.product_code,'접수자':c.requester||'','세척기준':c.cleaning_reason||'','세척내용':c.cleaning_method||'','완료일':c.complete_date||'','완료자':c.completed_by||'','비고':c.note||''};
@@ -685,8 +554,9 @@ function downloadCleanExcel() {
 function downloadRepairExcel() {
     var data = repairData.map(function(r) {
         var mold = moldsData.find(function(m){return m.id===r.mold_id;});
-        var typeKo = {'repair':'수리','overhaul':'오버홀','part_replace':'부품교체','other':'기타'};
-        return {'시작일':r.start_date,'사번':mold?mold.product_code:'','금형코드':mold?mold.mold_code:'','수리유형':typeKo[r.maintenance_type]||'','수리내용':r.description||'','수리업체':r.vendor||'','비용':r.cost||'','완료일':r.end_date||'','상태':r.repair_status==='completed'?'완료':'수리중'};
+        var typeKo = {'field_damage':'현장손상','repair':'수리','overhaul':'오버홀','part_replace':'부품교체','other':'기타'};
+        var stKo = r.repair_status==='completed'?'완료':(r.repair_status==='pending'?'접수(미조치)':'수리중');
+        return {'시작일':r.start_date,'사번':r.product_code||(mold?mold.product_code:''),'금형코드':mold?mold.mold_code:'','유형':typeKo[r.maintenance_type]||'','내용':r.description||'','설비':r.equipment_name||'','작업자':r.worker_name||'','수리업체':r.vendor||'','비용':r.cost||'','완료일':r.end_date||'','상태':stKo,'확인자':r.confirmed_by||'','비고':r.note||''};
     });
     var ws=XLSX.utils.json_to_sheet(data); var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'수리이력');
     XLSX.writeFile(wb,'금형수리이력_'+new Date().toISOString().split('T')[0].replace(/-/g,'')+'.xlsx');
@@ -696,7 +566,6 @@ function downloadRepairExcel() {
 // 토스트 + 모달 닫기
 // =============================================
 function showToast(msg,type) { var el=document.getElementById('toast'); el.textContent=msg; el.className='toast toast-'+type+' show'; setTimeout(function(){el.classList.remove('show');},3000); }
-document.getElementById('damageModal').addEventListener('click',function(e){if(e.target===this)closeDamageModal();});
 document.getElementById('cleanModal').addEventListener('click',function(e){if(e.target===this)closeCleanModal();});
 document.getElementById('repairModal').addEventListener('click',function(e){if(e.target===this)closeRepairModal();});
 
@@ -705,9 +574,8 @@ loadAll();
 // URL 해시로 탭 자동 전환 (#damage, #cleaning, #repair)
 function handleHash() {
     var h = window.location.hash.replace('#','');
-    if(h === 'damage') switchTab('damage');
+    if(h === 'damage' || h === 'repair') switchTab('repair');   // 손상은 수리로 통합(구 링크 호환)
     else if(h === 'cleaning') switchTab('cleaning');
-    else if(h === 'repair') switchTab('repair');
 }
 handleHash();
 // 같은 페이지에서 해시만 바뀔 때도 탭 전환
@@ -719,7 +587,7 @@ window.addEventListener('hashchange', function() {
 </div><!-- main -->
 <script src="sidebar.js"></script>
 <script>
-(async function(){ var user = await checkAuth(); if(!user) return; })();
+(async function(){ var user = await checkAuth(); if(!user) return; window._meName = user.name || null; })();
 </script>
 </body>
 </html>
