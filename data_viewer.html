@@ -95,7 +95,8 @@
 .show-deleted-toggle.active { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
 
 /* 정렬 가능 헤더 */
-th.sortable { cursor:pointer; user-select:none; position:relative; white-space:nowrap; }
+/* (2026-10-19) position:relative가 공용 th의 sticky(머리행 고정)를 덮어쓰던 문제 수정 — 정렬 열도 틀고정 유지 */
+th.sortable { cursor:pointer; user-select:none; position:sticky; top:0; z-index:5; white-space:nowrap; }
 th.sortable:hover { background:#eef0ff; }
 th.sortable::after { content:'⇅'; margin-left:4px; font-size:10px; color:#b0b8c9; }
 th.sortable.asc::after { content:'▲'; color:#243bb2; }
