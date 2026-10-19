@@ -208,7 +208,12 @@ table.dt tr:hover { background:#f8fafc; }
         </div>
         <div class="form-group"><label>내용 (손상/수리) *</label><textarea id="rDesc" rows="2" placeholder="예: 하금형 손상 발생 / 코어 교체"></textarea></div>
         <div class="form-row">
-            <div class="form-group"><label>설비명</label><select id="rEquipment"><option value="">-- 설비 선택 --</option></select></div>
+            <div class="form-group"><label>설비명</label>
+                <div style="display:flex;gap:6px;">
+                    <select id="rEquipment" style="flex:2;"><option value="">-- 설비 선택 --</option></select>
+                    <select id="rFace" style="flex:1;"><option value="">면 없음</option><option value="가면">가면</option><option value="나면">나면</option><option value="다면">다면</option></select>
+                </div>
+            </div>
             <div class="form-group"><label>작업자</label><select id="rWorker"><option value="">-- 작업자 선택 --</option></select></div>
         </div>
         <div class="form-row">
@@ -263,10 +268,13 @@ function buildDropdowns() {
     while(workerSel.options.length > 1) workerSel.remove(1);
     while(confirmedSel.options.length > 1) confirmedSel.remove(1);
 
+    var seenWorker = {};   // (2026-10-19) 작업자 테이블에 공정별 중복 행이 있어 이름 기준으로 1회만 표시
     for(var i=0; i<workersData.length; i++) {
         var w = workersData[i];
         var displayName = (w.name_local || w.name || '') + (w.name_local && w.name ? ' (' + w.name + ')' : '');
         if(!displayName) continue;
+        if(seenWorker[displayName]) continue;
+        seenWorker[displayName] = true;
 
         var opt1 = document.createElement('option');
         opt1.value = w.name_local || w.name;
@@ -467,6 +475,7 @@ function openRepairModal() {
     document.getElementById('rStatus').value='pending';
     document.getElementById('rDesc').value='';
     document.getElementById('rEquipment').value='';
+    document.getElementById('rFace').value='';
     document.getElementById('rWorker').value='';
     document.getElementById('rVendor').value='';
     document.getElementById('rCost').value='';
@@ -488,7 +497,9 @@ function editRepair(id) {
     document.getElementById('rType').value=r.maintenance_type||'repair';
     document.getElementById('rStatus').value=r.repair_status||'in_progress';
     document.getElementById('rDesc').value=r.description||'';
-    document.getElementById('rEquipment').value=r.equipment_name||'';
+    (function(){ var en=r.equipment_name||''; var m=en.match(/^(.*?)\s*(가면|나면|다면)$/);
+        document.getElementById('rEquipment').value = m ? m[1] : en;
+        document.getElementById('rFace').value = m ? m[2] : ''; })();
     document.getElementById('rWorker').value=r.worker_name||'';
     document.getElementById('rVendor').value=r.vendor||'';
     document.getElementById('rCost').value=(r.cost==null?'':r.cost);
@@ -510,7 +521,7 @@ async function submitRepair() {
         product_code: pc,
         maintenance_type:document.getElementById('rType').value,
         description:desc,
-        equipment_name:document.getElementById('rEquipment').value.trim()||null,
+        equipment_name:(function(){ var eq=document.getElementById('rEquipment').value.trim(); var fc=document.getElementById('rFace').value; return eq ? (fc ? eq+' '+fc : eq) : null; })(),
         worker_name:document.getElementById('rWorker').value.trim()||null,
         vendor:document.getElementById('rVendor').value.trim()||null,
         cost:parseFloat(document.getElementById('rCost').value)||null,
