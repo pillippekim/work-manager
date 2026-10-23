@@ -379,12 +379,18 @@ var SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6I
 var allMolds = [];
 var cleanData = [], repairData = [], moldsData = [], workersData = [], equipmentList = [];
 
-function supaHeaders() { return {'apikey':SK,'Authorization':'Bearer '+SK,'Content-Type':'application/json','Prefer':'return=representation'}; }
+function supaHeaders() {
+    // 2026-10-23: 로그인 세션 토큰 사용 (auth_guard.agHeaders), 미로드 시 anon 폴백
+    var h = window.agHeaders ? window.agHeaders() : {'apikey':SK,'Authorization':'Bearer '+SK};
+    h['Content-Type'] = 'application/json'; h['Prefer'] = 'return=representation';
+    return h;
+}
 
 async function sf(t,q) {
     var u = SU + '/rest/v1/' + t;
     if (q) u += '?' + q;
-    var r = await fetch(u, {headers:{'apikey':SK,'Authorization':'Bearer '+SK}});
+    await (window.agReady || Promise.resolve()); // 세션 토큰 준비 대기 (2026-10-23)
+    var r = await fetch(u, {headers: window.agHeaders ? window.agHeaders() : {'apikey':SK,'Authorization':'Bearer '+SK}});
     return await r.json();
 }
 

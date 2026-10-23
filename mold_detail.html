@@ -353,17 +353,16 @@ var shotTargetMold = null;
 // API 헬퍼
 // =============================================
 function supaHeaders() {
-    return {
-        'apikey': SUPABASE_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
-    };
+    // 2026-10-23: 로그인 세션 토큰 사용 (auth_guard.agHeaders), 미로드 시 anon 폴백
+    var h = window.agHeaders ? window.agHeaders() : {'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
+    h['Content-Type'] = 'application/json'; h['Prefer'] = 'return=representation';
+    return h;
 }
 
 async function supaFetch(table, query) {
     var url = SUPABASE_URL + '/rest/v1/' + table;
     if (query) url += '?' + query;
+    await (window.agReady || Promise.resolve()); // 세션 토큰 준비 대기 (2026-10-23)
     var res = await fetch(url, { headers: supaHeaders() });
     return await res.json();
 }

@@ -390,14 +390,13 @@ var currentBuildingId = null;
 async function supaFetch(table, query) {
     var url = SUPABASE_URL + '/rest/v1/' + table;
     if (query) url += '?' + query;
-    var res = await fetch(url, {
-        headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': 'Bearer ' + SUPABASE_KEY
-        }
-    });
+    await (window.agReady || Promise.resolve()); // 세션 토큰 준비 대기 (2026-10-23)
+    var res = await fetch(url, { headers: window.agHeaders ? window.agHeaders() : {'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY} });
     return await res.json();
 }
+// 2026-10-23: 팝업(상태 이력·타발수·비고)에서 쓰던 SB/H가 정의돼 있지 않아 ReferenceError로 동작 불가였음 → 정의 추가
+var SB = SUPABASE_URL;
+function H_() { return window.agHeaders ? window.agHeaders() : {'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}; }
 
 async function loadData() {
     // 현재 선택된 구역/동 기억
@@ -659,7 +658,7 @@ async function showMoldDetail(address) {
     var statusDates = {};
     try {
         for (var si = 0; si < moldIds.length; si++) {
-            var logRes = await fetch(SB + '/rest/v1/mold_status_logs?mold_id=eq.' + moldIds[si] + '&order=created_at.desc&limit=1', { headers: H });
+            var logRes = await fetch(SB + '/rest/v1/mold_status_logs?mold_id=eq.' + moldIds[si] + '&order=created_at.desc&limit=1', { headers: H_() });
             var logData = await logRes.json();
             if (Array.isArray(logData) && logData.length > 0) {
                 var dt = new Date(logData[0].created_at);
@@ -761,7 +760,7 @@ async function loadStatusHistory(moldId, idx) {
     var el = document.getElementById('historyList_' + idx);
     if (!el) return;
     try {
-        var res = await fetch(SB + '/rest/v1/mold_status_logs?select=*,molds(product_code)&mold_id=eq.' + moldId + '&order=created_at.desc&limit=5', { headers: H });
+        var res = await fetch(SB + '/rest/v1/mold_status_logs?select=*,molds(product_code)&mold_id=eq.' + moldId + '&order=created_at.desc&limit=5', { headers: H_() });
         var logs = await res.json();
         if (!Array.isArray(logs) || logs.length === 0) {
             el.innerHTML = '<div style="text-align:center;padding:8px;color:#94a3b8;font-size:12px;">이력이 없습니다</div>';
@@ -805,7 +804,7 @@ async function saveShotFromPopup(moldId, idx) {
     try {
         var res = await fetch(SB + '/rest/v1/molds?id=eq.' + moldId, {
             method: 'PATCH',
-            headers: Object.assign({}, H, { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+            headers: Object.assign({}, H_(), { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
             body: JSON.stringify({ total_shots: newTotal })
         });
         if (res.ok) {
@@ -830,7 +829,7 @@ async function saveNoteFromPopup(moldId, idx) {
     try {
         var res = await fetch(SB + '/rest/v1/molds?id=eq.' + moldId, {
             method: 'PATCH',
-            headers: Object.assign({}, H, { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+            headers: Object.assign({}, H_(), { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
             body: JSON.stringify({ note: note })
         });
         if (res.ok) {
@@ -1226,12 +1225,10 @@ document.getElementById('alertModal').addEventListener('click', function(e) {
 // Supabase 업데이트 함수
 // =============================================
 function supaHeaders() {
-    return {
-        'apikey': SUPABASE_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
-    };
+    // 2026-10-23: 로그인 세션 토큰 사용 (auth_guard.agHeaders), 미로드 시 anon 폴백
+    var h = window.agHeaders ? window.agHeaders() : {'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
+    h['Content-Type'] = 'application/json'; h['Prefer'] = 'return=representation';
+    return h;
 }
 
 async function supaUpdate(table, id, data) {
