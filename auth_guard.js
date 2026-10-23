@@ -5,6 +5,41 @@ var SUPABASE_URL_AG = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
 var SUPABASE_KEY_AG = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
 
 // =============================================
+// 세션 토큰 공유 (2026-10-23, 보안 2단계 ①)
+//  · raw fetch로 Supabase REST를 부르는 페이지(mold_*)가 anon key 대신
+//    로그인 세션 토큰(access_token)을 Authorization에 싣도록 한다.
+//  · window.agReady  : 세션 확인이 끝나면 resolve (토큰 또는 null)
+//  · window.AG_TOKEN : 현재 세션 토큰 (갱신 시 onAuthStateChange로 자동 교체)
+//  · window.agHeaders(extra) : {apikey, Authorization(세션 토큰, 없으면 anon)} + extra
+//  · 이 클라이언트 1개를 checkAuth/logout도 함께 사용
+// =============================================
+var _agClient = null;
+function agClient() {
+    if (!_agClient) _agClient = window.supabase.createClient(SUPABASE_URL_AG, SUPABASE_KEY_AG);
+    return _agClient;
+}
+window.AG_TOKEN = null;
+window.agReady = (async function () {
+    try {
+        // supabase-js가 auth_guard보다 늦게 로드되는 페이지 대비 (최대 3초 대기)
+        for (var i = 0; i < 30 && !window.supabase; i++) { await new Promise(function (r) { setTimeout(r, 100); }); }
+        if (!window.supabase) return null;
+        var c = agClient();
+        var s = await c.auth.getSession();
+        window.AG_TOKEN = (s.data && s.data.session && s.data.session.access_token) || null;
+        c.auth.onAuthStateChange(function (ev, session) {
+            window.AG_TOKEN = (session && session.access_token) || null;
+        });
+    } catch (e) { window.AG_TOKEN = null; }
+    return window.AG_TOKEN;
+})();
+window.agHeaders = function (extra) {
+    var h = { 'apikey': SUPABASE_KEY_AG, 'Authorization': 'Bearer ' + (window.AG_TOKEN || SUPABASE_KEY_AG) };
+    if (extra) { for (var k in extra) { h[k] = extra[k]; } }
+    return h;
+};
+
+// =============================================
 // 메뉴 구조 정의 (대분류 → 페이지 매핑)
 // =============================================
 window.MENU_STRUCTURE = {
@@ -69,7 +104,7 @@ window.canAccessCategory = function(userInfo, perms, category) {
 
 // 로그인 확인 함수 — 미로그인 시 login.html로 이동, 로그인 시 사용자 정보 반환
 async function checkAuth() {
-    var dbAuth = window.supabase.createClient(SUPABASE_URL_AG, SUPABASE_KEY_AG);
+    var dbAuth = agClient();
 
     var sessionResult = await dbAuth.auth.getSession();
     if (!sessionResult.data.session) {
@@ -180,7 +215,7 @@ async function checkAuth() {
 
 // 로그아웃
 async function logout() {
-    var dbAuth = window.supabase.createClient(SUPABASE_URL_AG, SUPABASE_KEY_AG);
+    var dbAuth = agClient();
     await dbAuth.auth.signOut();
     sessionStorage.removeItem('userInfo');
     sessionStorage.removeItem('userPerms');
