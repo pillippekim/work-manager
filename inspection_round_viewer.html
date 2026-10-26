@@ -204,7 +204,7 @@
 <script>
 var SU = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
 var SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
-var HR = {'apikey':SK,'Authorization':'Bearer '+SK};
+function HR(){ return window.agHeaders ? window.agHeaders() : {'apikey':SK,'Authorization':'Bearer '+SK}; } // 2026-10-26 세션 토큰
 var myInfo = null;
 var allData = [];
 var currentSort = { key: 'equipment', dir: 'desc' };
@@ -259,7 +259,7 @@ async function loadData() {
     }
 
     try {
-        var r = await fetch(SU+'/rest/v1/inspection_rounds?'+q, {headers:HR});
+        var r = await fetch(SU+'/rest/v1/inspection_rounds?'+q, {headers: HR()});
         allData = await r.json();
         currentSort = { key: 'equipment', dir: 'desc' };
         renderTable();
@@ -393,7 +393,7 @@ function editRecord(id) {
 async function deleteRecord(id) {
     if (!confirm('이 검사 기록(해당 면)을 삭제하시겠습니까?')) return;
     try {
-        await fetch(SU+'/rest/v1/inspection_rounds?id=eq.'+id, {method:'DELETE',headers:HR});
+        await fetch(SU+'/rest/v1/inspection_rounds?id=eq.'+id, {method:'DELETE',headers: HR()});
         showToast('삭제 완료','success');
         loadData();
     } catch(e) { showToast('삭제 실패','error'); }

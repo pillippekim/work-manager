@@ -258,8 +258,8 @@ body { font-family:'Noto Sans KR',sans-serif; background:#f1f3f9; color:#1e293b;
 <script>
 var SU = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
 var SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
-var H = {'apikey':SK,'Authorization':'Bearer '+SK,'Content-Type':'application/json','Prefer':'return=representation'};
-var HR = {'apikey':SK,'Authorization':'Bearer '+SK};
+function H(){ return window.agHeaders ? window.agHeaders({'Content-Type':'application/json','Prefer':'return=representation'}) : {'apikey':SK,'Authorization':'Bearer '+SK,'Content-Type':'application/json','Prefer':'return=representation'}; } // 2026-10-26 세션 토큰
+function HR(){ return window.agHeaders ? window.agHeaders() : {'apikey':SK,'Authorization':'Bearer '+SK}; } // 2026-10-26 세션 토큰
 
 var myInfo = null;
 var currentEquipType = 'press';
@@ -297,7 +297,7 @@ function showToast(msg,type) { var el=document.getElementById('toast'); el.textC
 async function loadEquipments() {
     var sel = document.getElementById('equipment');
     try {
-        var r = await fetch(SU+'/rest/v1/equipments?process=eq.성형&is_active=eq.true&order=sort_order', {headers:HR});
+        var r = await fetch(SU+'/rest/v1/equipments?process=eq.성형&is_active=eq.true&order=sort_order', {headers: HR()});
         var data = await r.json();
         if (data && data.length > 0) {
             // 그룹별 분류
@@ -546,11 +546,11 @@ async function autoCleanListup(sabun, inspDate, requester) {
         var dupUrl = SU + '/rest/v1/mold_cleaning_logs?product_code=eq.' + encodeURIComponent(sabun || '')
             + '&request_date=eq.' + encodeURIComponent(inspDate)
             + '&cleaning_reason=eq.' + encodeURIComponent('공정순회검사') + '&select=id';
-        var dr = await fetch(dupUrl, { headers: HR });
+        var dr = await fetch(dupUrl, { headers: HR() });
         var rows = dr.ok ? await dr.json() : [];
         if (rows && rows.length) return; // 같은 사번+접수일+공정순회검사 이미 있으면 건너뜀
         await fetch(SU + '/rest/v1/mold_cleaning_logs', {
-            method: 'POST', headers: H,
+            method: 'POST', headers: H(),
             body: JSON.stringify({
                 product_code: sabun || '',
                 request_date: inspDate,
@@ -664,7 +664,7 @@ async function submitForm() {
             var target = records.find(function(x){ return x.face === targetFace; }) || records[0];
             if (!target) { showToast('수정할 면 데이터가 비어 있습니다.','error'); return; }
             delete target.created_by; // 원래 작성자 유지
-            var r = await fetch(SU+'/rest/v1/inspection_rounds?id=eq.'+editId, {method:'PATCH',headers:H,body:JSON.stringify(target)});
+            var r = await fetch(SU+'/rest/v1/inspection_rounds?id=eq.'+editId, {method:'PATCH',headers: H(),body:JSON.stringify(target)});
             if (r.ok) {
                 showToast('수정 완료!','success');
                 await autoCleanListup(cleanSabun, inspDate, cleanWho);
@@ -673,7 +673,7 @@ async function submitForm() {
             return;
         }
         // 신규: 면별 개별 레코드로 저장
-        var r = await fetch(SU+'/rest/v1/inspection_rounds', {method:'POST',headers:H,body:JSON.stringify(records)});
+        var r = await fetch(SU+'/rest/v1/inspection_rounds', {method:'POST',headers: H(),body:JSON.stringify(records)});
         if (r.ok) {
             showToast('검사 제출 완료!','success');
             await autoCleanListup(cleanSabun, inspDate, cleanWho);
@@ -685,7 +685,7 @@ async function submitForm() {
 // 수정 모드 데이터 로드
 async function loadForEdit(id) {
     try {
-        var r = await fetch(SU+'/rest/v1/inspection_rounds?id=eq.'+id, {headers:HR});
+        var r = await fetch(SU+'/rest/v1/inspection_rounds?id=eq.'+id, {headers: HR()});
         var arr = await r.json();
         if (!arr || !arr[0]) return;
         var rec = arr[0];

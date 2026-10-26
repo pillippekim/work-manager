@@ -145,7 +145,7 @@ table.rp td.left { text-align:left; }
 <script>
 var SU = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
 var SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
-var HR = {'apikey':SK,'Authorization':'Bearer '+SK};
+function HR(){ return window.agHeaders ? window.agHeaders() : {'apikey':SK,'Authorization':'Bearer '+SK}; } // 2026-10-26 세션 토큰
 var myInfo = null;
 var faceMap = {A:'가',B:'나',C:'다'};
 
@@ -165,7 +165,7 @@ async function fetchAll(s, e){
   var all = [], offset = 0, limit = 1000;
   while (true) {
     var q = 'select=*&inspect_date=gte.'+s+'&inspect_date=lte.'+e+'&order=inspect_date.asc,equipment.asc&limit='+limit+'&offset='+offset;
-    var r = await fetch(SU+'/rest/v1/inspection_rounds?'+q, {headers:HR});
+    var r = await fetch(SU+'/rest/v1/inspection_rounds?'+q, {headers: HR()});
     var data = await r.json();
     if (!Array.isArray(data) || data.length === 0) break;
     all = all.concat(data);

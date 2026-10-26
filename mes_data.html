@@ -75,8 +75,8 @@ table.mes tr:hover { background:#f8fafc; }
 <script>
 var SU = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
 var SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
-function H(){ return {'apikey':SK,'Authorization':'Bearer '+SK,'Content-Type':'application/json','Prefer':'return=representation'}; }
-function HR(){ return {'apikey':SK,'Authorization':'Bearer '+SK}; }
+function H(){ return window.agHeaders ? window.agHeaders({'Content-Type':'application/json','Prefer':'return=representation'}) : {'apikey':SK,'Authorization':'Bearer '+SK,'Content-Type':'application/json','Prefer':'return=representation'}; } // 2026-10-26 세션 토큰
+function HR(){ return window.agHeaders ? window.agHeaders() : {'apikey':SK,'Authorization':'Bearer '+SK}; } // 2026-10-26 세션 토큰
 
 // ── 공정별 설정 ──────────────────────────────────────────────
 // map: [엑셀헤더, DB컬럼, 변환타입]  /  view: [DB컬럼, 표시헤더]
