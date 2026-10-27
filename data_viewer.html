@@ -2550,6 +2550,18 @@ function viewMoldingDay(date, sabun) {
 // 성형 기본 정렬: 작업일 desc → 반 → 설비 → 가나다 면 → 근무(주간→잔업→야간) → 비가동 행 하단
 function moldingFaceRank(wt){ var m={'가면':0,'나면':1,'다면':2}; return (wt in m) ? m[wt] : 3; }
 function moldingShiftRank(st){ var m={'주간':0,'잔업':1,'야간':2}; return (st in m) ? m[st] : 9; }
+// 비가동 사유 문자열: note.downtime(사번 매칭) 우선, 배열이 없을 때만 downtime_code 폴백 (2026-10-20 작성, 10/27 재적용)
+//   downtime_code 컬럼은 제출 시 첫 사유를 전 행에 복사한 요약값이라, 비가동을 지운 뒤에도 남아 있을 수 있음.
+function moldingDtCodes(r){
+  try {
+    var n = JSON.parse(r.note);
+    if (n && Array.isArray(n.downtime)) {
+      return n.downtime.filter(function(d){ return d && (!d.sabun || d.sabun === r.sabun); })
+                       .map(function(d){ return d.code; }).filter(Boolean).join(', ');
+    }
+  } catch(e) {}
+  return r.downtime_code || '';
+}
 function moldingRecHasDt(r){
   try { var n = JSON.parse(r.note); return (n.downtime||[]).some(function(d){ return (!d.sabun || d.sabun===r.sabun) && d.code; }) ? 1 : 0; } catch(e) { return 0; }
 }
@@ -2653,7 +2665,7 @@ function renderMoldingTable(data) {
         noteText = r.note || '';
       }
       // 비가동(사번 매칭) + 비가동시간(시작~종료(분))
-      let dtCode = r.downtime_code || '';
+      let dtCode = moldingDtCodes(r);
       let dtMin = '';
       try {
         const noteObj = JSON.parse(r.note);
@@ -2822,7 +2834,10 @@ async function saveEditMolding() {
     production_qty: parseInt(document.getElementById('emld_production_qty').value) || 0,
     defect_qty: parseInt(document.getElementById('emld_defect_qty').value) || 0,
     work_type: document.getElementById('emld_work_type').value,
-    note: noteVal
+    note: noteVal,
+    // 요약 컬럼도 함께 갱신 — 비가동을 모두 지우면 null (현장 molding.html 수정 로직과 동일)
+    downtime_code: _edited.length ? _edited[0].code : null,
+    problem: _edited.length ? (_edited[0].detail || null) : null
   };
 
   var { error } = await db.from('molding_reports').update(after).eq('id', id);
@@ -3457,7 +3472,7 @@ function downloadExcel() {
       '상판온도': (function(){ var c = moldingCondOf(r); return c ? c.u : ''; })(),
       '하판온도': (function(){ var c = moldingCondOf(r); return c ? c.l : ''; })(),
       '조건유형': (function(){ var c = moldingCondOf(r); return c ? c.t : ''; })(),
-      '비가동코드': r.downtime_code || '',
+      '비가동코드': moldingDtCodes(r),
       '비가동시간(분)': (function(){ var _d = moldingDowntimeMin(r); return _d > 0 ? _d : ''; })(),
       '근무시간': moldingWorkHours(r) === '-' ? '' : moldingWorkHours(r),
       '가동가능시간(분)': (function(){ var _a = moldingAvailableMin(r); return _a == null ? '' : _a; })(),
