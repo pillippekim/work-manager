@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="sidebar.css">
 <link rel="stylesheet" href="common.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><!-- 2026-10-28 누락 복구: auth_guard 세션 토큰이 이 라이브러리를 필요로 함 -->
 <script src="auth_guard.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -369,10 +370,9 @@ async function loadReport(){
 }
 
 document.addEventListener('DOMContentLoaded', async function(){
-  if (typeof checkPageAccess === 'function') {
-    myInfo = await checkPageAccess();
-    if (!myInfo) return;
-  }
+  myInfo = await checkAuth();            // 2026-10-28 포털 함수명으로 수정(checkPageAccess는 현장용이라 로그인 검사가 건너뛰어졌음)
+  if (!myInfo) return;
+  if (window.agReady) await window.agReady; // 세션 토큰 확보 후 조회
   quick('today');
 });
 </script>
