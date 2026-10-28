@@ -2065,6 +2065,20 @@ async function renderMolding(rows){
   /* 사번 셀: 사번(굵게) + 품명 + C/V, 금형교체로 투입된 사번은 🔄 */
   var mcTarget = {};
   mcs.forEach(function(m){ if (m.sabun) mcTarget[m.eq + '|' + m.sabun] = 1; });
+  /* 2026-10-28 사용자 의견: 금형교체 후 사번(🔄)은 기존 사번 아래로 — 사번 행 순서를 '기존 → 교체' 로 (화면·엑셀 공통, 원래 순서는 유지하는 안정 정렬) */
+  var mcWhen = {};   /* 교체 후 사번별 최초 교체 시각(일자+시작) — 교체가 여러 번이면 시각순 */
+  mcs.forEach(function(m){ if (!m.sabun) return; var k = m.eq+'|'+m.sabun, w = (m.date||'')+' '+(m.start||''); if (!mcWhen[k] || w < mcWhen[k]) mcWhen[k] = w; });
+  var mcAfter = function(eq, ord){
+    var keep = [], moved = [];
+    ord.forEach(function(sb){ (mcTarget[eq+'|'+sb] ? moved : keep).push(sb); });
+    moved.sort(function(a,b){ var x = mcWhen[eq+'|'+a]||'', y = mcWhen[eq+'|'+b]||''; return x < y ? -1 : (x > y ? 1 : 0); });
+    return keep.concat(moved);
+  };
+  eqs.forEach(function(k){
+    var E = byEq[k];
+    E.sbOrd = mcAfter(k, E.sbOrd);
+    Object.keys(E.fs).forEach(function(f){ E.fs[f].sbOrd = mcAfter(k, E.fs[f].sbOrd); });
+  });
   var sbCell = function(eq, sb, X){
     var pn = prodOf(sb).partName || '-';
     return '<td class="left" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px" title="'+esc(sb+' '+pn)+'">'
