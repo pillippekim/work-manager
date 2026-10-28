@@ -82,6 +82,8 @@ table.dt tr:hover { background:#f8fafc; }
 .btn-complete:hover { background:#15803d; }
 .btn-edit { background:#d97706; color:#fff; }
 .btn-edit:hover { background:#b45309; }
+.btn-del { background:#dc2626; color:#fff; }   /* 2026-10-28 수리 이력 삭제 */
+.btn-del:hover { background:#b91c1c; }
 
 /* 폼 (모달 안) */
 .form-group label { display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:4px; }
@@ -403,8 +405,10 @@ async function supaUpdate(t,id,d) {
     return await r.json();
 }
 async function supaDelete(t,id) {
+    // 2026-10-28: RLS에 막히면 0행 삭제인데도 204(성공)로 오므로, 삭제된 행을 돌려받아(Prefer: return=representation) 실제 건수로 판정
     var r = await fetch(SU+'/rest/v1/'+t+'?id=eq.'+id, {method:'DELETE', headers:supaHeaders()});
-    return r.ok;
+    if (!r.ok) return false;
+    try { var d = await r.json(); return Array.isArray(d) ? d.length > 0 : true; } catch (e) { return true; }
 }
 
 // 한국 로컬 날짜 포맷
@@ -1183,6 +1187,7 @@ function renderRepair() {
                 html+='<button class="btn-sm btn-complete" onclick="completeRepair('+r.id+')">✅ 완료</button> ';
             }
             html+='<button class="btn-sm btn-edit" onclick="editRepair('+r.id+')">✏️</button>';
+            if (window._meCanDel) html+=' <button class="btn-sm btn-del" onclick="deleteRepair('+r.id+')" title="삭제">🗑️</button>'; // 2026-10-28 관리자 이상
             html+='</td></tr>';
         }
     }
@@ -1267,6 +1272,47 @@ async function submitRepair() {
         closeRepairModal(); await loadHistoryData();
     } catch(e) { showToast('저장 실패: '+e.message,'error'); }
 }
+// =============================================
+// 2026-10-28 수리 이력 삭제 (사용자 의견) — 관리자(admin) 이상
+//  · 실제 DELETE. 미완료(접수/수리중) 건을 지우면 트리거가 돌지 않아 금형이 '수리중'에 남으므로
+//    같은 금형에 다른 미완료 건이 없을 때 '보관중'으로 복귀 + 상태변경 이력 기록 (완료 처리와 같은 결과)
+// =============================================
+async function deleteRepair(id) {
+    var r = null;
+    for (var i = 0; i < repairData.length; i++) { if (repairData[i].id === id) { r = repairData[i]; break; } }
+    if (!r) { showToast('대상을 찾을 수 없어요','error'); return; }
+    var stKo = r.repair_status === 'completed' ? '완료' : (r.repair_status === 'pending' ? '접수' : '수리중');
+    var msg = '이 수리 이력을 삭제할까요?\n\n'
+        + '사번: ' + (r.product_code || '-') + '\n시작일: ' + (r.start_date || '-') + '\n내용: ' + (r.description || '-') + '\n상태: ' + stKo + '\n\n'
+        + '※ 삭제 후 복구할 수 없어요.';
+    if (r.repair_status !== 'completed') msg += '\n※ 미완료 건이라 다른 미완료 건이 없으면 금형 상태를 보관중으로 되돌려요.';
+    if (!confirm(msg)) return;
+    try {
+        var ok = await supaDelete('mold_maintenance', id);
+        if (!ok) { showToast('삭제 실패 — 권한 또는 네트워크를 확인하세요','error'); return; }
+
+        // 상태 복구: 미완료 건 삭제 + 같은 금형에 다른 미완료 건 없음 + 현재 수리중 → 보관중
+        if (r.repair_status !== 'completed' && r.mold_id) {
+            var others = await sf('mold_maintenance', 'select=id&mold_id=eq.' + r.mold_id + '&repair_status=neq.completed&limit=1');
+            var cur = await sf('molds', 'select=id,status&id=eq.' + r.mold_id);
+            var curSt = (Array.isArray(cur) && cur[0]) ? cur[0].status : null;
+            if (Array.isArray(others) && others.length === 0 && curSt === 'repairing') {
+                await supaUpdate('molds', r.mold_id, { status: 'stored' });
+                try {
+                    await supaInsert('mold_status_logs', { mold_id: r.mold_id, prev_status: 'repairing', new_status: 'stored',
+                        reason: '수리 이력 삭제(' + (r.description || '') + ') — ' + (window._meName || '') });
+                } catch (e2) { console.log('상태 로그 기록 실패:', e2); }
+                showToast('삭제됨 · 금형 상태 보관중으로 복귀','success');
+            } else {
+                showToast('삭제됨','success');
+            }
+        } else {
+            showToast('삭제됨','success');
+        }
+        await loadHistoryData();
+    } catch (e) { showToast('삭제 실패: ' + (e.message || e), 'error'); }
+}
+
 async function completeRepair(id) {
     if (!confirm('이 수리건을 완료 처리하시겠습니까?')) return;
     try {
@@ -1325,7 +1371,7 @@ window.addEventListener('hashchange', handleHash);
 </script>
 <script src="sidebar.js"></script>
 <script>
-(async function(){ var user = await checkAuth(); if(!user) return; window._meName = user.name || null; })();
+(async function(){ var user = await checkAuth(); if(!user) return; window._meName = user.name || null; window._meCanDel = (user.user_type === 'super' || user.user_type === 'admin'); if (window._meCanDel && typeof renderRepair === 'function' && repairData.length) renderRepair(); })(); // 2026-10-28 삭제 권한(관리자 이상)
 </script>
 </body>
 </html>
