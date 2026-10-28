@@ -453,26 +453,38 @@
     // STEP 3: 출고 처리 (FIFO)
     // ══════════════════════════════════════
     function doMatchAndProcess() {
-      showLoading('슬롯 데이터 조회 중...');
+      showLoading('재고 데이터 조회 중...');
 
-      // 모든 occupied 슬롯 가져오기
-      supabase.from('inventory_rack_slots').select('*, inventory_racks(rack_name)')
-        .eq('status', 'occupied')
-        .order('lot_no')
-        .then(function(res) {
-          if (res.error) {
+      // 2026-10-28 적재대 슬롯 + 대차장(A/B동) LOT 동시 조회 — 대차 적재분도 차감 대상 (사용자 의견)
+      //  · 대차 LOT 조건은 inventory_viewer/inventory_zone 의 '현재고' 와 동일: location_type=zone, status stocked/waiting, quantity>0
+      Promise.all([
+        supabase.from('inventory_rack_slots').select('*, inventory_racks(rack_name)').eq('status', 'occupied').order('lot_no'),
+        supabase.from('inventory_lots').select('*').eq('location_type', 'zone').in('status', ['stocked', 'waiting']).gt('quantity', 0).order('lot_no'),
+        supabase.from('inventory_zones').select('id, zone_code, zone_name, lane_no, lane_name')
+      ]).then(function(rs) {
+        for (var k = 0; k < rs.length; k++) {
+          if (rs[k].error) {
             hideLoading();
-            showToast('슬롯 조회 오류: ' + res.error.message);
+            showToast(['슬롯', '대차 LOT', '대차 구역'][k] + ' 조회 오류: ' + rs[k].error.message);
             return;
           }
-
-          var allSlots = res.data || [];
-          processOutbound(allSlots);
-        });
+        }
+        var allSlots = rs[0].data || [];
+        var zoneLots = rs[1].data || [];
+        var zoneMap = {};
+        (rs[2].data || []).forEach(function(z) { zoneMap[z.id] = z; });
+        processOutbound(allSlots, zoneLots, zoneMap);
+      });
     }
 
-    function processOutbound(allSlots) {
+    function processOutbound(allSlots, zoneLots, zoneMap) {
       showLoading('FIFO 매칭 중...');
+      zoneLots = zoneLots || []; zoneMap = zoneMap || {};
+      // 대차 LOT 위치명: inventory_zone.html 출고 이력과 같은 형식 (zone_name + ' ' + lane_name)
+      var zoneLoc = function(l) {
+        var z = zoneMap[l.zone_id];
+        return z ? ((z.zone_name || (z.zone_code + '동')) + ' ' + (z.lane_name || (z.lane_no + '라인'))) : '대차';
+      };
 
       matchResults = [];
       var updatePromises = [];
@@ -486,19 +498,27 @@
         var needQty = row.quantity;
         var matchedSlots = [];
 
-        // 같은 사번의 슬롯을 LOT 날짜순으로 찾기 (FIFO)
+        // 같은 사번의 슬롯 + 대차 LOT을 LOT 번호순으로 찾기 (FIFO) — 2026-10-28 대차 포함
         var candidateSlots = [];
         for (var s = 0; s < allSlots.length; s++) {
           if (allSlots[s].product_code === row.product_code && allSlots[s].quantity > 0) {
+            allSlots[s]._kind = 'slot';
             candidateSlots.push(allSlots[s]);
           }
         }
+        for (var zl = 0; zl < zoneLots.length; zl++) {
+          if (zoneLots[zl].product_code === row.product_code && zoneLots[zl].quantity > 0) {
+            zoneLots[zl]._kind = 'zone';
+            candidateSlots.push(zoneLots[zl]);
+          }
+        }
 
-        // LOT 번호 순 정렬 (오래된 것부터)
+        // LOT 번호 순 정렬 (오래된 것부터) — 같은 LOT이면 적재대 먼저
         candidateSlots.sort(function(a, b) {
           var lotA = a.lot_no || '999999';
           var lotB = b.lot_no || '999999';
-          return lotA < lotB ? -1 : (lotA > lotB ? 1 : 0);
+          if (lotA !== lotB) return lotA < lotB ? -1 : 1;
+          return (a._kind === 'zone' ? 1 : 0) - (b._kind === 'zone' ? 1 : 0);
         });
 
         var remainQty = needQty;
@@ -508,9 +528,10 @@
           var deductQty = Math.min(remainQty, slot.quantity);
 
           matchedSlots.push({
-            slot_id: slot.id,
-            slot_code: slot.slot_code,
-            rack_name: slot.inventory_racks ? slot.inventory_racks.rack_name : '-',
+            kind: slot._kind || 'slot',                       // 'slot' = 적재대 슬롯, 'zone' = 대차 LOT
+            slot_id: slot.id,                                 // zone 이면 inventory_lots.id
+            slot_code: slot._kind === 'zone' ? '' : slot.slot_code,
+            rack_name: slot._kind === 'zone' ? zoneLoc(slot) : (slot.inventory_racks ? slot.inventory_racks.rack_name : '-'),
             lot_no: slot.lot_no,
             before_qty: slot.quantity,
             deduct_qty: deductQty,
@@ -582,7 +603,7 @@
           for (var j = 0; j < mr.matched_slots.length; j++) {
             var ms = mr.matched_slots[j];
             h += '<span style="font-size:11px;color:#666;">';
-            h += ms.rack_name + '-' + ms.slot_code;
+            h += ms.kind === 'zone' ? '<span style="color:#7c3aed">🛒' + ms.rack_name + '</span>' : (ms.rack_name + '-' + ms.slot_code);
             h += '(' + ms.deduct_qty.toLocaleString() + ')';
             if (j < mr.matched_slots.length - 1) h += ', ';
             h += '</span>';
@@ -679,33 +700,38 @@
           })
         );
 
-        // 슬롯 수량 차감
+        // 슬롯 / 대차 LOT 수량 차감
         for (var j = 0; j < mr.matched_slots.length; j++) {
           var ms = mr.matched_slots[j];
           var updateData = { quantity: ms.after_qty };
-          if (ms.after_qty <= 0) {
-            updateData.status = 'empty';
-            updateData.product_code = null;
-            updateData.lot_no = null;
-            updateData.quantity = 0;
+          var movement = {
+            product_code: row.product_code,
+            movement_type: 'outbound',
+            quantity: ms.deduct_qty,
+            lot_no: ms.lot_no,
+            reason: '이카운트 출하 - ' + row.customer,
+            moved_by: 'system'
+          };
+
+          if (ms.kind === 'zone') {
+            // 2026-10-28 대차 LOT: inventory_zone.html 수동 출고와 동일 규칙 (0이면 shipped)
+            if (ms.after_qty <= 0) { updateData.status = 'shipped'; updateData.quantity = 0; }
+            promises.push(supabase.from('inventory_lots').update(updateData).eq('id', ms.slot_id));
+            movement.lot_id = ms.slot_id;
+            movement.from_location = ms.rack_name;
+          } else {
+            if (ms.after_qty <= 0) {
+              updateData.status = 'empty';
+              updateData.product_code = null;
+              updateData.lot_no = null;
+              updateData.quantity = 0;
+            }
+            promises.push(supabase.from('inventory_rack_slots').update(updateData).eq('id', ms.slot_id));
+            movement.from_location = ms.rack_name + '-' + ms.slot_code;
           }
 
-          promises.push(
-            supabase.from('inventory_rack_slots').update(updateData).eq('id', ms.slot_id)
-          );
-
           // 이동 이력
-          promises.push(
-            supabase.from('inventory_movements').insert({
-              product_code: row.product_code,
-              movement_type: 'outbound',
-              from_location: ms.rack_name + '-' + ms.slot_code,
-              quantity: ms.deduct_qty,
-              lot_no: ms.lot_no,
-              reason: '이카운트 출하 - ' + row.customer,
-              moved_by: 'system'
-            })
-          );
+          promises.push(supabase.from('inventory_movements').insert(movement));
         }
       }
 
