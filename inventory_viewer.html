@@ -146,6 +146,15 @@
     .loc-link::after { content:' ↗'; font-size:10px; color:#818cf8; }
     .loc-link:hover { background:#243bb2; color:#fff; border-color:#243bb2; }
     .loc-link:hover::after { color:#c7d2fe; }
+    /* 2026-11-02 동별 바로가기 칩 + 펼치기 */
+    .loc-grp { background:#243bb2; color:#fff; border-color:#243bb2; font-weight:600; }
+    .loc-grp::after { color:#c7d2fe; }
+    .loc-grp:hover { background:#1a2d8a; }
+    .loc-grp.zone { background:#7c3aed; border-color:#7c3aed; }
+    .loc-grp.zone:hover { background:#6d28d9; }
+    .loc-groups { margin-bottom:4px; }
+    .loc-toggle { display:inline-block; margin-left:4px; padding:1px 8px; font-size:11px; color:#243bb2; background:#fff; border:1px dashed #c7d2fe; border-radius:6px; cursor:pointer; }
+    .loc-toggle:hover { background:#eef2ff; }
   </style>
 </head>
 <body>
@@ -302,6 +311,41 @@
     // ═══════════════════════════════════════════
     // TAB 1: 제품별 재고 현황
     // ═══════════════════════════════════════════
+    // 2026-11-02 적재 위치 셀: ① 동별 바로가기 칩(모든 동) ② 상위 5개 + '외 N건 펼치기'
+    function addLocGroup(prod, key, label, href, qty, isZone) {
+      if (!prod.groups) prod.groups = {};
+      if (!prod.groups[key]) prod.groups[key] = { label: label, href: href, qty: 0, cnt: 0, zone: !!isZone };
+      prod.groups[key].qty += (qty || 0); prod.groups[key].cnt += 1;
+    }
+    function renderLocCell(p) {
+      var out = '';
+      var gk = Object.keys(p.groups || {});
+      if (gk.length > 1) {   // 동이 2곳 이상일 때만 동별 칩 표시 (1곳이면 상세 링크로 충분)
+        gk.sort(function(a, b) { return p.groups[a].label < p.groups[b].label ? -1 : 1; });
+        out += '<div class="loc-groups">';
+        for (var i = 0; i < gk.length; i++) {
+          var g = p.groups[gk[i]];
+          var txt = g.label + ' ' + g.qty.toLocaleString() + '<span style="opacity:.8;font-weight:400"> · ' + g.cnt + (g.zone ? 'LOT' : '슬롯') + '</span>';
+          out += g.href ? '<a class="loc-link loc-grp' + (g.zone ? ' zone' : '') + '" href="' + g.href + '" title="' + g.label + ' 현황에서 이 사번 보기">' + txt + '</a> ' : '<span class="loc-link loc-grp">' + txt + '</span> ';
+        }
+        out += '</div>';
+      }
+      var n = p.locations.length;
+      out += p.locations.slice(0, 5).join(', ');
+      if (n > 5) {
+        out += '<span class="loc-more" style="display:none">, ' + p.locations.slice(5).join(', ') + '</span>'
+             + '<span class="loc-toggle" onclick="toggleLocs(this)" data-n="' + (n - 5) + '">외 ' + (n - 5) + '건 펼치기 ▾</span>';
+      }
+      return out;
+    }
+    function toggleLocs(btn) {
+      var more = btn.previousElementSibling;
+      if (!more || !more.classList.contains('loc-more')) return;
+      var open = more.style.display === 'none';
+      more.style.display = open ? '' : 'none';
+      btn.textContent = open ? '접기 ▴' : ('외 ' + btn.getAttribute('data-n') + '건 펼치기 ▾');
+    }
+
     function renderProduct() {
       // 사번별로 슬롯 데이터 집계
       var productMap = {};
@@ -321,6 +365,8 @@
         productMap[pc].locations.push(rackCode
           ? '<a class="loc-link" href="inventory_rack.html?rack=' + encodeURIComponent(rackCode) + '&hl=' + encodeURIComponent(pc) + '" title="적재대 현황에서 이 사번 슬롯 보기">' + locText + '</a>'
           : locText);
+        // 2026-11-02 동별 바로가기: 동(랙)마다 1개 칩 — 분산 적재 시 모든 동으로 이동 가능
+        addLocGroup(productMap[pc], 'R' + (rackCode || rackName), rackName || '(동 미지정)', rackCode ? 'inventory_rack.html?rack=' + encodeURIComponent(rackCode) + '&hl=' + encodeURIComponent(pc) : '', s.quantity, false);
         if (s.lot_no) productMap[pc].lots.push(s.lot_no);
       }
 
@@ -342,6 +388,7 @@
         productMap[pc].locations.push((zInfo && zInfo.zone_code)
           ? '<a class="loc-link" href="inventory_zone.html?zone=' + encodeURIComponent(zInfo.zone_code) + '&lane=' + encodeURIComponent(zInfo.lane_no || 1) + '&hl=' + encodeURIComponent(pc) + '" title="대차 현황에서 이 사번 보기">' + zLabel + '</a>'
           : zLabel);
+        addLocGroup(productMap[pc], 'Z' + l.zone_id, zoneLabel(l.zone_id), (zInfo && zInfo.zone_code) ? 'inventory_zone.html?zone=' + encodeURIComponent(zInfo.zone_code) + '&lane=' + encodeURIComponent(zInfo.lane_no || 1) + '&hl=' + encodeURIComponent(pc) : '', l.quantity || 0, true); // 2026-11-02
         if (l.lot_no) productMap[pc].lots.push(l.lot_no);
       }
 
@@ -381,7 +428,7 @@
         h += '<td class="qty-cell">' + (isAlert ? '<span class="alert-icon">⚠️ </span>' : '') + p.totalQty.toLocaleString() + '</td>';
         h += '<td>' + p.slotCount + '개' + ((p.zoneCount || 0) > 0 ? ' <span style="color:#7c3aed;font-size:11px">+대차' + p.zoneCount + '</span>' : '') + '</td>';
         h += '<td>' + (safety > 0 ? safety.toLocaleString() : '-') + '</td>';
-        h += '<td style="font-size:12px;max-width:300px;word-break:break-all">' + p.locations.slice(0, 5).join(', ') + (p.locations.length > 5 ? ' 외 ' + (p.locations.length - 5) + '건' : '') + '</td>';
+        h += '<td style="font-size:12px;max-width:300px;word-break:break-all">' + renderLocCell(p) + '</td>'; // 2026-11-02 동별 칩 + 펼치기
         h += '<td style="font-size:12px">' + (p.lots.length > 0 ? p.lots.slice(0, 3).join(', ') : '-') + '</td>';
         h += '</tr>';
       }
@@ -409,6 +456,9 @@
       // 적재 위치 링크(a 태그)를 평문으로 치환한 복제본으로 엑셀 생성
       // (엑셀에 상대경로 하이퍼링크가 들어가면 클릭 시 오류가 나므로)
       var clone = table.cloneNode(true);
+      // 2026-11-02 펼치기 버튼은 제외, 접혀 있던 위치는 전부 포함
+      var tg = clone.querySelectorAll('.loc-toggle'); for (var ti = 0; ti < tg.length; ti++) tg[ti].parentNode.removeChild(tg[ti]);
+      var mo = clone.querySelectorAll('.loc-more'); for (var mi = 0; mi < mo.length; mi++) mo[mi].style.display = '';
       var links = clone.querySelectorAll('a');
       for (var li = 0; li < links.length; li++) {
         links[li].parentNode.replaceChild(document.createTextNode(links[li].textContent), links[li]);
