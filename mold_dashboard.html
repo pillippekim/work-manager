@@ -223,8 +223,9 @@ table.dt tr:hover { background:#f8fafc; }
                 <th onclick="sortClnTable(6)">완료일 <span class="sort-icon">▲▼</span></th>
                 <th onclick="sortClnTable(7)">완료자 <span class="sort-icon">▲▼</span></th>
                 <th>비고</th>
+                <th style="width:60px">관리</th><!-- 2026-11-02 세척 삭제 -->
             </tr></thead>
-            <tbody id="clnBody"><tr><td colspan="9" class="empty-msg">로딩 중...</td></tr></tbody>
+            <tbody id="clnBody"><tr><td colspan="10" class="empty-msg">로딩 중...</td></tr></tbody>
         </table>
         </div>
     </div>
@@ -691,7 +692,7 @@ function renderClean() {
 
     // 테이블 렌더링
     var html='';
-    if (filtered.length===0) { html='<tr><td colspan="9" class="empty-msg">데이터가 없습니다</td></tr>'; }
+    if (filtered.length===0) { html='<tr><td colspan="10" class="empty-msg">데이터가 없습니다</td></tr>'; }
     else {
         for (var i=0;i<filtered.length;i++) {
             var c=filtered[i];
@@ -710,6 +711,7 @@ function renderClean() {
                 +'<td>'+(c.complete_date||'-')+'</td>'
                 +'<td>'+(c.completed_by||'-')+'</td>'
                 +'<td>'+(c.note||'')+'</td>'
+                +'<td>'+(window._meCanDel ? '<button class="btn-sm btn-del" onclick="deleteClean('+c.id+')" title="삭제">🗑️</button>' : '')+'</td>' // 2026-11-02 관리자 이상
                 +'</tr>';
         }
     }
@@ -1277,6 +1279,23 @@ async function submitRepair() {
 //  · 실제 DELETE. 미완료(접수/수리중) 건을 지우면 트리거가 돌지 않아 금형이 '수리중'에 남으므로
 //    같은 금형에 다른 미완료 건이 없을 때 '보관중'으로 복귀 + 상태변경 이력 기록 (완료 처리와 같은 결과)
 // =============================================
+// 2026-11-02 세척 이력 삭제 (사용자 의견) — 관리자 이상, 실제 DELETE. 세척 등록은 금형 상태를 바꾸지 않으므로 복구 로직 불필요
+async function deleteClean(id) {
+    var c = null;
+    for (var i = 0; i < cleanData.length; i++) { if (cleanData[i].id === id) { c = cleanData[i]; break; } }
+    if (!c) { showToast('대상을 찾을 수 없어요','error'); return; }
+    var msg = '이 세척 이력을 삭제할까요?\n\n'
+        + '사번: ' + (c.product_code || '-') + '\n접수일: ' + (c.request_date || '-') + '\n세척내용: ' + (c.cleaning_method || '-') + '\n접수자: ' + (c.requester || '-') + '\n\n'
+        + '※ 삭제 후 복구할 수 없어요.';
+    if (!confirm(msg)) return;
+    try {
+        var ok = await supaDelete('mold_cleaning_logs', id);
+        if (!ok) { showToast('삭제 실패 — 권한 또는 네트워크를 확인하세요','error'); return; }
+        showToast('삭제됨','success');
+        await loadHistoryData();
+    } catch (e) { showToast('삭제 실패: ' + (e.message || e), 'error'); }
+}
+
 async function deleteRepair(id) {
     var r = null;
     for (var i = 0; i < repairData.length; i++) { if (repairData[i].id === id) { r = repairData[i]; break; } }
@@ -1371,7 +1390,7 @@ window.addEventListener('hashchange', handleHash);
 </script>
 <script src="sidebar.js"></script>
 <script>
-(async function(){ var user = await checkAuth(); if(!user) return; window._meName = user.name || null; window._meCanDel = (user.user_type === 'super' || user.user_type === 'admin'); if (window._meCanDel && typeof renderRepair === 'function' && repairData.length) renderRepair(); })(); // 2026-10-28 삭제 권한(관리자 이상)
+(async function(){ var user = await checkAuth(); if(!user) return; window._meName = user.name || null; window._meCanDel = (user.user_type === 'super' || user.user_type === 'admin'); if (window._meCanDel && typeof renderRepair === 'function' && repairData.length) renderRepair(); if (window._meCanDel && typeof renderClean === 'function' && cleanData.length) renderClean(); })(); // 2026-10-28 삭제 권한(관리자 이상)
 </script>
 </body>
 </html>
