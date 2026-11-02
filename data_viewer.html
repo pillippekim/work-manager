@@ -743,6 +743,14 @@ function firstDayOfMonth() {
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';
 }
 function fmtDate(s) { return s ? s.slice(0,10) : '-'; }
+// 2026-10-27 XSS 방어: DB 값을 innerHTML 템플릿에 넣을 때 HTML 특수문자 이스케이프
+//  · 값(<td>), 속성(title="…"), onclick 인자(JSON) 모두 이 함수로 감싼다 (브라우저가 속성 안 엔티티를 되돌려 주므로 JS에는 원문이 전달됨)
+//  · textContent / 검색식(ilike) / 엑셀 내보내기에는 쓰지 않는다 (&amp; 같은 글자가 데이터에 섞임)
+function esc(v) {
+  if (v == null) return '';
+  return String(v).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; });
+}
+
 function fmtDatetime(s) {
   if (!s) return '-';
   const d = new Date(s);
@@ -1537,8 +1545,8 @@ function renderStats() {
       <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-label">성형 건수</div><div class="stat-num blue">${mold.length} <span class="stat-unit">건</span></div></div>
       <div class="stat-card"><div class="stat-icon">🔧</div><div class="stat-label">총 생산수량</div><div class="stat-num green">${totalQty.toLocaleString()} <span class="stat-unit">EA</span></div></div>
       <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-label">총 불량수량</div><div class="stat-num" style="color:#dc2626">${totalDefect.toLocaleString()} <span class="stat-unit">EA</span></div></div>
-      <div class="stat-card" title="${mcTitle}" style="cursor:pointer" onclick="toggleMcDetail()"><div class="stat-icon">🔄</div><div class="stat-label">금형교체 <span style="font-size:10px;color:#b9a06a">(클릭=내역)</span></div><div class="stat-num" style="color:#d97706">${moldChangeCnt} <span class="stat-unit">건</span></div></div>
-      <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">작업자 / 반</div><div class="stat-num orange">${workers} <span class="stat-unit">명</span><span style="font-size:12px;color:#888"> (${teamStr})</span></div></div>
+      <div class="stat-card" title="${esc(mcTitle)}" style="cursor:pointer" onclick="toggleMcDetail()"><div class="stat-icon">🔄</div><div class="stat-label">금형교체 <span style="font-size:10px;color:#b9a06a">(클릭=내역)</span></div><div class="stat-num" style="color:#d97706">${moldChangeCnt} <span class="stat-unit">건</span></div></div>
+      <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">작업자 / 반</div><div class="stat-num orange">${workers} <span class="stat-unit">명</span><span style="font-size:12px;color:#888"> (${esc(teamStr)})</span></div></div>
     `;
   } else if (currentProcess === '조립') {
     const totalQty = asm.reduce((s,r)=>s+(r.production_qty||0),0);
@@ -1582,7 +1590,7 @@ function renderAllSections() {
       </div>
       <div class="section-card">
         ${pkg.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
-          : pkg.slice(0, 5).map(r => `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.worker_id} · ${r.worker_name||'-'}</span><span style="color:#243bb2;font-weight:500">${(r.quantity||0).toLocaleString()} EA</span></div>`).join('')
+          : pkg.slice(0, 5).map(r => `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${esc(r.work_date)} · ${esc(r.worker_id)} · ${esc(r.worker_name||'-')}</span><span style="color:#243bb2;font-weight:500">${(r.quantity||0).toLocaleString()} EA</span></div>`).join('')
           + (pkg.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('포장')">전체 ${pkg.length}건 보기 →</button></div>` : '')}
       </div>
     </div>
@@ -1595,7 +1603,7 @@ function renderAllSections() {
         ${ins.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
           : ins.slice(0, 5).map(r => {
               const fail = r.fail_qty || 0;
-              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.worker_id} · ${r.worker_name||'-'}</span><span><span style="color:#16a34a">합격 ${(r.pass_qty||0).toLocaleString()}</span> / <span style="color:#e53e3e">불합 ${fail.toLocaleString()}</span></span></div>`;
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${esc(r.work_date)} · ${esc(r.worker_id)} · ${esc(r.worker_name||'-')}</span><span><span style="color:#16a34a">합격 ${(r.pass_qty||0).toLocaleString()}</span> / <span style="color:#e53e3e">불합 ${fail.toLocaleString()}</span></span></div>`;
             }).join('')
           + (ins.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('검사')">전체 ${ins.length}건 보기 →</button></div>` : '')}
       </div>
@@ -1609,7 +1617,7 @@ function renderAllSections() {
         ${cmb.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
           : cmb.slice(0, 5).map(r => {
               const remixTag = r.is_remix ? '<span style="background:#fff4e6;color:#b45309;padding:1px 6px;border-radius:4px;font-size:10px;margin-left:4px">재믹싱</span>' : '';
-              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.lot_no||'-'} · ${r.material_name||'-'}${remixTag}</span><span style="color:#b45309;font-weight:500">${(parseFloat(r.weight)||0).toFixed(3)} Kg</span></div>`;
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${esc(r.work_date)} · ${esc(r.lot_no||'-')} · ${esc(r.material_name||'-')}${remixTag}</span><span style="color:#b45309;font-weight:500">${(parseFloat(r.weight)||0).toFixed(3)} Kg</span></div>`;
             }).join('')
           + (cmb.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('혼련(CMB)')">전체 ${cmb.length}건 보기 →</button></div>` : '')}
       </div>
@@ -1622,7 +1630,7 @@ function renderAllSections() {
       <div class="section-card">
         ${cut.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
           : cut.slice(0, 5).map(r => {
-              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.worker_id||'-'} · ${r.material_name||'-'}</span><span style="color:#7e22ce;font-weight:500">${(r.box_count||0).toLocaleString()} 박스 / ${(r.total_qty||0).toLocaleString()} EA</span></div>`;
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${esc(r.work_date)} · ${esc(r.worker_id||'-')} · ${esc(r.material_name||'-')}</span><span style="color:#7e22ce;font-weight:500">${(r.box_count||0).toLocaleString()} 박스 / ${(r.total_qty||0).toLocaleString()} EA</span></div>`;
             }).join('')
           + (cut.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('재단')">전체 ${cut.length}건 보기 →</button></div>` : '')}
       </div>
@@ -1635,7 +1643,7 @@ function renderAllSections() {
       <div class="section-card">
         ${coat.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
           : coat.slice(0, 5).map(r => {
-              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.worker_id||'-'} · ${r.work_type||'-'}</span><span style="color:#243bb2;font-weight:500">${(r.total_qty||0).toLocaleString()} EA</span></div>`;
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${esc(r.work_date)} · ${esc(r.worker_id||'-')} · ${esc(r.work_type||'-')}</span><span style="color:#243bb2;font-weight:500">${(r.total_qty||0).toLocaleString()} EA</span></div>`;
             }).join('')
           + (coat.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('도포')">전체 ${coat.length}건 보기 →</button></div>` : '')}
       </div>
@@ -1648,7 +1656,7 @@ function renderAllSections() {
       <div class="section-card">
         ${pc.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
           : pc.slice(0, 5).map(r => {
-              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.worker_id||'-'} · ${r.material_name||'-'}</span><span style="color:#243bb2;font-weight:500">${(r.input_qty||0).toLocaleString()} EA</span></div>`;
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${esc(r.work_date)} · ${esc(r.worker_id||'-')} · ${esc(r.material_name||'-')}</span><span style="color:#243bb2;font-weight:500">${(r.input_qty||0).toLocaleString()} EA</span></div>`;
             }).join('')
           + (pc.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('2차가류')">전체 ${pc.length}건 보기 →</button></div>` : '')}
       </div>
@@ -1662,7 +1670,7 @@ function renderAllSections() {
         ${shot.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
           : shot.slice(0, 5).map(r => {
               const typeTag = r.shot_type==='freeze' ? '❄️냉동' : '⚙️자동';
-              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${typeTag} · ${r.worker_id||'-'}</span><span style="color:#243bb2;font-weight:500">${(r.work_qty||0).toLocaleString()} EA</span></div>`;
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${esc(r.work_date)} · ${typeTag} · ${esc(r.worker_id||'-')}</span><span style="color:#243bb2;font-weight:500">${(r.work_qty||0).toLocaleString()} EA</span></div>`;
             }).join('')
           + (shot.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('쇼트')">전체 ${shot.length}건 보기 →</button></div>` : '')}
       </div>
@@ -1675,7 +1683,7 @@ function renderAllSections() {
       <div class="section-card">
         ${mold.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
           : mold.slice(0, 5).map(r => {
-              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.equipment_no||'-'} · ${r.sabun||'-'}</span><span style="color:#243bb2;font-weight:500">${(r.production_qty||0).toLocaleString()} EA</span></div>`;
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${esc(r.work_date)} · ${esc(r.equipment_no||'-')} · ${esc(r.sabun||'-')}</span><span style="color:#243bb2;font-weight:500">${(r.production_qty||0).toLocaleString()} EA</span></div>`;
             }).join('')
           + (mold.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('성형')">전체 ${mold.length}건 보기 →</button></div>` : '')}
       </div>
@@ -1688,7 +1696,7 @@ function renderAllSections() {
       <div class="section-card">
         ${asm.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
           : asm.slice(0, 5).map(r => {
-              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${r.sabun||'-'} · ${r.worker_name||'-'}</span><span style="color:#243bb2;font-weight:500">${(r.production_qty||0).toLocaleString()} EA</span></div>`;
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${esc(r.work_date)} · ${esc(r.sabun||'-')} · ${esc(r.worker_name||'-')}</span><span style="color:#243bb2;font-weight:500">${(r.production_qty||0).toLocaleString()} EA</span></div>`;
             }).join('')
           + (asm.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('조립')">전체 ${asm.length}건 보기 →</button></div>` : '')}
       </div>
@@ -1702,7 +1710,7 @@ function renderAllSections() {
         ${sas.length === 0 ? '<div style="color:#aaa;text-align:center;padding:1rem;font-size:13px">데이터 없음</div>'
           : sas.slice(0, 5).map(r => {
               const tag = r.work_method === '자동사상' ? '⚙️자동' : '✋수사상';
-              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${r.work_date} · ${tag} · ${r.sabun||'-'} · ${r.worker_name||'-'}</span><span style="color:#243bb2;font-weight:500">${(r.production_qty||0).toLocaleString()} EA</span></div>`;
+              return `<div style="font-size:12px;color:#555;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between"><span>${esc(r.work_date)} · ${tag} · ${esc(r.sabun||'-')} · ${esc(r.worker_name||'-')}</span><span style="color:#243bb2;font-weight:500">${(r.production_qty||0).toLocaleString()} EA</span></div>`;
             }).join('')
           + (sas.length > 5 ? `<div style="text-align:center;padding-top:8px"><button class="btn-section-detail" onclick="switchProcess('사상')">전체 ${sas.length}건 보기 →</button></div>` : '')}
       </div>
@@ -1731,13 +1739,13 @@ function renderUnifiedTable() {
               const prod = PRODUCTS[r.worker_id] || {};
               return `<tr>
                 <td style="color:#bbb;font-size:12px">${i+1}</td>
-                <td>${r.work_date}</td>
-                <td><span class="process-tag process-${r._proc}">${r._proc}</span></td>
-                <td style="font-weight:500">${r.worker_id||'-'}</td>
-                <td style="font-size:12px;color:#555">${prod.partName||'-'}</td>
-                <td style="min-width:80px">${r.worker_name||'-'}</td>
+                <td>${esc(r.work_date)}</td>
+                <td><span class="process-tag process-${esc(r._proc)}">${esc(r._proc)}</span></td>
+                <td style="font-weight:500">${esc(r.worker_id||'-')}</td>
+                <td style="font-size:12px;color:#555">${esc(prod.partName||'-')}</td>
+                <td style="min-width:80px">${esc(r.worker_name||'-')}</td>
                 <td style="text-align:right;font-weight:500;color:#243bb2">${(r._qty||0).toLocaleString()}</td>
-                <td style="font-size:12px;color:#888">${r.note || r.remarks || '-'}</td>
+                <td style="font-size:12px;color:#888">${esc(r.note || r.remarks || '-')}</td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -1763,28 +1771,28 @@ function renderPackagingTable(data) {
           <tbody>
             ${data.map((r, i) => {
               const prod = PRODUCTS[r.worker_id] || {};
-              const lots = (r.lot_nos||[]).map(l => `<span class="lot-tag">${l}</span>`).join('') || '-';
+              const lots = (r.lot_nos||[]).map(l => `<span class="lot-tag">${esc(l)}</span>`).join('') || '-';
               const isDeleted = !!r.deleted_at;
               const canEdit = canEditDelete(r) && !isDeleted;
               const reason = canEdit ? '' : (isDeleted ? '삭제됨' : getCannotEditReason(r));
               const actionsHtml = isDeleted
-                ? (myInfo && myInfo.user_type === 'super' ? `<button class="btn-row btn-row-edit" onclick="restoreRecord('packaging_reports', ${r.id})">복구</button>` : '<span style="color:#aaa;font-size:11px">삭제됨</span>')
+                ? (myInfo && myInfo.user_type === 'super' ? `<button class="btn-row btn-row-edit" onclick="restoreRecord('packaging_reports', ${esc(r.id)})">복구</button>` : '<span style="color:#aaa;font-size:11px">삭제됨</span>')
                 : `<div class="row-actions">
-                    <button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditPackaging(${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">수정</button>
-                    <button class="btn-row btn-row-del" ${canEdit ? `onclick='openDelete("packaging_reports", ${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">삭제</button>
+                    <button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditPackaging(${esc(JSON.stringify(r))})'` : 'disabled'} title="${reason}">수정</button>
+                    <button class="btn-row btn-row-del" ${canEdit ? `onclick='openDelete("packaging_reports", ${esc(JSON.stringify(r))})'` : 'disabled'} title="${reason}">삭제</button>
                   </div>`;
               return `<tr class="${isDeleted ? 'deleted-row' : ''}">
                 <td style="color:#bbb;font-size:12px">${i+1}</td>
-                <td>${r.work_date}${isDeleted ? '<span class="deleted-badge">삭제됨</span>' : ''}</td>
-                <td style="font-weight:500">${r.worker_id||'-'}</td>
-                <td style="font-size:12px;color:#555">${prod.partNo||'-'}</td>
-                <td style="font-size:12px;color:#555">${prod.partName||'-'}</td>
-                <td style="min-width:80px">${r.worker_name||'-'}</td>
+                <td>${esc(r.work_date)}${isDeleted ? '<span class="deleted-badge">삭제됨</span>' : ''}</td>
+                <td style="font-weight:500">${esc(r.worker_id||'-')}</td>
+                <td style="font-size:12px;color:#555">${esc(prod.partNo||'-')}</td>
+                <td style="font-size:12px;color:#555">${esc(prod.partName||'-')}</td>
+                <td style="min-width:80px">${esc(r.worker_name||'-')}</td>
                 <td class="lot-cell">${lots}</td>
                 <td style="text-align:right;font-weight:500;color:#243bb2">${(r.quantity||0).toLocaleString()}</td>
-                <td style="font-size:12px;color:#888">${r.note||'-'}</td>
-                <td style="font-size:12px;color:#888">${r.remarks||'-'}</td>
-                <td style="font-size:11px;color:#888">${r.created_by_name||'-'}</td>
+                <td style="font-size:12px;color:#888">${esc(r.note||'-')}</td>
+                <td style="font-size:12px;color:#888">${esc(r.remarks||'-')}</td>
+                <td style="font-size:11px;color:#888">${esc(r.created_by_name||'-')}</td>
                 <td style="font-size:11px;color:#aaa">${fmtDatetime(r.submitted_at)}</td>
                 <td>${actionsHtml}</td>
               </tr>`;
@@ -1812,32 +1820,32 @@ function renderInspectionTable(data) {
           <tbody>
             ${data.map((r, i) => {
               const prod = PRODUCTS[r.worker_id] || {};
-              const lots = (r.lot_nos||[]).map(l => `<span class="lot-tag">${l}</span>`).join('') || '-';
+              const lots = (r.lot_nos||[]).map(l => `<span class="lot-tag">${esc(l)}</span>`).join('') || '-';
               const isDeleted = !!r.deleted_at;
               const canEdit = canEditDelete(r) && !isDeleted;
               const reason = canEdit ? '' : (isDeleted ? '삭제됨' : getCannotEditReason(r));
               const actionsHtml = isDeleted
-                ? (myInfo && myInfo.user_type === 'super' ? `<button class="btn-row btn-row-edit" onclick="restoreRecord('inspection_reports', ${r.id})">복구</button>` : '<span style="color:#aaa;font-size:11px">삭제됨</span>')
+                ? (myInfo && myInfo.user_type === 'super' ? `<button class="btn-row btn-row-edit" onclick="restoreRecord('inspection_reports', ${esc(r.id)})">복구</button>` : '<span style="color:#aaa;font-size:11px">삭제됨</span>')
                 : `<div class="row-actions">
-                    <button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditInspection(${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">수정</button>
-                    <button class="btn-row btn-row-del" ${canEdit ? `onclick='openDelete("inspection_reports", ${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">삭제</button>
+                    <button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditInspection(${esc(JSON.stringify(r))})'` : 'disabled'} title="${reason}">수정</button>
+                    <button class="btn-row btn-row-del" ${canEdit ? `onclick='openDelete("inspection_reports", ${esc(JSON.stringify(r))})'` : 'disabled'} title="${reason}">삭제</button>
                   </div>`;
               return `<tr class="${isDeleted ? 'deleted-row' : ''}">
                 <td style="color:#bbb;font-size:12px">${i+1}</td>
-                <td>${r.work_date}${isDeleted ? '<span class="deleted-badge">삭제됨</span>' : ''}</td>
-                <td style="font-weight:500">${r.worker_id||'-'}</td>
-                <td style="font-size:12px;color:#555">${prod.partNo||'-'}</td>
-                <td style="font-size:12px;color:#555">${prod.partName||'-'}</td>
-                <td style="min-width:80px">${r.worker_name||'-'}</td>
+                <td>${esc(r.work_date)}${isDeleted ? '<span class="deleted-badge">삭제됨</span>' : ''}</td>
+                <td style="font-weight:500">${esc(r.worker_id||'-')}</td>
+                <td style="font-size:12px;color:#555">${esc(prod.partNo||'-')}</td>
+                <td style="font-size:12px;color:#555">${esc(prod.partName||'-')}</td>
+                <td style="min-width:80px">${esc(r.worker_name||'-')}</td>
                 <td class="lot-cell">${lots}</td>
                 <td style="text-align:right;font-weight:500;color:#243bb2">${(r.inspect_qty||0).toLocaleString()}</td>
                 <td class="pass-cell" style="text-align:right">${(r.pass_qty||0).toLocaleString()}</td>
                 <td class="defect-cell" style="text-align:right">${(r.fail_qty||0).toLocaleString()}</td>
-                <td style="font-size:12px;max-width:200px;white-space:normal;word-break:break-all">${r.defect_type||'-'}</td>
-                <td style="font-size:12px;color:#888">${r.defect_memo||'-'}</td>
+                <td style="font-size:12px;max-width:200px;white-space:normal;word-break:break-all">${esc(r.defect_type||'-')}</td>
+                <td style="font-size:12px;color:#888">${esc(r.defect_memo||'-')}</td>
                 <td style="text-align:center;font-size:11px">${r.recheck ? '<span style="color:#7c3aed;font-weight:700">✓</span>' : '-'}</td>
-                <td style="font-size:12px;color:#888">${r.remarks||'-'}</td>
-                <td style="font-size:11px;color:#888">${r.created_by_name||'-'}</td>
+                <td style="font-size:12px;color:#888">${esc(r.remarks||'-')}</td>
+                <td style="font-size:11px;color:#888">${esc(r.created_by_name||'-')}</td>
                 <td style="font-size:11px;color:#aaa">${fmtDatetime(r.submitted_at)}</td>
                 <td>${actionsHtml}</td>
               </tr>`;
@@ -1876,10 +1884,10 @@ function renderCmbTable(data) {
               const canEdit = canEditDelete(r) && !isDeleted;
               const reason = canEdit ? '' : (isDeleted ? '삭제됨' : getCannotEditReason(r));
               const actionsHtml = isDeleted
-                ? (myInfo && myInfo.user_type === 'super' ? `<button class="btn-row btn-row-edit" onclick="restoreRecord('cmb_reports', ${r.id})">복구</button>` : '<span style="color:#aaa;font-size:11px">삭제됨</span>')
+                ? (myInfo && myInfo.user_type === 'super' ? `<button class="btn-row btn-row-edit" onclick="restoreRecord('cmb_reports', ${esc(r.id)})">복구</button>` : '<span style="color:#aaa;font-size:11px">삭제됨</span>')
                 : `<div class="row-actions">
-                    <button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditCmb(${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">수정</button>
-                    <button class="btn-row btn-row-del" ${canEdit ? `onclick='openDelete("cmb_reports", ${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">삭제</button>
+                    <button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditCmb(${esc(JSON.stringify(r))})'` : 'disabled'} title="${reason}">수정</button>
+                    <button class="btn-row btn-row-del" ${canEdit ? `onclick='openDelete("cmb_reports", ${esc(JSON.stringify(r))})'` : 'disabled'} title="${reason}">삭제</button>
                   </div>`;
               const remixBadge = r.is_remix 
                 ? '<span style="background:#fff4e6;color:#b45309;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">재믹싱</span>'
@@ -1896,24 +1904,24 @@ function renderCmbTable(data) {
                   return v && Object.values(v).some(x => x !== null && x !== '');
                 }).length;
                 if (filledCount > 0) {
-                  checkSummary = `<button class="btn-row" style="background:#f0f3f9;color:#243bb2;font-size:11px;padding:3px 8px" onclick='showCheckData(${JSON.stringify(r.check_data).replace(/'/g, "&#39;")})'>${filledCount}/4 보기</button>`;
+                  checkSummary = `<button class="btn-row" style="background:#f0f3f9;color:#243bb2;font-size:11px;padding:3px 8px" onclick='showCheckData(${esc(JSON.stringify(r.check_data))})'>${filledCount}/4 보기</button>`;
                 }
               }
               return `<tr class="${isDeleted ? 'deleted-row' : ''}">
                 <td style="color:#bbb;font-size:12px">${i+1}</td>
-                <td>${r.work_date}${isDeleted ? '<span class="deleted-badge">삭제됨</span>' : ''}</td>
-                <td style="font-weight:500;color:#b45309">${r.lot_no||'-'}</td>
-                <td style="font-weight:500">${r.worker_id||'-'}</td>
-                <td style="font-size:12px;color:#555">${prod.partName||'-'}</td>
-                <td style="font-weight:500;color:#243bb2">${r.material_name||'-'}</td>
+                <td>${esc(r.work_date)}${isDeleted ? '<span class="deleted-badge">삭제됨</span>' : ''}</td>
+                <td style="font-weight:500;color:#b45309">${esc(r.lot_no||'-')}</td>
+                <td style="font-weight:500">${esc(r.worker_id||'-')}</td>
+                <td style="font-size:12px;color:#555">${esc(prod.partName||'-')}</td>
+                <td style="font-weight:500;color:#243bb2">${esc(r.material_name||'-')}</td>
                 <td style="text-align:right;font-weight:500">${(parseFloat(r.weight)||0).toFixed(3)}</td>
                 <td style="text-align:center">${remixBadge}</td>
                 <td style="text-align:center">${weighingBadge}</td>
-                <td style="min-width:80px">${r.worker_name||'-'}</td>
-                <td style="font-size:12px;color:#888">${r.note||'-'}</td>
+                <td style="min-width:80px">${esc(r.worker_name||'-')}</td>
+                <td style="font-size:12px;color:#888">${esc(r.note||'-')}</td>
                 <td style="text-align:center">${checkSummary}</td>
-                <td style="font-size:12px;color:#888">${r.remarks||'-'}</td>
-                <td style="font-size:11px;color:#888">${r.created_by_name||'-'}</td>
+                <td style="font-size:12px;color:#888">${esc(r.remarks||'-')}</td>
+                <td style="font-size:11px;color:#888">${esc(r.created_by_name||'-')}</td>
                 <td style="font-size:11px;color:#aaa">${fmtDatetime(r.submitted_at)}</td>
                 <td>${actionsHtml}</td>
               </tr>`;
@@ -1938,7 +1946,7 @@ function showCheckData(checkData) {
   let html = '<table style="width:100%;border-collapse:collapse;font-size:13px">';
   html += '<thead><tr><th style="background:#f0f3f9;padding:8px;border:1px solid #ddd">시간</th>';
   Object.values(labels).forEach(l => {
-    html += `<th style="background:#f0f3f9;padding:8px;border:1px solid #ddd">${l}</th>`;
+    html += `<th style="background:#f0f3f9;padding:8px;border:1px solid #ddd">${esc(l)}</th>`;
   });
   html += '</tr></thead><tbody>';
   times.forEach(time => {
@@ -2052,10 +2060,10 @@ function renderCuttingTable(data) {
               const canEdit = canEditDelete(r) && !isDeleted;
               const reason = canEdit ? '' : (isDeleted ? '삭제됨' : getCannotEditReason(r));
               const actionsHtml = isDeleted
-                ? (myInfo && myInfo.user_type === 'super' ? `<button class="btn-row btn-row-edit" onclick="restoreRecord('cutting_reports', ${r.id})">복구</button>` : '<span style="color:#aaa;font-size:11px">삭제됨</span>')
+                ? (myInfo && myInfo.user_type === 'super' ? `<button class="btn-row btn-row-edit" onclick="restoreRecord('cutting_reports', ${esc(r.id)})">복구</button>` : '<span style="color:#aaa;font-size:11px">삭제됨</span>')
                 : `<div class="row-actions">
-                    <button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditCutting(${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">수정</button>
-                    <button class="btn-row btn-row-del" ${canEdit ? `onclick='openDelete("cutting_reports", ${JSON.stringify(r).replace(/'/g, "&#39;")})'` : 'disabled'} title="${reason}">삭제</button>
+                    <button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditCutting(${esc(JSON.stringify(r))})'` : 'disabled'} title="${reason}">수정</button>
+                    <button class="btn-row btn-row-del" ${canEdit ? `onclick='openDelete("cutting_reports", ${esc(JSON.stringify(r))})'` : 'disabled'} title="${reason}">삭제</button>
                   </div>`;
               
               // 해당 날짜의 안전점검 데이터
@@ -2070,24 +2078,24 @@ function renderCuttingTable(data) {
                 });
                 const color = abnormalCount > 0 ? '#dc2626' : '#10b981';
                 const bgColor = abnormalCount > 0 ? '#fee2e2' : '#d1fae5';
-                safetyBtn = `<button class="btn-row" style="background:${bgColor};color:${color};font-size:11px;padding:3px 8px;font-weight:600" onclick='showSafetyData(${JSON.stringify(safety).replace(/'/g, "&#39;")})'>${abnormalCount > 0 ? '⚠️ ' : '✓ '}${abnormalCount === 0 ? '정상' : abnormalCount + '건 이상'}</button>`;
+                safetyBtn = `<button class="btn-row" style="background:${bgColor};color:${color};font-size:11px;padding:3px 8px;font-weight:600" onclick='showSafetyData(${esc(JSON.stringify(safety))})'>${abnormalCount > 0 ? '⚠️ ' : '✓ '}${abnormalCount === 0 ? '정상' : abnormalCount + '건 이상'}</button>`;
               }
               
               return `<tr class="${isDeleted ? 'deleted-row' : ''}">
                 <td style="color:#bbb;font-size:12px">${i+1}</td>
-                <td>${r.work_date}${isDeleted ? '<span class="deleted-badge">삭제됨</span>' : ''}</td>
-                <td style="font-weight:500">${r.worker_id||'-'}</td>
-                <td style="font-size:12px;color:#555">${prod.partName||'-'}</td>
-                <td style="font-weight:500;color:#7e22ce">${r.material_name||'-'}</td>
-                <td style="color:#7e22ce;font-size:12px">${r.lot_no||'-'}</td>
+                <td>${esc(r.work_date)}${isDeleted ? '<span class="deleted-badge">삭제됨</span>' : ''}</td>
+                <td style="font-weight:500">${esc(r.worker_id||'-')}</td>
+                <td style="font-size:12px;color:#555">${esc(prod.partName||'-')}</td>
+                <td style="font-weight:500;color:#7e22ce">${esc(r.material_name||'-')}</td>
+                <td style="color:#7e22ce;font-size:12px">${esc(r.lot_no||'-')}</td>
                 <td style="text-align:right;font-weight:500">${(r.box_count||0).toLocaleString()}</td>
                 <td style="text-align:right;font-weight:500;color:#243bb2">${(r.total_qty||0).toLocaleString()}</td>
                 <td style="text-align:right">${(parseFloat(r.scrap_weight)||0).toFixed(2)}</td>
-                <td style="min-width:80px">${r.worker_name||'-'}</td>
-                <td style="font-size:12px;color:#888">${r.note||'-'}</td>
-                <td style="font-size:12px;color:#888">${r.remarks||'-'}</td>
+                <td style="min-width:80px">${esc(r.worker_name||'-')}</td>
+                <td style="font-size:12px;color:#888">${esc(r.note||'-')}</td>
+                <td style="font-size:12px;color:#888">${esc(r.remarks||'-')}</td>
                 <td style="text-align:center">${safetyBtn}</td>
-                <td style="font-size:11px;color:#888">${r.created_by_name||'-'}</td>
+                <td style="font-size:11px;color:#888">${esc(r.created_by_name||'-')}</td>
                 <td style="font-size:11px;color:#aaa">${fmtDatetime(r.submitted_at)}</td>
                 <td>${actionsHtml}</td>
               </tr>`;
@@ -2123,7 +2131,7 @@ function showSafetyData(safety) {
   // thead: 점검항목 | 설비1 | 설비2 | ...
   html += '<thead><tr><th style="background:#dc2626;color:white;padding:10px 12px;border:1px solid #ddd;text-align:center;min-width:130px">점검항목</th>';
   EQUIPMENTS.forEach(eq => {
-    html += `<th style="background:#fef2f2;color:#991b1b;padding:8px 6px;border:1px solid #ddd;font-size:11px;min-width:140px">${eq.name}<br><span style="font-size:10px;font-weight:400;color:#b91c1c">${eq.sub}</span></th>`;
+    html += `<th style="background:#fef2f2;color:#991b1b;padding:8px 6px;border:1px solid #ddd;font-size:11px;min-width:140px">${esc(eq.name)}<br><span style="font-size:10px;font-weight:400;color:#b91c1c">${esc(eq.sub)}</span></th>`;
   });
   html += '</tr></thead><tbody>';
   
@@ -2138,7 +2146,7 @@ function showSafetyData(safety) {
       else if (v === '△') { bg = '#f59e0b'; color = 'white'; }
       else if (v === '×') { bg = '#ef4444'; color = 'white'; }
       else if (v === '│') { bg = '#6b7280'; color = 'white'; }
-      html += `<td style="padding:6px;border:1px solid #ddd;text-align:center;background:${bg};color:${color};font-weight:700;font-size:16px">${v}</td>`;
+      html += `<td style="padding:6px;border:1px solid #ddd;text-align:center;background:${bg};color:${color};font-weight:700;font-size:16px">${esc(v)}</td>`;
     });
     html += '</tr>';
   });
@@ -2160,17 +2168,17 @@ function showSafetyData(safety) {
   html += '</div>';
   
   if (safety.overall_remarks) {
-    html += `<div style="margin-top:14px;padding:12px;background:#fef2f2;border-left:4px solid #dc2626;border-radius:6px"><strong style="color:#991b1b">전체 특이사항:</strong><br>${safety.overall_remarks}</div>`;
+    html += `<div style="margin-top:14px;padding:12px;background:#fef2f2;border-left:4px solid #dc2626;border-radius:6px"><strong style="color:#991b1b">전체 특이사항:</strong><br>${esc(safety.overall_remarks)}</div>`;
   }
   
-  html += `<div style="margin-top:10px;font-size:11px;color:#888;text-align:right">점검자: ${safety.checked_by_name || '-'} · ${fmtDatetime(safety.checked_at)}</div>`;
+  html += `<div style="margin-top:10px;font-size:11px;color:#888;text-align:right">점검자: ${esc(safety.checked_by_name || '-')} · ${fmtDatetime(safety.checked_at)}</div>`;
   
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
   const box = document.createElement('div');
   box.style.cssText = 'background:white;border-radius:12px;padding:24px;max-width:900px;width:100%;max-height:85vh;overflow-y:auto';
   box.innerHTML = `
-    <h3 style="margin:0 0 16px;color:#dc2626">🔒 일일 안전 점검 (${safety.check_date})</h3>
+    <h3 style="margin:0 0 16px;color:#dc2626">🔒 일일 안전 점검 (${esc(safety.check_date)})</h3>
     ${html}
     <div style="text-align:right;margin-top:16px">
       <button id="__safetyPopupClose" style="padding:8px 20px;background:#243bb2;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">닫기</button>
@@ -2255,19 +2263,19 @@ function renderCoatingTable(data) {
               const defectStyle = (r.defect_qty||0) > 0 ? 'color:#e53e3e;font-weight:600' : '';
               return `<tr style="${rowStyle}">
                 <td>${i+1}</td>
-                <td>${r.work_date}</td>
-                <td>${r.worker_id||'-'}</td>
-                <td><span style="background:#e8ecfa;color:#243bb2;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">${r.work_type||'-'}</span></td>
-                <td>${r.qty_per_line||0}</td>
-                <td>${r.line_count||0}</td>
+                <td>${esc(r.work_date)}</td>
+                <td>${esc(r.worker_id||'-')}</td>
+                <td><span style="background:#e8ecfa;color:#243bb2;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">${esc(r.work_type||'-')}</span></td>
+                <td>${esc(r.qty_per_line||0)}</td>
+                <td>${esc(r.line_count||0)}</td>
                 <td style="font-weight:600;color:#243bb2">${(r.total_qty||0).toLocaleString()}</td>
                 <td style="${defectStyle}">${(r.defect_qty||0).toLocaleString()}</td>
-                <td style="min-width:80px">${r.worker_name||'-'}</td>
-                <td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.note||'-'}</td>
-                <td style="font-size:11px">${r.remarks||'-'}</td>
-                <td style="font-size:11px">${r.created_by_name||'-'}</td>
+                <td style="min-width:80px">${esc(r.worker_name||'-')}</td>
+                <td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.note||'-')}</td>
+                <td style="font-size:11px">${esc(r.remarks||'-')}</td>
+                <td style="font-size:11px">${esc(r.created_by_name||'-')}</td>
                 <td style="font-size:11px">${r.created_at ? new Date(r.created_at).toLocaleString('ko-KR') : '-'}</td>
-                <td>${isDeleted ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : `<div class="row-actions"><button class="btn-row btn-row-edit" onclick='openEditCoating(${JSON.stringify(r).replace(/'/g, "&#39;")})'>수정</button><button class="btn-row btn-row-del" onclick="deleteCoating(${r.id})">삭제</button></div>`}</td>
+                <td>${isDeleted ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : `<div class="row-actions"><button class="btn-row btn-row-edit" onclick='openEditCoating(${esc(JSON.stringify(r))})'>수정</button><button class="btn-row btn-row-del" onclick="deleteCoating(${esc(r.id)})">삭제</button></div>`}</td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -2377,21 +2385,21 @@ function renderPostcureTable(data) {
               const rowStyle = isDeleted ? 'background:#f9f9f9;opacity:0.5;text-decoration:line-through' : '';
               return `<tr style="${rowStyle}">
                 <td>${i+1}</td>
-                <td>${r.work_date}</td>
-                <td>${r.worker_id||'-'}</td>
-                <td>${r.material_name||'-'}</td>
+                <td>${esc(r.work_date)}</td>
+                <td>${esc(r.worker_id||'-')}</td>
+                <td>${esc(r.material_name||'-')}</td>
                 <td>${r.temperature != null ? r.temperature : '-'}</td>
                 <td>${r.duration_min != null ? r.duration_min : '-'}</td>
                 <td style="font-weight:600;color:#243bb2">${(r.input_qty||0).toLocaleString()}</td>
-                <td>${r.molding_worker||'-'}</td>
-                <td>${r.hardness||'-'}</td>
-                <td style="font-size:11px">${r.lot_no||'-'}</td>
-                <td style="min-width:80px">${r.worker_name||'-'}</td>
-                <td style="font-size:11px">${r.note||'-'}</td>
-                <td style="font-size:11px">${r.remarks||'-'}</td>
-                <td style="font-size:11px">${r.created_by_name||'-'}</td>
+                <td>${esc(r.molding_worker||'-')}</td>
+                <td>${esc(r.hardness||'-')}</td>
+                <td style="font-size:11px">${esc(r.lot_no||'-')}</td>
+                <td style="min-width:80px">${esc(r.worker_name||'-')}</td>
+                <td style="font-size:11px">${esc(r.note||'-')}</td>
+                <td style="font-size:11px">${esc(r.remarks||'-')}</td>
+                <td style="font-size:11px">${esc(r.created_by_name||'-')}</td>
                 <td style="font-size:11px">${r.created_at ? new Date(r.created_at).toLocaleString('ko-KR') : '-'}</td>
-                <td>${isDeleted ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : `<div class="row-actions"><button class="btn-row btn-row-edit" onclick='openEditPostcure(${JSON.stringify(r).replace(/'/g, "&#39;")})'>수정</button><button class="btn-row btn-row-del" onclick="deletePostcure(${r.id})">삭제</button></div>`}</td>
+                <td>${isDeleted ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : `<div class="row-actions"><button class="btn-row btn-row-edit" onclick='openEditPostcure(${esc(JSON.stringify(r))})'>수정</button><button class="btn-row btn-row-del" onclick="deletePostcure(${esc(r.id)})">삭제</button></div>`}</td>
               </tr>`;
             }).join('')}
           </tbody>
@@ -2467,11 +2475,11 @@ function renderShotTable(data) {
       const typeTag = r.shot_type==='freeze' ? '<span style="background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:4px;font-size:11px">❄️ 냉동</span>' : '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px">⚙️ 자동</span>';
       const col1 = r.shot_type==='freeze' ? (r.temperature != null ? r.temperature+'℃' : '-') : (r.grinding_time_sec != null ? r.grinding_time_sec+'초' : '-');
       const col2 = r.shot_type==='freeze' ? (r.duration_min != null ? r.duration_min+'분' : '-') : (r.rotation_time_sec != null ? r.rotation_time_sec+'초' : '-');
-      return `<tr style="${st}"><td>${i+1}</td><td>${r.work_date}</td><td>${typeTag}</td><td style="font-size:11px">${r.equipment||'-'}</td><td>${r.worker_id||'-'}</td>
-        <td>${col1}</td><td>${col2}</td><td style="font-weight:600;color:#243bb2">${(r.work_qty||0).toLocaleString()}</td><td>${r.ball_size||'-'}</td><td>${r.rpm||'-'}</td>
-        <td style="font-size:11px">${r.lot_no||'-'}</td><td style="min-width:80px">${r.worker_name||'-'}</td><td style="font-size:11px">${r.note||'-'}</td>
-        <td style="font-size:11px">${r.created_by_name||'-'}</td><td style="font-size:11px">${r.created_at?new Date(r.created_at).toLocaleString('ko-KR'):'-'}</td>
-        <td>${del?'<span style="color:#aaa;font-size:11px">삭제됨</span>':`<div class="row-actions"><button class="btn-row btn-row-edit" onclick='openEditShot(${JSON.stringify(r).replace(/'/g, "&#39;")})'>수정</button><button class="btn-row btn-row-del" onclick="deleteShot(${r.id})">삭제</button></div>`}</td></tr>`;
+      return `<tr style="${st}"><td>${i+1}</td><td>${esc(r.work_date)}</td><td>${typeTag}</td><td style="font-size:11px">${esc(r.equipment||'-')}</td><td>${esc(r.worker_id||'-')}</td>
+        <td>${col1}</td><td>${col2}</td><td style="font-weight:600;color:#243bb2">${(r.work_qty||0).toLocaleString()}</td><td>${esc(r.ball_size||'-')}</td><td>${esc(r.rpm||'-')}</td>
+        <td style="font-size:11px">${esc(r.lot_no||'-')}</td><td style="min-width:80px">${esc(r.worker_name||'-')}</td><td style="font-size:11px">${esc(r.note||'-')}</td>
+        <td style="font-size:11px">${esc(r.created_by_name||'-')}</td><td style="font-size:11px">${r.created_at?new Date(r.created_at).toLocaleString('ko-KR'):'-'}</td>
+        <td>${del?'<span style="color:#aaa;font-size:11px">삭제됨</span>':`<div class="row-actions"><button class="btn-row btn-row-edit" onclick='openEditShot(${esc(JSON.stringify(r))})'>수정</button><button class="btn-row btn-row-del" onclick="deleteShot(${esc(r.id)})">삭제</button></div>`}</td></tr>`;
     }).join('')}
     </tbody></table></div></div>`;
 }
@@ -2681,26 +2689,26 @@ function renderMoldingTable(data) {
         }
       } catch(e) {}
       return `<tr style="${st}">
-        <td>${i+1}</td><td>${r.work_date||''}</td><td>${r.shift_type||''}</td>
-        <td style="font-size:11px">${r.equipment_no||''}</td>
-        <td><span style="background:${tc}15;color:${tc};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">${r.work_type||'표준'}</span></td>
-        <td>${r.sabun||''}</td><td style="font-size:11px">${(PRODUCTS[r.sabun]&&PRODUCTS[r.sabun].materialName)||'-'}</td>
-        <td style="font-size:11px">${r.batch_no||''}</td><td>${r.cavity||''}</td><td>${r.shot_count||''}</td>
+        <td>${i+1}</td><td>${esc(r.work_date||'')}</td><td>${esc(r.shift_type||'')}</td>
+        <td style="font-size:11px">${esc(r.equipment_no||'')}</td>
+        <td><span style="background:${tc}15;color:${tc};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">${esc(r.work_type||'표준')}</span></td>
+        <td>${esc(r.sabun||'')}</td><td style="font-size:11px">${(PRODUCTS[r.sabun]&&PRODUCTS[r.sabun].materialName)||'-'}</td>
+        <td style="font-size:11px">${esc(r.batch_no||'')}</td><td>${esc(r.cavity||'')}</td><td>${esc(r.shot_count||'')}</td>
         <td style="text-align:right;font-weight:600">${(r.production_qty||0).toLocaleString()}</td>
-        <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${r.defect_qty||0}</td>
+        <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${esc(r.defect_qty||0)}</td>
         <td style="font-size:11px;white-space:nowrap">${(function(){
           var c = moldingCondOf(r);
           if (!c) return '-';
           var t = (c.u!==''?c.u:'-')+'/'+(c.l!==''?c.l:'-')+'℃';
           return (c.t!=='기준'?'<span style="color:#7c3aed">'+c.t+'</span> ':'') + t + (c.p!==''?' · '+c.p:'');
         })()}</td>
-        <td style="font-size:11px;color:#e67e22">${dtCode}</td>
+        <td style="font-size:11px;color:#e67e22">${esc(dtCode)}</td>
         <td style="font-size:11px;color:#e67e22">${dtMin}</td>
         <td style="font-size:11px;text-align:center">${moldingWorkHours(r)}</td>
         <td style="font-size:11px;text-align:right;font-weight:600">${(function(){var _m=moldingOperatingMin(r);return _m==null?'-':_m+'분';})()}</td>
-        <td style="min-width:80px">${r.worker_name||''}</td><td style="font-size:11px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${noteText}">${noteText||'-'}</td>
+        <td style="min-width:80px">${esc(r.worker_name||'')}</td><td style="font-size:11px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(noteText)}">${noteText||'-'}</td>
         <td style="font-size:11px;color:#999">${fmtDatetime(r.created_at)}</td>
-        <td>${del ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : `<div class="row-actions"><button class="btn-row" style="background:#eef2ff;color:#243bb2" onclick='openViewMolding(${JSON.stringify(r).replace(/'/g, "&#39;")})'>보기</button><button class="btn-row btn-row-edit" onclick='openEditMolding(${JSON.stringify(r).replace(/'/g, "&#39;")})'>수정</button><button class="btn-row btn-row-del" onclick="deleteMolding('${r.id}')">삭제</button></div>`}</td>
+        <td>${del ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : `<div class="row-actions"><button class="btn-row" style="background:#eef2ff;color:#243bb2" onclick='openViewMolding(${esc(JSON.stringify(r))})'>보기</button><button class="btn-row btn-row-edit" onclick='openEditMolding(${esc(JSON.stringify(r))})'>수정</button><button class="btn-row btn-row-del" onclick="deleteMolding('${esc(r.id)}')">삭제</button></div>`}</td>
       </tr>`;
     }).join('')}
     </tbody></table></div></div>`;
@@ -2865,16 +2873,16 @@ function renderAssemblyTable(data) {
       const st = del ? 'background:#f9f9f9;opacity:0.5;text-decoration:line-through' : '';
       const methodColor = r.work_method === '수작업' ? 'background:#fef3c7;color:#92400e' : 'background:#dbeafe;color:#1e40af';
       return `<tr style="${st}">
-        <td>${i+1}</td><td>${r.work_date||''}</td><td>${r.shift_type||''}</td>
-        <td style="font-size:11px">${r.equipment_no||''}</td>
-        <td>${r.sabun||''}</td><td style="font-size:11px">${r.product_name||''}</td>
-        <td style="font-size:11px">${r.assembly_type||''}</td>
-        <td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;${methodColor}">${r.work_method||''}</span></td>
+        <td>${i+1}</td><td>${esc(r.work_date||'')}</td><td>${esc(r.shift_type||'')}</td>
+        <td style="font-size:11px">${esc(r.equipment_no||'')}</td>
+        <td>${esc(r.sabun||'')}</td><td style="font-size:11px">${esc(r.product_name||'')}</td>
+        <td style="font-size:11px">${esc(r.assembly_type||'')}</td>
+        <td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;${methodColor}">${esc(r.work_method||'')}</span></td>
         <td style="text-align:right;font-weight:600">${(r.production_qty||0).toLocaleString()}</td>
-        <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${r.defect_qty||0}</td>
-        <td style="min-width:80px">${r.worker_name||''}</td><td style="font-size:11px">${r.note||''}</td>
+        <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${esc(r.defect_qty||0)}</td>
+        <td style="min-width:80px">${esc(r.worker_name||'')}</td><td style="font-size:11px">${esc(r.note||'')}</td>
         <td style="font-size:11px;color:#999">${fmtDatetime(r.created_at)}</td>
-        <td>${del ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : (() => { const canEdit = canEditDelete(r); const reason = canEdit ? '' : getCannotEditReason(r); return `<div class="row-actions"><button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditAssembly(${JSON.stringify(r).replace(/'/g, "&#39;")})'>수정` : `disabled title="${reason}">수정`}</button><button class="btn-row btn-row-del" ${canEdit ? `onclick="deleteAssembly('${r.id}')">삭제` : `disabled title="${reason}">삭제`}</button></div>`; })()}</td>
+        <td>${del ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : (() => { const canEdit = canEditDelete(r); const reason = canEdit ? '' : getCannotEditReason(r); return `<div class="row-actions"><button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditAssembly(${esc(JSON.stringify(r))})'>수정` : `disabled title="${reason}">수정`}</button><button class="btn-row btn-row-del" ${canEdit ? `onclick="deleteAssembly('${esc(r.id)}')">삭제` : `disabled title="${reason}">삭제`}</button></div>`; })()}</td>
       </tr>`;
     }).join('')}
     </tbody></table></div></div>`;
@@ -2942,16 +2950,16 @@ function renderSasangTable(data) {
       const st = del ? 'background:#f9f9f9;opacity:0.5;text-decoration:line-through' : '';
       const methodColor = r.work_method === '수사상' ? 'background:#fef3c7;color:#92400e' : 'background:#dbeafe;color:#1e40af';
       return `<tr style="${st}">
-        <td>${i+1}</td><td>${r.work_date||''}</td><td>${r.shift_type||''}</td>
-        <td style="font-size:11px">${r.equipment_no||''}</td>
-        <td>${r.sabun||''}</td><td style="font-size:11px">${r.product_name||''}</td>
-        <td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;${methodColor}">${r.work_method||''}</span></td>
-        <td style="font-size:11px;font-family:monospace;color:#ca8a04">${r.lot_no||'-'}</td>
+        <td>${i+1}</td><td>${esc(r.work_date||'')}</td><td>${esc(r.shift_type||'')}</td>
+        <td style="font-size:11px">${esc(r.equipment_no||'')}</td>
+        <td>${esc(r.sabun||'')}</td><td style="font-size:11px">${esc(r.product_name||'')}</td>
+        <td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;${methodColor}">${esc(r.work_method||'')}</span></td>
+        <td style="font-size:11px;font-family:monospace;color:#ca8a04">${esc(r.lot_no||'-')}</td>
         <td style="text-align:right;font-weight:600">${(r.production_qty||0).toLocaleString()}</td>
-        <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${r.defect_qty||0}</td>
-        <td style="min-width:80px">${r.worker_name||''}</td><td style="font-size:11px">${r.note||''}</td>
+        <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${esc(r.defect_qty||0)}</td>
+        <td style="min-width:80px">${esc(r.worker_name||'')}</td><td style="font-size:11px">${esc(r.note||'')}</td>
         <td style="font-size:11px;color:#999">${fmtDatetime(r.created_at)}</td>
-        <td>${del ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : (() => { const canEdit = canEditDelete(r); const reason = canEdit ? '' : getCannotEditReason(r); return `<div class="row-actions"><button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditSasang(${JSON.stringify(r).replace(/'/g, "&#39;")})'>수정` : `disabled title="${reason}">수정`}</button><button class="btn-row btn-row-del" ${canEdit ? `onclick="deleteSasang('${r.id}')">삭제` : `disabled title="${reason}">삭제`}</button></div>`; })()}</td>
+        <td>${del ? '<span style="color:#aaa;font-size:11px">삭제됨</span>' : (() => { const canEdit = canEditDelete(r); const reason = canEdit ? '' : getCannotEditReason(r); return `<div class="row-actions"><button class="btn-row btn-row-edit" ${canEdit ? `onclick='openEditSasang(${esc(JSON.stringify(r))})'>수정` : `disabled title="${reason}">수정`}</button><button class="btn-row btn-row-del" ${canEdit ? `onclick="deleteSasang('${esc(r.id)}')">삭제` : `disabled title="${reason}">삭제`}</button></div>`; })()}</td>
       </tr>`;
     }).join('')}
     </tbody></table></div></div>`;
@@ -3028,7 +3036,7 @@ const MES_TABS = {
 const MES_SUB = '[▶뱃지계]';
 function isMesTab(p){ return !!MES_TABS[p]; }
 function mesN(v){ var n = parseFloat(v); return isNaN(n) ? 0 : n; }
-function mesC(v){ return (v == null || v === '') ? '-' : String(v); }
+function mesC(v){ return (v == null || v === '') ? '-' : esc(String(v)); } // 2026-10-27 XSS: 템플릿 전용 헬퍼라 내부에서 이스케이프
 function mesF(v, d){ return mesN(v).toLocaleString('ko-KR', { minimumFractionDigits:d, maximumFractionDigits:d }); }
 async function loadMesRows(p, start, end, fSabun, fWorker, fEquip) {
   const cfg = MES_TABS[p];
@@ -3068,8 +3076,8 @@ function renderMesCuttingTable(data) {
       const sp = mesN(r.weight_spec);
       const dv = v => { if (!sp || v == null || v === '') return ''; const d = Math.abs(mesN(v) - sp) / sp * 100; return d >= 5 ? 'color:#dc2626;font-weight:600' : (d >= 3 ? 'color:#d97706' : ''); };
       return `<tr>
-        <td>${i+1}</td><td>${r.work_date||''}</td><td style="font-size:11px">${mesC(r.machine)}</td><td style="font-size:11px">${mesC(r.batch_no)}</td>
-        <td style="font-weight:600">${mesC(r.product_code)}</td><td style="font-size:11px">${prod.partNo||'-'}</td><td style="font-size:11px">${prod.partName||'-'}</td><td style="font-size:11px">${mesC(r.material)}</td>
+        <td>${i+1}</td><td>${esc(r.work_date||'')}</td><td style="font-size:11px">${mesC(r.machine)}</td><td style="font-size:11px">${mesC(r.batch_no)}</td>
+        <td style="font-weight:600">${mesC(r.product_code)}</td><td style="font-size:11px">${esc(prod.partNo||'-')}</td><td style="font-size:11px">${esc(prod.partName||'-')}</td><td style="font-size:11px">${mesC(r.material)}</td>
         <td>${mesC(r.length_mm)}</td><td>${mesC(r.thickness)}</td><td>${mesC(r.weight_spec)}</td>
         <td style="${dv(r.q_first)}">${mesC(r.q_first)}</td><td style="${dv(r.q_mid)}">${mesC(r.q_mid)}</td><td style="${dv(r.q_last)}">${mesC(r.q_last)}</td>
         <td style="text-align:right">${mesC(r.box_count)}</td><td style="text-align:right;font-weight:600">${mesN(r.total_qty).toLocaleString()}</td>
@@ -3093,13 +3101,13 @@ function renderMesMixingTable(data) {
     ${data.map((r, i) => {
       const prod = PRODUCTS[r.product_code] || {};
       return `<tr>
-        <td>${i+1}</td><td>${r.work_date||''}</td><td style="font-size:11px">${mesC(r.batch_no)}</td>
-        <td style="font-weight:600">${mesC(r.product_code)}</td><td style="font-size:11px">${prod.partNo||'-'}</td><td style="font-size:11px">${prod.partName||'-'}</td><td style="font-size:11px">${mesC(r.material)}</td>
+        <td>${i+1}</td><td>${esc(r.work_date||'')}</td><td style="font-size:11px">${mesC(r.batch_no)}</td>
+        <td style="font-weight:600">${mesC(r.product_code)}</td><td style="font-size:11px">${esc(prod.partNo||'-')}</td><td style="font-size:11px">${esc(prod.partName||'-')}</td><td style="font-size:11px">${mesC(r.material)}</td>
         <td style="font-size:11px">${mesC(r.cmb_lot_no)}</td><td style="font-size:11px">${mesC(r.cmb_name)}</td>
         <td style="text-align:right;font-weight:600">${mesC(r.batch_qty)}</td><td style="text-align:right">${mesC(r.total_weight)}</td>
         <td>${mesC(r.kneader_min)}</td><td>${mesC(r.kneader_temp)}</td><td>${mesC(r.roller_min)}</td><td>${mesC(r.roller_temp)}</td>
         <td>${mesC(r.length_mm)}</td><td>${mesC(r.thickness)}</td><td style="text-align:right;color:${mesN(r.scrap)>0?'#d97706':'#999'}">${mesC(r.scrap)}</td>
-        <td>${mesC(r.worker)}</td><td style="font-size:11px;max-width:200px" title="${(r.note||'').replace(/"/g,'&quot;')}">${r.note||'-'}</td>
+        <td>${mesC(r.worker)}</td><td style="font-size:11px;max-width:200px" title="${esc(r.note||'')}">${esc(r.note||'-')}</td>
       </tr>`;
     }).join('')}
     </tbody></table></div></div>`;
@@ -3118,8 +3126,8 @@ function renderMesWeighingTable(data) {
       const prod = PRODUCTS[r.product_code] || {};
       const sub = r.material === MES_SUB;
       return `<tr style="${sub ? 'background:#e2e8f0;font-weight:700' : ''}">
-        <td>${i+1}</td><td>${r.work_date||''}</td><td style="font-size:11px">${mesC(r.machine)}</td>
-        <td style="font-weight:600">${mesC(r.product_code)}</td><td style="font-size:11px">${prod.partNo||'-'}</td>
+        <td>${i+1}</td><td>${esc(r.work_date||'')}</td><td style="font-size:11px">${mesC(r.machine)}</td>
+        <td style="font-weight:600">${mesC(r.product_code)}</td><td style="font-size:11px">${esc(prod.partNo||'-')}</td>
         <td>${sub ? '▶ 뱃지계' : mesC(r.material)}</td><td style="font-size:11px">${mesC(r.item_name)}</td>
         <td style="text-align:right">${mesC(r.batch_qty)}</td><td style="text-align:right">${mesC(r.weight_kg)}</td>
       </tr>`;
