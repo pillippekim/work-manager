@@ -36,7 +36,7 @@ body { background:#eef0f4; color:#222; }
 .sign-table td { height:28px; }
 
 /* 요약 카드 */
-.sum-grid { display:grid; grid-template-columns:repeat(8,1fr); gap:6px; margin-bottom:16px; }
+.sum-grid { display:grid; grid-template-columns:repeat(9,1fr); gap:6px; margin-bottom:16px; } /* 2026-11-02 금형 교체 카드 추가 → 9칸 */
 .sum-card { border:1px solid #dfe3ec; border-radius:6px; padding:6px 2px; text-align:center; }
 .sum-card .n { font-size:15px; font-weight:800; }
 .sum-card .l { font-size:9.5px; color:#777; margin-top:1px; letter-spacing:-0.3px; }
@@ -103,7 +103,7 @@ table.rp td.left { text-align:left; }
     <tr><td></td><td></td><td></td></tr>
   </table>
 
-  <div class="sum-grid" style="grid-template-columns:repeat(8,1fr)">
+  <div class="sum-grid" style="grid-template-columns:repeat(9,1fr)">
     <div class="sum-card"><div class="n" id="cTotal">-</div><div class="l">총 검사</div></div>
     <div class="sum-card"><div class="n" id="cPress">-</div><div class="l">Press</div></div>
     <div class="sum-card"><div class="n" id="cInj">-</div><div class="l">Injection</div></div>
@@ -112,6 +112,7 @@ table.rp td.left { text-align:left; }
     <div class="sum-card"><div class="n" id="cChange" style="color:#b45309">-</div><div class="l">변동점(전체)</div></div>
     <div class="sum-card"><div class="n" id="cMoldClean" style="color:#0369a1">-</div><div class="l">금형 세척</div></div>
     <div class="sum-card"><div class="n" id="cMoldDamage" style="color:#dc2626">-</div><div class="l">금형 수정/파손</div></div>
+    <div class="sum-card"><div class="n" id="cMoldSwap" style="color:#7c3aed">-</div><div class="l">금형 교체</div></div><!-- 2026-11-02 사용자 의견: 교체 건수 카드 -->
   </div>
 
   <h2 class="sec">1. 설비별 검사 현황</h2>
@@ -233,6 +234,7 @@ async function loadReport(){
   document.getElementById('cInactive').textContent = inactive;
   document.getElementById('cMoldClean').textContent = moldClean;
   document.getElementById('cMoldDamage').textContent = moldDamage;
+  document.getElementById('cMoldSwap').textContent = moldSwap;   // 2026-11-02
 
   // ── 1. 설비별 현황 ──
   var eq = {};
