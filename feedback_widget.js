@@ -1,6 +1,7 @@
 /* =====================================================================
-   feedback_widget.js — 개선 요청(의견 접수) 위젯  (2026-11-04, 양 저장소 공통 파일)
-   · auth_guard.js 가 로드하는 모든 페이지에 우하단 💬 버튼 표시
+   feedback_widget.js — 개선 요청(의견 접수) 위젯  (2026-11-04 v2, 양 저장소 공통 파일)
+   · auth_guard.js 가 로드하는 모든 페이지 상단 헤더(날짜/사용자 왼쪽)에 🎧 버튼 — 2026-11-04 v2: 우하단 떠 있는 버튼 → 헤더 고정(사용자 의견: 페이지 버튼 가림)
+   · 답변이 새로 달리면 🎧 에 빨간 배지 숫자 → [내 요청] 열면 사라짐
    · 모달: [요청하기] 유형·내용·스크린샷(자동 축소 ≤1280px·JPEG) / [내 요청] 상태·회신 확인
    · 페이지명·사용자·출처(portal/field)는 자동 기록
    · 언어: localStorage.hkht_lang (ko/id/en, 현장 i18n 과 동일 키)
@@ -20,7 +21,7 @@
   // ── 다국어 ──
   var LANG = (function () { try { var l = localStorage.getItem('hkht_lang'); return (l === 'id' || l === 'en') ? l : 'ko'; } catch (e) { return 'ko'; } })();
   var T = {
-    btn:        { ko: '개선 요청',           id: 'Saran / Laporan',      en: 'Feedback' },
+    btn:        { ko: '문의·요청',           id: 'Bantuan',              en: 'Support' },
     title:      { ko: '💬 개선 요청 · 문의',  id: '💬 Saran / Laporan',   en: '💬 Feedback / Request' },
     tabNew:     { ko: '요청하기',            id: 'Kirim',                en: 'New' },
     tabMine:    { ko: '내 요청',             id: 'Laporan saya',         en: 'My requests' },
@@ -54,8 +55,13 @@
 
   // ── 스타일 ──
   var css = ''
-    + '#fbw-btn{position:fixed;right:18px;bottom:18px;z-index:99990;background:#243bb2;color:#fff;border:none;border-radius:999px;padding:10px 16px;font-size:13px;font-weight:700;box-shadow:0 6px 18px rgba(36,59,178,.35);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px}'
-    + '#fbw-btn:hover{background:#1a2d8a}'
+    + '#fbw-btn{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#243bb2;border:1px solid #c7d2fe;border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;position:relative;white-space:nowrap}'
+    + '#fbw-btn:hover{background:#eef2ff}'
+    + '#fbw-btn .ic{font-size:15px}'
+    + '#fbw-btn.fbw-fixed{position:fixed;top:10px;right:14px;z-index:99990;box-shadow:0 2px 8px rgba(0,0,0,.12)}'
+    + '#fbw-badge{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:#dc2626;color:#fff;font-size:10.5px;font-weight:800;display:none;align-items:center;justify-content:center;box-sizing:border-box}'
+    + '#fbw-badge.on{display:inline-flex}'
+    + '@media (max-width:640px){#fbw-btn .lb{display:none}#fbw-btn{padding:5px 9px}}'
     + '@media print{#fbw-btn,#fbw-ov{display:none!important}}'
     + '#fbw-ov{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:99991;display:none;align-items:center;justify-content:center;padding:16px}'
     + '#fbw-ov.show{display:flex}'
@@ -87,7 +93,7 @@
   function el(tag, attrs, html) { var e = document.createElement(tag); for (var k in (attrs || {})) e.setAttribute(k, attrs[k]); if (html != null) e.innerHTML = html; return e; }
   function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
-  var btn = el('button', { id: 'fbw-btn', type: 'button', title: t('btn') }, '💬 <span>' + esc(t('btn')) + '</span>');
+  var btn = el('button', { id: 'fbw-btn', type: 'button', title: t('btn') }, '<span class="ic">🎧</span><span class="lb">' + esc(t('btn')) + '</span><span id="fbw-badge"></span>');
   var ov = el('div', { id: 'fbw-ov' });
   ov.innerHTML = ''
     + '<div id="fbw-box">'
@@ -104,9 +110,26 @@
     + '  <div class="fbw-act"><button type="button" id="fbw-cancel">' + esc(t('cancel')) + '</button><button type="button" class="pri" id="fbw-send">' + esc(t('submit')) + '</button></div>'
     + '</div>';
 
+  // 헤더에 끼워 넣기: 포털 top-header(날짜 왼쪽) → 현장 .top-bar(사용자 정보 왼쪽) → .header-row → 폴백(상단 우측 고정)
+  function place() {
+    var hr = document.querySelector('.top-header-right');
+    if (hr) { var dt = hr.querySelector('.top-header-date'); hr.insertBefore(btn, dt || hr.firstChild); return true; }
+    var ui = document.querySelector('.top-bar #userInfo, .top-bar .user-info');
+    if (ui) { var rb = ui.parentElement; var wrap = el('div'); wrap.style.cssText = 'display:flex;align-items:center;gap:12px'; rb.parentNode.insertBefore(wrap, rb); wrap.appendChild(btn); wrap.appendChild(rb); return true; }
+    var row = document.querySelector('.page-header .header-row');
+    if (row) { var acts = row.querySelector('.header-actions'); if (acts) acts.insertBefore(btn, acts.firstChild); else row.appendChild(btn); return true; }
+    return false;
+  }
   function mount() {
     if (!document.body) { return setTimeout(mount, 50); }
-    document.body.appendChild(btn); document.body.appendChild(ov);
+    document.body.appendChild(ov);
+    var tries = 0;
+    (function tryPlace() {
+      if (place()) return;
+      if (++tries < 60) return setTimeout(tryPlace, 100);   // 사이드바가 헤더를 늦게 그리는 페이지 대비(최대 6초)
+      btn.classList.add('fbw-fixed'); document.body.appendChild(btn);
+    })();
+    setTimeout(loadBadge, 1500);
     document.getElementById('fbw-page').textContent = PAGE + (document.title ? ' · ' + document.title.replace(/\s*[-·|].*$/, '') : '');
     btn.onclick = function () { ov.classList.add('show'); showTab('new'); };
     document.getElementById('fbw-x').onclick = close; document.getElementById('fbw-cancel').onclick = close;
@@ -121,7 +144,22 @@
     document.getElementById('fbw-new').style.display = name === 'new' ? '' : 'none';
     document.getElementById('fbw-mine').style.display = name === 'mine' ? '' : 'none';
     document.getElementById('fbw-send').style.display = name === 'new' ? '' : 'none';
-    if (name === 'mine') loadMine();
+    if (name === 'mine') { loadMine(); markSeen(); }
+  }
+  // ── 새 답변 배지: 마지막으로 [내 요청]을 본 시각 이후에 달린 답변 수 ──
+  var _uidForSeen = null;
+  function seenKey() { return 'fbw_seen_' + (_uidForSeen || 'x'); }
+  function markSeen() { try { localStorage.setItem(seenKey(), new Date().toISOString()); } catch (e) {} setBadge(0); }
+  function setBadge(n) { var b = document.getElementById('fbw-badge'); if (!b) return; b.textContent = n > 99 ? '99+' : String(n); b.classList.toggle('on', n > 0); }
+  async function loadBadge() {
+    try {
+      var u = await me(); if (!u) return; _uidForSeen = u.uid;
+      var since = ''; try { since = localStorage.getItem(seenKey()) || ''; } catch (e) {}
+      var q = client().from('feedback').select('id, replied_at').eq('reporter_uid', u.uid).not('replied_at', 'is', null).limit(100);
+      if (since) q = q.gt('replied_at', since);
+      var r = await q; if (r.error || !r.data) return;
+      setBadge(r.data.length);
+    } catch (e) {}
   }
   function msg(text, kind) { var m = document.getElementById('fbw-msg'); m.textContent = text; m.className = 'fbw-msg' + (kind ? ' ' + kind : ''); }
 
