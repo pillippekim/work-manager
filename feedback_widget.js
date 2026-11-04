@@ -114,6 +114,8 @@
   function place() {
     var hr = document.querySelector('.top-header-right');
     if (hr) { var dt = hr.querySelector('.top-header-date'); hr.insertBefore(btn, dt || hr.firstChild); return true; }
+    // 포털(#top-header 자리가 있는 페이지)은 사이드바가 헤더를 그릴 때까지 기다림 — 페이지 자체 header-row 에 먼저 꽂히는 것 방지(위치 통일)
+    if (document.getElementById('top-header')) return false;
     var ui = document.querySelector('.top-bar #userInfo, .top-bar .user-info');
     if (ui) { var rb = ui.parentElement; var wrap = el('div'); wrap.style.cssText = 'display:flex;align-items:center;gap:12px'; rb.parentNode.insertBefore(wrap, rb); wrap.appendChild(btn); wrap.appendChild(rb); return true; }
     var row = document.querySelector('.page-header .header-row');
