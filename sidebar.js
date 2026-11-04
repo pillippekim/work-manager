@@ -23,7 +23,7 @@ function initSidebar() {
     var isMesPage = ['mes_data.html'].indexOf(page) !== -1;
     var isQualityPage = ['inspection_round_viewer.html', 'inspection_report.html'].indexOf(page) !== -1;
     var isDataPage = ['data_viewer.html','safety_viewer.html','docs_manager.html','process_report.html','molding_condition.html'].indexOf(page) !== -1;
-    var isSystemPage = ['master_data.html','users.html'].indexOf(page) !== -1;
+    var isSystemPage = ['master_data.html','users.html','feedback_admin.html'].indexOf(page) !== -1; // 2026-11-04
     var isInventoryPage = ['inventory_layout.html','inventory_rack.html','inventory_io.html','inventory_viewer.html','inventory_zone.html','inventory_special.html'].indexOf(page) !== -1;
     var isAssetPage = ['asset_manage.html'].indexOf(page) !== -1;
 
@@ -50,6 +50,7 @@ function initSidebar() {
     var masterActive = (page === 'master_data.html') ? ' nav-active' : '';
     var usersActive = (page === 'users.html') ? ' nav-active' : '';
     var permActive = (page === 'permissions.html') ? ' nav-active' : '';
+    var fbActive = (page === 'feedback_admin.html') ? ' nav-active' : ''; // 2026-11-04
 
     // 재고관리 active
     var invLayoutActive = (page === 'inventory_layout.html') ? ' nav-active' : '';
@@ -267,6 +268,7 @@ function initSidebar() {
                     '<a class="nav-link' + usersActive + '" href="users.html"><span class="n-icon">👥</span>사용자 관리</a>' +
                     '<a class="nav-link' + permActive + '" href="permissions.html"><span class="n-icon">🔐</span>권한 관리</a>' +
                     '<a class="nav-link" href="audit.html"><span class="n-icon">📋</span>변경 이력</a>' +
+                    '<a class="nav-link' + fbActive + '" href="feedback_admin.html"><span class="n-icon">💬</span>개선 요청 관리</a>' + // 2026-11-04
                 '</div>' +
             '</div>' +
         '</div>' +

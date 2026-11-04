@@ -48,7 +48,7 @@ window.MENU_STRUCTURE = {
     logistics:  { name: '물류관리', pages: ['inventory_layout.html', 'inventory_rack.html', 'inventory_zone.html', 'inventory_io.html', 'inventory_viewer.html', 'inventory_special.html'] },
     management: { name: '경영지원', pages: ['asset_manage.html'], sensitive: true },
     data:       { name: '데이터 관리', pages: ['data_viewer.html', 'safety_viewer.html', 'docs_manager.html', 'process_report.html', 'molding_condition.html'] },
-    system:     { name: '시스템 관리', pages: ['master_data.html', 'users.html', 'permissions.html'] }
+    system:     { name: '시스템 관리', pages: ['master_data.html', 'users.html', 'permissions.html', 'feedback_admin.html'] } // 2026-11-04 개선 요청 관리
 };
 
 // 페이지가 속한 대분류 코드 반환
@@ -221,3 +221,12 @@ async function logout() {
     sessionStorage.removeItem('userPerms');
     location.href = 'login.html';
 }
+
+// =============================================
+// 2026-11-04 개선 요청(의견 접수) 위젯 로드 — 이 파일을 쓰는 모든 페이지 우하단에 💬 버튼 (login·change_password 는 위젯이 스스로 제외)
+// =============================================
+(function () {
+    if (document.getElementById('fbw-loader')) return;
+    var s = document.createElement('script'); s.id = 'fbw-loader'; s.src = 'feedback_widget.js?v=20261104'; s.defer = true;
+    (document.head || document.documentElement).appendChild(s);
+})();

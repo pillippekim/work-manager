@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>개선 요청 관리 - HKHT</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sidebar.css">
+<link rel="stylesheet" href="common.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth_guard.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+.container { max-width: 100% !important; margin: 0 !important; padding: 16px 20px !important; }
+.fb-stats { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:14px; }
+.fb-stat { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px 14px; cursor:pointer; }
+.fb-stat.on { border-color:#243bb2; box-shadow:0 0 0 2px #e0e7ff; }
+.fb-stat .n { font-size:22px; font-weight:800; }
+.fb-stat .l { font-size:11.5px; color:#666; margin-top:2px; }
+.fb-filter { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+.fb-filter select, .fb-filter input { padding:7px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; font-family:inherit; }
+table.fb { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; }
+table.fb th { background:#f8fafc; font-size:12px; color:#555; padding:10px 10px; text-align:left; border-bottom:1px solid #e5e7eb; position:sticky; top:0; }
+table.fb td { padding:10px; font-size:12.5px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+table.fb tr:hover td { background:#fafbff; cursor:pointer; }
+table.fb tr.sel td { background:#eef2ff; }
+.st { display:inline-block; padding:2px 9px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap; }
+.cat { display:inline-block; padding:1px 7px; border-radius:4px; font-size:11px; font-weight:600; }
+.cat-오류 { background:#fee2e2; color:#991b1b; } .cat-개선 { background:#dbeafe; color:#1e40af; } .cat-문의 { background:#f3f4f6; color:#374151; }
+.src { font-size:11px; color:#888; }
+.fb-layout { display:grid; grid-template-columns: 1fr 420px; gap:14px; align-items:start; }
+@media (max-width:1100px) { .fb-layout { grid-template-columns:1fr; } }
+.fb-detail { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:16px; position:sticky; top:12px; }
+.fb-detail h3 { margin:0 0 10px; font-size:15px; }
+.fb-meta { font-size:12px; color:#666; line-height:1.7; margin-bottom:10px; }
+.fb-content { white-space:pre-wrap; font-size:13px; line-height:1.6; background:#f8fafc; padding:10px 12px; border-radius:8px; margin-bottom:10px; }
+.fb-shot img { max-width:100%; border:1px solid #e5e7eb; border-radius:8px; cursor:zoom-in; }
+.fb-detail label { display:block; font-size:12px; color:#555; font-weight:600; margin:10px 0 4px; }
+.fb-detail select, .fb-detail textarea { width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; font-family:inherit; }
+.fb-detail textarea { min-height:90px; resize:vertical; }
+.fb-detail .acts { display:flex; gap:8px; margin-top:12px; justify-content:space-between; }
+.btn-save { font-size:13px; padding:8px 18px; border-radius:8px; background:#243bb2; color:#fff; border:none; cursor:pointer; font-family:inherit; font-weight:600; }
+.btn-save:disabled { opacity:.6; }
+.btn-del { font-size:12px; padding:8px 12px; border-radius:8px; background:#fff; color:#dc2626; border:1px solid #fca5a5; cursor:pointer; font-family:inherit; }
+.empty { padding:40px; text-align:center; color:#999; font-size:13px; }
+.toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#111; color:#fff; padding:10px 18px; border-radius:8px; font-size:13px; opacity:0; transition:.2s; z-index:9999; pointer-events:none; }
+.toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<div id="authCheckOverlay" style="position:fixed;inset:0;background:#f1f3f9;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px">
+  <div style="width:36px;height:36px;border:3px solid #e5e5e5;border-top-color:#243bb2;border-radius:50%;animation:authSpin 0.8s linear infinite"></div>
+  <div style="font-size:13px;color:#888;font-family:inherit">권한 확인 중...</div>
+  <style>@keyframes authSpin { to { transform: rotate(360deg); } }</style>
+</div>
+
+<div id="top-header" class="top-header"></div>
+<nav id="sidebar-nav" class="sidebar"></nav>
+
+<div class="main">
+  <div class="page-header">
+    <div class="header-row">
+      <div>
+        <h1>💬 개선 요청 관리</h1>
+        <div class="sub">담당자가 각 화면에서 보낸 오류·개선·문의 접수 → 검토 → 배포 → 회신</div>
+      </div>
+      <div class="header-actions"><button class="btn-excel" onclick="exportXlsx()">📥 엑셀</button></div>
+    </div>
+  </div>
+
+<div class="container">
+  <div class="fb-stats" id="fbStats"></div>
+
+  <div class="fb-filter">
+    <select id="fSource"><option value="">출처 전체</option><option value="portal">포털</option><option value="field">현장</option></select>
+    <select id="fCat"><option value="">유형 전체</option><option value="오류">오류</option><option value="개선">개선</option><option value="문의">문의</option></select>
+    <input type="text" id="fQ" placeholder="내용·화면·이름 검색" style="width:220px">
+    <label style="font-size:12px;color:#666;display:flex;align-items:center;gap:4px"><input type="checkbox" id="fClosed"> 확인완료 포함</label>
+    <button class="btn-secondary" onclick="loadAll()">🔄 새로고침</button>
+  </div>
+
+  <div class="fb-layout">
+    <div><div style="overflow:auto;max-height:calc(100vh - 300px)"><table class="fb" id="fbTable">
+      <thead><tr><th style="width:52px">#</th><th style="width:90px">접수일</th><th style="width:50px">출처</th><th style="width:150px">화면</th><th style="width:52px">유형</th><th>내용</th><th style="width:90px">요청자</th><th style="width:80px">상태</th></tr></thead>
+      <tbody id="fbBody"><tr><td colspan="8" class="empty">로딩 중...</td></tr></tbody>
+    </table></div></div>
+    <div class="fb-detail" id="fbDetail"><div class="empty">왼쪽 목록에서 건을 선택하세요</div></div>
+  </div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var SU = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+var SK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+var BUCKET = 'feedback-shots';
+var ST = { '접수':{c:'#b45309',bg:'#fef3c7'}, '검토중':{c:'#1d4ed8',bg:'#dbeafe'}, '배포완료':{c:'#15803d',bg:'#dcfce7'}, '확인완료':{c:'#6b7280',bg:'#f3f4f6'}, '보류':{c:'#7c3aed',bg:'#ede9fe'} };
+var ORDER = ['접수','검토중','배포완료','보류','확인완료'];
+var me = null, db = null, rows = [], selId = null, statFilter = '';
+
+function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function showToast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(function(){t.classList.remove('show');},2500); }
+function fmtDt(s){ if(!s) return '-'; var d=new Date(s); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function shotUrl(p){ return SU+'/storage/v1/object/public/'+BUCKET+'/'+p; }
+
+(async function(){
+  me = await checkAuth(); if (!me) return;
+  if (me.user_type !== 'super' && me.user_type !== 'admin') { document.body.innerHTML = '<div class="empty" style="padding:80px">관리자만 볼 수 있는 화면이에요.</div>'; return; }
+  document.getElementById('authCheckOverlay').style.display = 'none';
+  db = (typeof agClient === 'function') ? agClient() : window.supabase.createClient(SU, SK); // auth_guard 공용 클라이언트(세션 토큰) 우선
+  ['fSource','fCat','fClosed'].forEach(function(id){ document.getElementById(id).addEventListener('change', render); });
+  document.getElementById('fQ').addEventListener('input', render);
+  loadAll();
+})();
+
+async function loadAll(){
+  var r = await db.from('feedback').select('*').order('created_at', {ascending:false}).limit(1000);
+  if (r.error) { showToast('조회 오류: ' + r.error.message); return; }
+  rows = r.data || [];
+  renderStats(); render();
+  if (selId) showDetail(selId);
+}
+
+function renderStats(){
+  var cnt = {}; ORDER.forEach(function(s){ cnt[s]=0; }); rows.forEach(function(x){ cnt[x.status]=(cnt[x.status]||0)+1; });
+  var open = rows.filter(function(x){ return x.status!=='확인완료'; }).length;
+  var h = '<div class="fb-stat'+(statFilter===''?' on':'')+'" onclick="setStat(\'\')"><div class="n">'+open+'</div><div class="l">미완료 전체</div></div>';
+  ORDER.forEach(function(s){ h += '<div class="fb-stat'+(statFilter===s?' on':'')+'" onclick="setStat(\''+s+'\')"><div class="n" style="color:'+ST[s].c+'">'+cnt[s]+'</div><div class="l">'+s+'</div></div>'; });
+  document.getElementById('fbStats').innerHTML = h;
+}
+function setStat(s){ statFilter = s; if (s==='확인완료') document.getElementById('fClosed').checked = true; renderStats(); render(); }
+
+function filtered(){
+  var src = document.getElementById('fSource').value, cat = document.getElementById('fCat').value, q = document.getElementById('fQ').value.trim().toLowerCase(), closed = document.getElementById('fClosed').checked;
+  return rows.filter(function(x){
+    if (statFilter && x.status !== statFilter) return false;
+    if (!statFilter && !closed && x.status === '확인완료') return false;
+    if (src && x.source !== src) return false;
+    if (cat && x.category !== cat) return false;
+    if (q && ((x.content||'')+' '+(x.page||'')+' '+(x.page_title||'')+' '+(x.reporter_name||'')+' '+(x.admin_reply||'')).toLowerCase().indexOf(q) === -1) return false;
+    return true;
+  });
+}
+
+function render(){
+  var list = filtered(), h = '';
+  if (!list.length) h = '<tr><td colspan="8" class="empty">해당하는 요청이 없습니다</td></tr>';
+  list.forEach(function(x){
+    var s = ST[x.status] || ST['접수'];
+    h += '<tr data-id="'+x.id+'" class="'+(x.id===selId?'sel':'')+'" onclick="showDetail('+x.id+')">'
+      + '<td>#'+x.id+'</td><td>'+esc((x.created_at||'').slice(0,10))+'</td>'
+      + '<td><span class="src">'+(x.source==='field'?'🏭 현장':'🖥 포털')+'</span></td>'
+      + '<td title="'+esc(x.page)+'">'+esc(x.page_title || x.page || '-')+'</td>'
+      + '<td><span class="cat cat-'+esc(x.category)+'">'+esc(x.category)+'</span></td>'
+      + '<td style="max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(x.content)+'">'+(x.screenshot?'📎 ':'')+esc(x.content)+'</td>'
+      + '<td>'+esc(x.reporter_name||'-')+'<div class="src">'+esc(x.reporter_dept||'')+'</div></td>'
+      + '<td><span class="st" style="color:'+s.c+';background:'+s.bg+'">'+esc(x.status)+'</span></td></tr>';
+  });
+  document.getElementById('fbBody').innerHTML = h;
+}
+
+function showDetail(id){
+  selId = id; var x = null; for (var i=0;i<rows.length;i++) if (rows[i].id===id) { x = rows[i]; break; }
+  var trs = document.querySelectorAll('#fbBody tr'); for (var j=0;j<trs.length;j++) trs[j].classList.toggle('sel', +trs[j].getAttribute('data-id')===id);
+  if (!x) return;
+  var h = '<h3>#'+x.id+' <span class="cat cat-'+esc(x.category)+'">'+esc(x.category)+'</span></h3>'
+    + '<div class="fb-meta">'+(x.source==='field'?'🏭 현장':'🖥 포털')+' · <b>'+esc(x.page_title||'')+'</b> <span style="color:#999">('+esc(x.page||'')+')</span><br>'
+    + '요청자: <b>'+esc(x.reporter_name||'-')+'</b> '+esc(x.reporter_dept||'')+' · '+fmtDt(x.created_at)+'</div>'
+    + '<div class="fb-content">'+esc(x.content)+'</div>'
+    + (x.screenshot ? '<div class="fb-shot"><a href="'+shotUrl(x.screenshot)+'" target="_blank"><img src="'+shotUrl(x.screenshot)+'" alt="screenshot"></a></div>' : '')
+    + '<label>상태</label><select id="dStatus">'+ORDER.map(function(s){ return '<option value="'+s+'"'+(x.status===s?' selected':'')+'>'+s+'</option>'; }).join('')+'</select>'
+    + '<label>답변 (요청자의 [내 요청]에 표시됨)</label><textarea id="dReply" placeholder="처리 내용·배포 일자·대안 등">'+esc(x.admin_reply||'')+'</textarea>'
+    + (x.replied_at ? '<div class="src" style="margin-top:4px">마지막 답변: '+esc(x.replied_by||'')+' · '+fmtDt(x.replied_at)+'</div>' : '')
+    + '<div class="acts"><button class="btn-del" onclick="delItem('+x.id+')">삭제</button><button class="btn-save" id="dSave" onclick="saveItem('+x.id+')">저장</button></div>';
+  document.getElementById('fbDetail').innerHTML = h;
+}
+
+async function saveItem(id){
+  var b = document.getElementById('dSave'); b.disabled = true;
+  var x = rows.find(function(r){ return r.id===id; }) || {};
+  var status = document.getElementById('dStatus').value, reply = document.getElementById('dReply').value.trim();
+  var upd = { status: status };
+  if (reply !== (x.admin_reply||'')) { upd.admin_reply = reply || null; upd.replied_by = me.name || null; upd.replied_at = reply ? new Date().toISOString() : null; }
+  var r = await db.from('feedback').update(upd).eq('id', id).select('id');
+  b.disabled = false;
+  if (r.error) { showToast('저장 실패: ' + r.error.message); return; }
+  if (!r.data || !r.data.length) { showToast('저장 실패 — 권한을 확인하세요'); return; }
+  showToast('저장됨'); await loadAll();
+}
+
+async function delItem(id){
+  var x = rows.find(function(r){ return r.id===id; }); if (!x) return;
+  if (!confirm('#'+id+' 요청을 삭제할까요?\n삭제 후 복구할 수 없어요. (보통은 "확인완료"로 닫는 것을 권장)')) return;
+  if (x.screenshot) { try { await db.storage.from(BUCKET).remove([x.screenshot]); } catch(e) {} }
+  var r = await db.from('feedback').delete().eq('id', id).select('id');
+  if (r.error || !r.data || !r.data.length) { showToast('삭제 실패' + (r.error ? ': '+r.error.message : ' — 권한 확인')); return; }
+  selId = null; document.getElementById('fbDetail').innerHTML = '<div class="empty">왼쪽 목록에서 건을 선택하세요</div>';
+  showToast('삭제됨'); await loadAll();
+}
+
+function exportXlsx(){
+  var data = filtered().map(function(x){ return { 'ID':x.id, '접수일':fmtDt(x.created_at), '출처':x.source==='field'?'현장':'포털', '화면':x.page_title||'', '파일':x.page||'', '유형':x.category, '내용':x.content, '요청자':x.reporter_name||'', '부서/공정':x.reporter_dept||'', '상태':x.status, '답변':x.admin_reply||'', '답변일':fmtDt(x.replied_at), '스크린샷':x.screenshot?shotUrl(x.screenshot):'' }; });
+  if (!data.length) { showToast('내보낼 건이 없어요'); return; }
+  var ws = XLSX.utils.json_to_sheet(data); var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '개선요청');
+  XLSX.writeFile(wb, '개선요청_' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '.xlsx');
+}
+</script>
+<script src="sidebar.js"></script>
+</body>
+</html>
