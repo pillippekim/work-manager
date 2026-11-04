@@ -912,12 +912,26 @@ async function submitClnMigration() {
     if (clnMigData.length === 0) return;
     // 같은 기간에 이미 등록된 건수 사전 확인 (재업로드 중복 방지 경고)
     var ds = clnMigData.map(function(r){return r.request_date;}).sort();
-    var dupNote = '';
+    // 2026-11-04 이미 등록된 건(접수일·사번·세척기준·세척내용 동일)은 자동으로 건너뜀 — 같은 파일 재업로드/부분 겹침 안전 (사용자 의견)
+    var dupNote = '', skipDup = 0;
     try {
-        var exist = await sf('mold_cleaning_logs','select=id&request_date=gte.'+ds[0]+'&request_date=lte.'+ds[ds.length-1]+'&limit=1000');
-        if (Array.isArray(exist) && exist.length > 0) dupNote = '\n\n⚠ 이 기간('+ds[0]+'~'+ds[ds.length-1]+')에 이미 '+exist.length+'건이 등록되어 있어요.\n같은 파일을 두 번 올리면 그대로 중복됩니다!';
+        var exist = await sf('mold_cleaning_logs','select=request_date,product_code,cleaning_reason,cleaning_method&request_date=gte.'+ds[0]+'&request_date=lte.'+ds[ds.length-1]+'&limit=5000');
+        if (Array.isArray(exist) && exist.length > 0) {
+            var key = function(x){ return [x.request_date||'', String(x.product_code||'').trim(), String(x.cleaning_reason||'').trim(), String(x.cleaning_method||'').trim()].join('|'); };
+            var seen = {}; exist.forEach(function(x){ seen[key(x)] = 1; });
+            var before = clnMigData.length;
+            clnMigData = clnMigData.filter(function(d){ return !seen[key(d)]; });
+            skipDup = before - clnMigData.length;
+            dupNote = '\n\n이 기간에 이미 등록된 ' + exist.length + '건 중 파일과 똑같은 ' + skipDup + '건은 건너뛰고, 새 건 ' + clnMigData.length + '건만 등록합니다.\n(기존 자료는 지워지지 않아요)';
+        }
     } catch(e) {}
-    if (!confirm(clnMigData.length + '건을 일괄 등록하시겠습니까?\n기간: ' + ds[0] + ' ~ ' + ds[ds.length-1] + dupNote)) return;
+    // 날짜 이상치: 대부분과 다른 달의 행 → 오타 의심 안내
+    var ymCnt = {}; clnMigData.forEach(function(d){ var ym=(d.request_date||'').slice(0,7); ymCnt[ym]=(ymCnt[ym]||0)+1; });
+    var mainYm = Object.keys(ymCnt).sort(function(a,b){ return ymCnt[b]-ymCnt[a]; })[0] || '';
+    var odd = clnMigData.filter(function(d){ return (d.request_date||'').slice(0,7) !== mainYm; });
+    var oddNote = odd.length ? '\n\n⚠ ' + mainYm + ' 이 아닌 날짜 ' + odd.length + '건이 있어요(오타 의심): ' + odd.slice(0,5).map(function(d){ return d.request_date + ' ' + (d.product_code||''); }).join(', ') + (odd.length>5?' …':'') + '\n엑셀에서 날짜를 고친 뒤 다시 올리는 것을 권장합니다.' : '';
+    if (clnMigData.length === 0) { alert('파일의 ' + skipDup + '건이 모두 이미 등록되어 있어요. 새로 등록할 건이 없습니다.'); return; }
+    if (!confirm(clnMigData.length + '건을 일괄 등록하시겠습니까?\n기간: ' + ds[0] + ' ~ ' + ds[ds.length-1] + dupNote + oddNote)) return;
 
     var total = clnMigData.length;
     var success = 0, fail = 0;
@@ -1042,11 +1056,20 @@ function repReparse() {
 async function submitRepMigration() {
     if (repMigData.length === 0) return;
     var ds = repMigData.map(function(r){return r.start_date;}).sort();
-    var dupNote = '';
+    // 2026-11-04 이미 등록된 건(시작일·사번·내용 동일)은 자동으로 건너뜀
+    var dupNote = '', skipDup = 0;
     try {
-        var exist = await sf('mold_maintenance','select=id&start_date=gte.'+ds[0]+'&start_date=lte.'+ds[ds.length-1]+'&limit=1000');
-        if (Array.isArray(exist) && exist.length > 0) dupNote = '\n\n⚠ 이 기간('+ds[0]+'~'+ds[ds.length-1]+')에 이미 '+exist.length+'건이 등록되어 있어요.\n같은 파일을 두 번 올리면 그대로 중복됩니다!';
+        var exist = await sf('mold_maintenance','select=start_date,product_code,description&start_date=gte.'+ds[0]+'&start_date=lte.'+ds[ds.length-1]+'&limit=5000');
+        if (Array.isArray(exist) && exist.length > 0) {
+            var key = function(x){ return [x.start_date||'', String(x.product_code||'').trim(), String(x.description||'').trim()].join('|'); };
+            var seen = {}; exist.forEach(function(x){ seen[key(x)] = 1; });
+            var before = repMigData.length;
+            repMigData = repMigData.filter(function(d){ return !seen[key(d)]; });
+            skipDup = before - repMigData.length;
+            dupNote = '\n\n이 기간에 이미 등록된 ' + exist.length + '건 중 파일과 똑같은 ' + skipDup + '건은 건너뛰고, 새 건 ' + repMigData.length + '건만 등록합니다.\n(기존 자료는 지워지지 않아요)';
+        }
     } catch(e) {}
+    if (repMigData.length === 0) { alert('파일의 ' + skipDup + '건이 모두 이미 등록되어 있어요. 새로 등록할 건이 없습니다.'); return; }
     if (!confirm(repMigData.length + '건을 일괄 등록하시겠습니까?\n기간: ' + ds[0] + ' ~ ' + ds[ds.length-1]
         + (repMigSkipped.length ? '\n(대장에 없는 사번 ' + repMigSkipped.length + '종은 제외)' : '') + dupNote)) return;
 
