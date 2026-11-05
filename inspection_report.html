@@ -46,6 +46,9 @@ h2.sec { font-size:14px; color:#1a2340; border-left:4px solid #1a2340; padding-l
 table.rp { width:100%; border-collapse:collapse; font-size:12px; }
 table.rp th, table.rp td { border:1px solid #c9cfdb; padding:5px 7px; text-align:center; }
 table.rp th { background:#f0f2f7; font-weight:700; }
+/* 2026-11-05 사용자 의견: 스크롤 시 표 헤더 고정 — 상단 고정 헤더(56px+3px) 아래에 붙음. border-collapse 에서 sticky 셀의 가로선이 사라지는 문제는 box-shadow 로 보완 */
+table.rp tr:first-child th { position:sticky; top:59px; z-index:3; box-shadow: inset 0 1px 0 #c9cfdb, 0 1px 0 #c9cfdb; }
+@media print { table.rp tr:first-child th { position:static; box-shadow:none; } }
 table.rp td.left { text-align:left; }
 .tag-def { background:#fef2f2; color:#dc2626; font-size:10px; padding:1px 6px; border-radius:3px; margin:0 1px; display:inline-block; }
 .tag-chg { background:#fff7e6; color:#b45309; font-size:10px; padding:1px 6px; border-radius:3px; margin:0 1px; display:inline-block; }
