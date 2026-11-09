@@ -182,6 +182,7 @@ table.dt tr:hover { background:#f8fafc; }
     <div style="padding:16px 0;">
         <!-- 통계 카드 -->
         <div class="hist-stat-row">
+            <div class="hist-stat-card" id="clnPendingCard" onclick="toggleClnPending()" style="cursor:pointer" title="클릭: 미완료만 보기/전체"><div class="num" id="clnPending" style="color:#dc2626;">-</div><div class="label">접수(미완료)</div></div><!-- 2026-11-09 -->
             <div class="hist-stat-card"><div class="num" id="clnTotal" style="color:#243bb2;">-</div><div class="label">전체</div></div>
             <div class="hist-stat-card"><div class="num" id="clnMonth" style="color:#0ea5e9;">-</div><div class="label">이번 달</div></div>
             <div class="hist-stat-card"><div class="num" id="clnInspect" style="color:#16a34a;">-</div><div class="label">순회검사</div></div>
@@ -327,6 +328,28 @@ table.dt tr:hover { background:#f8fafc; }
         </div>
         <div class="form-group"><label>비고</label><input type="text" id="cNote"></div>
         <button class="btn-submit" onclick="submitClean()">등록</button>
+    </div>
+</div>
+
+<!-- 2026-11-09 세척 완료 처리 모달 (공정검사 자동 접수 건) -->
+<div class="modal-overlay" id="cleanDoneModal">
+    <div class="modal-content">
+        <h3><span>🧽 세척 완료 처리</span><button class="modal-close" onclick="closeCleanDoneModal()">✕</button></h3>
+        <div id="cdInfo" style="font-size:13px;color:#555;margin-bottom:10px"></div>
+        <div class="form-row">
+            <div class="form-group"><label>완료일 *</label><input type="date" id="cdDate"></div>
+            <div class="form-group"><label>완료자 *</label><input type="text" id="cdBy" placeholder="완료자명"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>세척내용 *</label>
+                <select id="cdMethod"><option value="금형 세척제 사용 세척">금형 세척제 사용 세척</option><option value="샌드 브라스트 세척">샌드 브라스트 세척</option><option value="드라이아이스 세척">드라이아이스 세척</option><option value="기타">기타</option></select>
+            </div>
+            <div class="form-group"><label>금형점검 (찍힘/파손)</label>
+                <select id="cdInspection"><option value="">해당없음</option><option value="정상">정상</option><option value="찍힘">찍힘</option><option value="파손">파손</option><option value="마모">마모</option></select>
+            </div>
+        </div>
+        <div class="form-group"><label>비고</label><input type="text" id="cdNote"></div>
+        <button class="btn-submit" onclick="submitCleanDone()">완료 처리</button>
     </div>
 </div>
 
@@ -649,8 +672,9 @@ function renderClean() {
     var keyword = (document.getElementById('clnSearch').value||'').toUpperCase();
 
     var filtered = cleanData.filter(function(c) {
+        if (clnPendingOnly && c.complete_date) return false;   // 2026-11-09 미완료만 보기
         if (!keyword) return true;
-        var s = ((c.product_code||'')+(c.requester||'')+(c.cleaning_method||'')+(c.cleaning_reason||'')).toUpperCase();
+        var s = ((c.product_code||'')+(c.requester||'')+(c.cleaning_method||'')+(c.cleaning_reason||'')+(c.note||'')).toUpperCase();
         return s.indexOf(keyword)!==-1;
     });
 
@@ -675,6 +699,9 @@ function renderClean() {
     var inspectCount = cleanData.filter(function(c){ return c.cleaning_reason==='공정순회검사'; }).length;
     var changeCount = cleanData.filter(function(c){ return c.cleaning_reason==='금형교체'; }).length;
     document.getElementById('clnTotal').textContent = cleanData.length;
+    var pendingCount = cleanData.filter(function(c){ return !c.complete_date; }).length;   // 2026-11-09
+    document.getElementById('clnPending').textContent = pendingCount;
+    document.getElementById('clnPendingCard').style.outline = clnPendingOnly ? '2px solid #dc2626' : 'none';
     document.getElementById('clnMonth').textContent = monthCount;
     document.getElementById('clnInspect').textContent = inspectCount;
     document.getElementById('clnChange').textContent = changeCount;
@@ -709,10 +736,11 @@ function renderClean() {
                 +'<td>'+(c.cleaning_reason||'-')+'</td>'
                 +'<td>'+(c.cleaning_method||'-')+'</td>'
                 +'<td'+inspStyle+'>'+inspText+'</td>'
-                +'<td>'+(c.complete_date||'-')+'</td>'
+                +'<td>'+(c.complete_date || '<span class="badge badge-pending">접수</span>')+'</td>'   // 2026-11-09 미완료 표시
                 +'<td>'+(c.completed_by||'-')+'</td>'
                 +'<td>'+(c.note||'')+'</td>'
-                +'<td>'+(window._meCanDel ? '<button class="btn-sm btn-del" onclick="deleteClean('+c.id+')" title="삭제">🗑️</button>' : '')+'</td>' // 2026-11-02 관리자 이상
+                +'<td style="white-space:nowrap">'+(!c.complete_date ? '<button class="btn-sm btn-complete" onclick="openCleanDoneModal('+c.id+')" title="세척 완료 처리">✅ 완료</button> ' : '')   // 2026-11-09
+                +(window._meCanDel ? '<button class="btn-sm btn-del" onclick="deleteClean('+c.id+')" title="삭제">🗑️</button>' : '')+'</td>' // 2026-11-02 관리자 이상
                 +'</tr>';
         }
     }
@@ -743,6 +771,39 @@ function openCleanModal() {
     document.getElementById('cleanModal').classList.add('show');
 }
 function closeCleanModal() { document.getElementById('cleanModal').classList.remove('show'); }
+
+// ── 2026-11-09 세척 완료 처리 (공정검사 자동 접수 건 → 세척 담당자가 실제 세척 후 완료) ──
+var clnPendingOnly = false, cleanDoneId = null;
+function toggleClnPending() { clnPendingOnly = !clnPendingOnly; renderClean(); }
+function openCleanDoneModal(id) {
+    var c = null; for (var i = 0; i < cleanData.length; i++) if (cleanData[i].id === id) { c = cleanData[i]; break; }
+    if (!c) return;
+    cleanDoneId = id;
+    document.getElementById('cdInfo').innerHTML = '<b>' + (c.product_code || '-') + '</b> · 접수 ' + (c.request_date || '-') + ' · ' + (c.requester || '-') + (c.note ? '<br><span style="color:#888">' + c.note + '</span>' : '');
+    document.getElementById('cdDate').value = fmtLocal(new Date());
+    document.getElementById('cdBy').value = window._meName || '';
+    document.getElementById('cdMethod').value = c.cleaning_method || '금형 세척제 사용 세척';
+    document.getElementById('cdInspection').value = c.mold_inspection || '';
+    document.getElementById('cdNote').value = '';
+    document.getElementById('cleanDoneModal').classList.add('show');
+}
+function closeCleanDoneModal() { document.getElementById('cleanDoneModal').classList.remove('show'); cleanDoneId = null; }
+async function submitCleanDone() {
+    if (!cleanDoneId) return;
+    var d = document.getElementById('cdDate').value, by = document.getElementById('cdBy').value.trim();
+    if (!d || !by) { showToast('완료일과 완료자는 필수입니다', 'error'); return; }
+    var c = cleanData.find(function(x){ return x.id === cleanDoneId; }) || {};
+    var extra = document.getElementById('cdNote').value.trim();
+    var upd = { complete_date: d, completed_by: by, cleaning_method: document.getElementById('cdMethod').value,
+                mold_inspection: document.getElementById('cdInspection').value || null,
+                note: ((c.note || '') + (extra ? ' / ' + extra : '')).trim() || null };
+    try {
+        var r = await fetch(SU + '/rest/v1/mold_cleaning_logs?id=eq.' + cleanDoneId, { method: 'PATCH', headers: supaHeaders(), body: JSON.stringify(upd) });
+        var rows = r.ok ? await r.json() : null;
+        if (!r.ok || !Array.isArray(rows) || !rows.length) { showToast('완료 처리 실패 — 권한 또는 네트워크를 확인하세요', 'error'); return; }
+        showToast('세척 완료 처리됨', 'success'); closeCleanDoneModal(); await loadHistoryData();
+    } catch (e) { showToast('완료 처리 실패: ' + (e.message || e), 'error'); }
+}
 
 async function submitClean() {
     var pc=document.getElementById('cProductCode').value.trim();
