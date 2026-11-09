@@ -1,5 +1,5 @@
 /* =====================================================================
-   feedback_widget.js — 개선 요청(의견 접수) 위젯  (2026-11-04 v2, 양 저장소 공통 파일)
+   feedback_widget.js — 개선 요청(의견 접수) 위젯  (2026-11-09 v3, 양 저장소 공통 파일)
    · auth_guard.js 가 로드하는 모든 페이지 상단 헤더(날짜/사용자 왼쪽)에 🎧 버튼 — 2026-11-04 v2: 우하단 떠 있는 버튼 → 헤더 고정(사용자 의견: 페이지 버튼 가림)
    · 답변이 새로 달리면 🎧 에 빨간 배지 숫자 → [내 요청] 열면 사라짐
    · 모달: [요청하기] 유형·내용·스크린샷(자동 축소 ≤1280px·JPEG) / [내 요청] 상태·회신 확인
@@ -117,7 +117,14 @@
     // 포털(#top-header 자리가 있는 페이지)은 사이드바가 헤더를 그릴 때까지 기다림 — 페이지 자체 header-row 에 먼저 꽂히는 것 방지(위치 통일)
     if (document.getElementById('top-header')) return false;
     var ui = document.querySelector('.top-bar #userInfo, .top-bar .user-info');
-    if (ui) { var rb = ui.parentElement; var wrap = el('div'); wrap.style.cssText = 'display:flex;align-items:center;gap:12px'; rb.parentNode.insertBefore(wrap, rb); wrap.appendChild(btn); wrap.appendChild(rb); return true; }
+    if (ui) {
+      // 2026-11-09 수정: 헤더(.top-bar)의 "직계 자식" 블록을 찾아 그 안/앞에 넣는다 — 이전 코드는 .user-info 가 직계 자식인 페이지(현장 홈)에서 헤더 자체를 감싸 레이아웃을 깨뜨렸음
+      var bar = ui.closest ? ui.closest('.top-bar') : null;
+      var rb = ui; while (bar && rb.parentElement && rb.parentElement !== bar) rb = rb.parentElement;
+      if (rb === bar) { bar.appendChild(btn); return true; }                       // 예외: .top-bar 자체면 끝에 추가
+      if (getComputedStyle(rb).display.indexOf('flex') !== -1) { rb.insertBefore(btn, rb.firstChild); return true; }   // 가로 flex 블록 → 맨 앞
+      var wrap = el('div'); wrap.style.cssText = 'display:flex;align-items:center;gap:12px'; rb.parentNode.insertBefore(wrap, rb); wrap.appendChild(btn); wrap.appendChild(rb); return true;  // 세로 블록 → 감싸서 왼쪽
+    }
     var row = document.querySelector('.page-header .header-row');
     if (row) { var acts = row.querySelector('.header-actions'); if (acts) acts.insertBefore(btn, acts.firstChild); else row.appendChild(btn); return true; }
     return false;
