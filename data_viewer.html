@@ -2327,7 +2327,7 @@ async function saveEditCoating() {
     await db.from('audit_logs').insert({
       table_name: 'coating_reports',
       record_id: id,
-      action: 'UPDATE',
+      action: 'update',
       before_data: editingCoatingBefore,
       after_data: updates,
       performed_by: currentUser?.name || '-',
@@ -2351,7 +2351,7 @@ async function deleteCoating(id) {
     await db.from('audit_logs').insert({
       table_name: 'coating_reports',
       record_id: id,
-      action: 'DELETE',
+      action: 'delete',
       performed_by: currentUser?.name || '-',
       performed_at: new Date().toISOString()
     });
@@ -2442,7 +2442,7 @@ async function saveEditPostcure() {
   const { error } = await db.from('postcure_reports').update(updates).eq('id', id);
   if (error) { alert('수정 실패: ' + error.message); return; }
   try {
-    await db.from('audit_logs').insert({ table_name: 'postcure_reports', record_id: id, action: 'UPDATE', before_data: editingPostcureBefore, after_data: updates, performed_by: currentUser?.name || '-', performed_at: new Date().toISOString() });
+    await db.from('audit_logs').insert({ table_name: 'postcure_reports', record_id: id, action: 'update', before_data: editingPostcureBefore, after_data: updates, performed_by: currentUser?.name || '-', performed_at: new Date().toISOString() });
   } catch(e) {}
   closeModal('editPostcureModal');
   alert('수정 완료!');
@@ -2454,7 +2454,7 @@ async function deletePostcure(id) {
   const { error } = await db.from('postcure_reports').update({ deleted_at: new Date().toISOString() }).eq('id', id);
   if (error) { alert('삭제 실패: ' + error.message); return; }
   try {
-    await db.from('audit_logs').insert({ table_name: 'postcure_reports', record_id: id, action: 'DELETE', performed_by: currentUser?.name || '-', performed_at: new Date().toISOString() });
+    await db.from('audit_logs').insert({ table_name: 'postcure_reports', record_id: id, action: 'delete', performed_by: currentUser?.name || '-', performed_at: new Date().toISOString() });
   } catch(e) {}
   alert('삭제 완료!');
   loadData();
@@ -2544,7 +2544,7 @@ async function saveEditShot() {
 async function deleteShot(id) {
   if (!confirm('이 기록을 삭제할까요?')) return;
   await db.from('shot_reports').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-  try { await db.from('audit_logs').insert({ table_name:'shot_reports', record_id:id, action:'DELETE', performed_by:currentUser?.name||'-', performed_at:new Date().toISOString() }); } catch(e){}
+  try { await db.from('audit_logs').insert({ table_name:'shot_reports', record_id:id, action:'delete', performed_by:currentUser?.name||'-', performed_at:new Date().toISOString() }); } catch(e){}
   alert('삭제 완료!'); loadData();
 }
 
@@ -2718,7 +2718,7 @@ function renderMoldingTable(data) {
 async function deleteMolding(id) {
   if (!confirm('이 기록을 삭제할까요?')) return;
   await db.from('molding_reports').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-  try { await db.from('audit_logs').insert({ table_name:'molding_reports', record_id:id, action:'DELETE', performed_by:currentUser?.name||'-', performed_at:new Date().toISOString() }); } catch(e){}
+  try { await db.from('audit_logs').insert({ table_name:'molding_reports', record_id:id, action:'delete', performed_by:currentUser?.name||'-', performed_at:new Date().toISOString() }); } catch(e){}
   alert('삭제 완료!'); loadData();
 }
 
@@ -2932,7 +2932,7 @@ async function saveEditAssembly() {
 async function deleteAssembly(id) {
   if (!confirm('이 기록을 삭제할까요?')) return;
   await db.from('assembly_reports').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-  try { await db.from('audit_logs').insert({ table_name:'assembly_reports', record_id:id, action:'DELETE', performed_by:currentUser?.name||'-', performed_at:new Date().toISOString() }); } catch(e){}
+  try { await db.from('audit_logs').insert({ table_name:'assembly_reports', record_id:id, action:'delete', performed_by:currentUser?.name||'-', performed_at:new Date().toISOString() }); } catch(e){}
   alert('삭제 완료!'); loadData();
 }
 
@@ -3021,7 +3021,7 @@ async function saveEditSasang() {
 async function deleteSasang(id) {
   if (!confirm('이 기록을 삭제할까요?')) return;
   await db.from('sasang_reports').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-  try { await db.from('audit_logs').insert({ table_name:'sasang_reports', record_id:id, action:'DELETE', performed_by:currentUser?.name||'-', performed_at:new Date().toISOString() }); } catch(e){}
+  try { await db.from('audit_logs').insert({ table_name:'sasang_reports', record_id:id, action:'delete', performed_by:currentUser?.name||'-', performed_at:new Date().toISOString() }); } catch(e){}
   alert('삭제 완료!'); loadData();
 }
 
