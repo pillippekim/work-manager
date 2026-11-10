@@ -582,7 +582,7 @@
         h += '<td><span class="status-badge ' + statusClass + '">' + statusText + '</span></td>';
         h += '<td class="qty-cell">' + (l.quantity || 0).toLocaleString() + '</td>';
         h += '<td>' + (l.slot_code || '-') + '</td>';
-        h += '<td>' + (l.source_type || '-') + '</td>';
+        h += '<td>' + ({ manual: '수동', excel: '엑셀', packaging: '포장일지' }[l.source_type] || l.source_type || '-') + '</td>';   // 2026-11-10 출처 한글
         h += '<td>' + fmtKst(l.created_at) + '</td>';
         h += '</tr>';
       }

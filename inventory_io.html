@@ -318,6 +318,8 @@
     var waitingLots = [];
     var allRacks = [];
     var allSlots = [];
+    var allZones = [];                 // 2026-11-10 ② 대차장(라인) 목록
+    var SRC_KO = { manual: '수동', excel: '엑셀', packaging: '포장일지' };   // 2026-11-10 출처 표시
     var parsedRows = [];
     var matchResults = [];
     var uploadedFile = null;
@@ -335,11 +337,14 @@
       Promise.all([
         supabase.from('inventory_lots').select('*').eq('status', 'waiting').order('created_at'),
         supabase.from('inventory_racks').select('*').eq('active', true).order('sort_order'),
-        supabase.from('inventory_rack_slots').select('*, inventory_racks(rack_name)').order('rack_id').order('row_no').order('col_no')
+        supabase.from('inventory_rack_slots').select('*, inventory_racks(rack_name)').order('rack_id').order('row_no').order('col_no'),
+        supabase.from('inventory_zones').select('*').eq('active', true).order('zone_code').order('lane_no')   // 2026-11-10 ②
       ]).then(function(res) {
+        for (var e = 0; e < res.length; e++) { if (res[e].error) { showToast('데이터 조회 오류: ' + res[e].error.message); } }   // 2026-11-10 .error 검사
         waitingLots = res[0].data || [];
         allRacks = res[1].data || [];
         allSlots = res[2].data || [];
+        allZones = res[3].data || [];
         document.getElementById('waitingCount').textContent = waitingLots.length;
         renderCurrentTab();
       });
@@ -402,7 +407,7 @@
           h += '<td>' + (lot.lot_no || '-') + '</td>';
           h += '<td class="qty-cell">' + (lot.quantity || 0).toLocaleString() + '</td>';
           h += '<td>' + fmtKst(lot.created_at) + '</td>';
-          h += '<td>' + (lot.source_type || '-') + '</td>';
+          h += '<td title="' + String(lot.note || '').replace(/"/g, '&quot;') + '">' + (SRC_KO[lot.source_type] || lot.source_type || '-') + '</td>';   // 2026-11-10 출처 한글 + 메모 툴팁
           h += '<td><button class="row-btn inbound" onclick="openInboundModal(' + lot.id + ')">입고처리</button></td>';
           h += '</tr>';
         }
@@ -484,6 +489,19 @@
       h += '<div style="color:#888;margin-top:2px;">LOT: ' + (lot.lot_no || '-') + ' | 수량: ' + (lot.quantity || 0).toLocaleString() + '</div>';
       h += '</div>';
 
+      // 2026-11-10 ② 입고 위치 선택: 적재대(동/슬롯) 또는 대차장(라인)
+      h += '<div class="form-group" style="margin-bottom:10px;"><label>입고 위치</label>';
+      h += '<div style="display:flex;gap:16px;font-size:14px;padding:4px 0;">';
+      h += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="inbLocType" value="rack" checked onchange="toggleInbLoc()"> 적재대(동/슬롯)</label>';
+      h += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="inbLocType" value="zone" onchange="toggleInbLoc()"' + (allZones.length ? '' : ' disabled') + '> 대차장(라인)</label>';
+      h += '</div></div>';
+      h += '<div id="inbLocZone" style="display:none;">';
+      h += '<div class="form-group"><label>대차장 라인 선택</label><select id="modalZone"><option value="">-- 라인 선택 --</option>';
+      for (var zi = 0; zi < allZones.length; zi++) {
+        h += '<option value="' + allZones[zi].id + '">' + zoneLabelOf(allZones[zi]) + '</option>';
+      }
+      h += '</select></div></div>';
+      h += '<div id="inbLocRack">';
       h += '<button type="button" class="action-btn" onclick="autoFindSlot(' + lotId + ')" style="width:100%;margin-bottom:10px;background:#eef2ff;color:#243bb2;font-weight:700;">&#127919; 빈 슬롯 자동 찾기 (동일 사번 · 오래된 순)</button>';
       h += '<div id="autoFindInfo" style="display:none;font-size:12px;background:#f0fdf4;color:#166534;border-radius:6px;padding:8px 10px;margin-bottom:10px;"></div>';
 
@@ -498,6 +516,7 @@
       h += '<div class="form-group"><label>슬롯 선택</label>';
       h += '<select id="modalSlot"><option value="">-- 먼저 동을 선택 --</option></select></div>';
       h += '</div>';
+      h += '</div>';   // 2026-11-10 #inbLocRack 끝
 
       h += '<div class="action-bar" style="margin-top:16px;">';
       h += '<button class="action-btn secondary" onclick="closeInboundModal()">취소</button>';
@@ -507,6 +526,18 @@
       document.getElementById('inboundModalBody').innerHTML = h;
       document.getElementById('inboundModal').className = 'modal-overlay show';
     }
+
+    // 2026-11-10 ② 입고 위치 토글
+    function inbLocType() {
+      var el = document.querySelector('input[name="inbLocType"]:checked');
+      return el ? el.value : 'rack';
+    }
+    function toggleInbLoc() {
+      var zone = inbLocType() === 'zone';
+      document.getElementById('inbLocRack').style.display = zone ? 'none' : '';
+      document.getElementById('inbLocZone').style.display = zone ? '' : 'none';
+    }
+    function zoneLabelOf(z) { return (z.zone_name || z.zone_code || '') + ' ' + (z.lane_name || (z.lane_no ? z.lane_no + '라인' : '')); }
 
     // 빈 슬롯 자동 찾기: ① 같은 사번이 있다가 비워진 슬롯 ② 비워진 지 오래된 순
     function autoFindSlot(lotId) {
@@ -569,6 +600,7 @@
     }
 
     function processInbound(lotId) {
+      if (inbLocType() === 'zone') { processInboundZone(lotId); return; }   // 2026-11-10 ② 대차장 입고
       var rackId = parseInt(document.getElementById('modalRack').value);
       var slotId = parseInt(document.getElementById('modalSlot').value);
       if (!rackId) { showToast('동을 선택해주세요'); return; }
@@ -635,8 +667,81 @@
       });
     }
 
+    // 2026-11-10 ② 대차장 입고: LOT 자체가 재고(수량 LOT에 보관) → 슬롯 갱신 없음. inventory_zone.html 수동 등록과 같은 필드
+    function processInboundZone(lotId) {
+      var zoneId = parseInt(document.getElementById('modalZone').value);
+      if (!zoneId) { showToast('대차장 라인을 선택해주세요'); return; }
+      var lot = null, zone = null;
+      for (var i = 0; i < waitingLots.length; i++) { if (waitingLots[i].id === lotId) { lot = waitingLots[i]; break; } }
+      for (var z = 0; z < allZones.length; z++) { if (allZones[z].id === zoneId) { zone = allZones[z]; break; } }
+      if (!lot || !zone) return;
+      var label = zoneLabelOf(zone);
+
+      showLoading('입고 처리 중...');
+      supabase.from('inventory_lots').update({
+        status: 'stocked',
+        location_type: 'zone',
+        zone_id: zoneId,
+        rack_id: null,
+        slot_code: null,
+        stocked_at: new Date().toISOString()
+      }).eq('id', lotId).eq('status', 'waiting').select('id').then(function(r1) {
+        if (r1.error) { hideLoading(); showToast('LOT 업데이트 오류: ' + r1.error.message); return; }
+        if (!r1.data || !r1.data.length) { hideLoading(); showToast('이미 처리된 LOT입니다 — 목록을 새로고침합니다'); loadInitialData(); return; }
+        return supabase.from('inventory_movements').insert({
+          lot_id: lotId,
+          product_code: lot.product_code,
+          movement_type: 'inbound',
+          to_location: label,
+          quantity: lot.quantity,
+          lot_no: lot.lot_no,
+          reason: '입고대기 → 대차장 입고',
+          moved_by: 'system'
+        }).then(function(r2) {
+          hideLoading();
+          if (r2.error) { showToast('입고는 됐지만 이력 기록 실패: ' + r2.error.message); }
+          else { showToast('대차장 입고 완료! (' + label + ')'); }
+          closeInboundModal();
+          loadInitialData();
+        });
+      });
+    }
+
     function closeInboundModal() {
       document.getElementById('inboundModal').className = 'modal-overlay';
+    }
+
+    // 2026-11-10 중복 안내: 같은 사번+LOT 이 입고대기/재고에 이미 있으면 확인 팝업 (포장 일지 자동 등록과 겹치는 경우 대비)
+    //  → Promise<boolean> (true = 계속 등록)
+    function confirmNotDuplicate(items) {
+      var codes = [], lots = [];
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].product_code && codes.indexOf(items[i].product_code) < 0) codes.push(items[i].product_code);
+        if (items[i].lot_no) lots.push(String(items[i].lot_no).trim());
+      }
+      if (codes.length === 0) return Promise.resolve(true);
+      return supabase.from('inventory_lots').select('product_code, lot_no, quantity, status, source_type')
+        .in('product_code', codes).in('status', ['waiting', 'stocked']).gt('quantity', 0).limit(500)
+        .then(function(res) {
+          if (res.error) { console.error(res.error); return true; }   // 조회 실패 시 등록은 막지 않음
+          var dup = [];
+          for (var k = 0; k < items.length; k++) {
+            var it = items[k], ln = String(it.lot_no || '').trim();
+            if (!ln) continue;
+            for (var m = 0; m < (res.data || []).length; m++) {
+              var ex = res.data[m];
+              if (ex.product_code !== it.product_code) continue;
+              var exLots = String(ex.lot_no || '').split(',').map(function(s) { return s.trim(); });
+              if (exLots.indexOf(ln) >= 0) {
+                dup.push(it.product_code + ' / LOT ' + ln + ' → ' + (ex.status === 'waiting' ? '입고대기' : '재고') + ' ' + (ex.quantity || 0).toLocaleString() + '개 (' + (SRC_KO[ex.source_type] || ex.source_type || '-') + ')');
+                break;
+              }
+            }
+          }
+          if (dup.length === 0) return true;
+          var show = dup.slice(0, 10).join('\n') + (dup.length > 10 ? '\n… 외 ' + (dup.length - 10) + '건' : '');
+          return confirm('이미 등록된 사번/LOT이 ' + dup.length + '건 있습니다.\n(포장 일지 제출 시 입고대기에 자동 등록됩니다)\n\n' + show + '\n\n중복이 아닌 것을 확인했다면 [확인], 아니면 [취소]를 눌러주세요.');
+        });
     }
 
     // ── 수동 등록 ──
@@ -652,25 +757,27 @@
       if (!lotNo) { showToast('LOT 번호를 입력해주세요'); return; }
       if (qty <= 0) { showToast('수량을 입력해주세요'); return; }
 
-      showLoading('등록 중...');
-
-      supabase.from('inventory_lots').insert({
-        product_code: productCode,
-        product_name: productName,
-        lot_no: lotNo,
-        quantity: qty,
-        initial_quantity: qty,
-        status: 'waiting',
-        source_type: 'manual',
-        produced_at: producedAt,
-        note: note,
-        created_by: 'system'
-      }).then(function(res) {
-        hideLoading();
-        if (res.error) { showToast('등록 오류: ' + res.error.message); return; }
-        showToast('입고대기 등록 완료!');
-        manualFormOpen = false;
-        loadInitialData();
+      confirmNotDuplicate([{ product_code: productCode, lot_no: lotNo }]).then(function(go) {   // 2026-11-10 중복 안내
+        if (!go) { showToast('등록을 취소했습니다'); return; }
+        showLoading('등록 중...');
+        supabase.from('inventory_lots').insert({
+          product_code: productCode,
+          product_name: productName,
+          lot_no: lotNo,
+          quantity: qty,
+          initial_quantity: qty,
+          status: 'waiting',
+          source_type: 'manual',
+          produced_at: producedAt,
+          note: note,
+          created_by: 'system'
+        }).then(function(res) {
+          hideLoading();
+          if (res.error) { showToast('등록 오류: ' + res.error.message); return; }
+          showToast('입고대기 등록 완료!');
+          manualFormOpen = false;
+          loadInitialData();
+        });
       });
     }
 
@@ -713,11 +820,14 @@
 
           if (inserts.length === 0) { hideLoading(); showToast('유효한 데이터가 없습니다'); return; }
 
-          supabase.from('inventory_lots').insert(inserts).then(function(res) {
-            hideLoading();
-            if (res.error) { showToast('등록 오류: ' + res.error.message); return; }
-            showToast(inserts.length + '건 입고대기 등록 완료!');
-            loadInitialData();
+          confirmNotDuplicate(inserts).then(function(go) {   // 2026-11-10 중복 안내
+            if (!go) { hideLoading(); showToast('등록을 취소했습니다'); return; }
+            return supabase.from('inventory_lots').insert(inserts).then(function(res) {
+              hideLoading();
+              if (res.error) { showToast('등록 오류: ' + res.error.message); return; }
+              showToast(inserts.length + '건 입고대기 등록 완료!');
+              loadInitialData();
+            });
           });
         } catch (err) {
           hideLoading();
