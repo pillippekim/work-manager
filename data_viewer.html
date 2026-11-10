@@ -2581,6 +2581,8 @@ function sortMoldingDefault(data){
     var ea=(a.equipment_no||''), eb=(b.equipment_no||''); if (ea!==eb) return ea<eb ? -1 : 1; // 설비(호기)
     var fr = moldingFaceRank(a.work_type) - moldingFaceRank(b.work_type); if (fr!==0) return fr; // 유형(면)
     var sr = moldingShiftRank(a.shift_type) - moldingShiftRank(b.shift_type); if (sr!==0) return sr; // 근무
+    var sa=(''+(a.start_time||'')).slice(0,5), sb=(''+(b.start_time||'')).slice(0,5);                 // 2026-11-10 사용자 의견: 같은 호기·근무 안에서는 작업 시작시간 순 (이전엔 제출시각 역순)
+    if (sa!==sb) return sa<sb ? -1 : 1;
     return moldingRecHasDt(a) - moldingRecHasDt(b);                                        // 비가동여부
   });
 }
