@@ -1,5 +1,7 @@
 /* =====================================================================
-   feedback_widget.js — 개선 요청(의견 접수) 위젯  (2026-11-09 v3, 양 저장소 공통 파일)
+   feedback_widget.js — 개선 요청(의견 접수) 위젯  (2026-11-11 v4, 양 저장소 공통 파일)
+   · v4: 사진 첨부 3가지 추가 — 📷 카메라 바로 촬영(태블릿) · Ctrl+V 붙여넣기(PC 캡처) · 🖥 이 화면 캡처(vendor/html2canvas-1.4.1.min.js, 버튼 누를 때만 로드)
+         어떤 경로든 같은 축소 함수(긴 변 1280px·JPEG 0.8·2MB 제한)를 거침 → 저장 용량 정책 동일
    · auth_guard.js 가 로드하는 모든 페이지 상단 헤더(날짜/사용자 왼쪽)에 🎧 버튼 — 2026-11-04 v2: 우하단 떠 있는 버튼 → 헤더 고정(사용자 의견: 페이지 버튼 가림)
    · 답변이 새로 달리면 🎧 에 빨간 배지 숫자 → [내 요청] 열면 사라짐
    · 모달: [요청하기] 유형·내용·스크린샷(자동 축소 ≤1280px·JPEG) / [내 요청] 상태·회신 확인
@@ -32,8 +34,15 @@
     catAsk:     { ko: '문의 (사용법·질문)',   id: 'Pertanyaan',           en: 'Question' },
     content:    { ko: '내용',                id: 'Isi',                  en: 'Details' },
     contentPh:  { ko: '무엇이, 어느 화면에서, 어떻게 되어야 하는지 적어주세요.', id: 'Apa masalahnya, di halaman mana, seharusnya bagaimana.', en: 'What happened, on which screen, and what should happen.' },
-    shot:       { ko: '스크린샷 (선택, 1장)', id: 'Screenshot (opsional, 1)', en: 'Screenshot (optional, 1)' },
-    shotHint:   { ko: '자동으로 줄여서 올라갑니다', id: 'Otomatis diperkecil', en: 'Automatically resized' },
+    shot:       { ko: '사진·스크린샷 (선택, 1장)', id: 'Foto / screenshot (opsional, 1)', en: 'Photo / screenshot (optional, 1)' },
+    shotHint:   { ko: '자동으로 줄여서 올라갑니다 · PC는 캡처 후 이 창에 Ctrl+V 붙여넣기도 돼요', id: 'Otomatis diperkecil · PC: Ctrl+V untuk tempel', en: 'Automatically resized · On PC you can paste (Ctrl+V)' },
+    btnCam:     { ko: '📷 사진 촬영',          id: '📷 Ambil foto',         en: '📷 Take photo' },
+    btnFile:    { ko: '🖼 파일 선택',          id: '🖼 Pilih file',         en: '🖼 Choose file' },
+    btnShot:    { ko: '🖥 이 화면 캡처',       id: '🖥 Tangkap layar ini',  en: '🖥 Capture this screen' },
+    capturing:  { ko: '화면을 캡처하는 중...',  id: 'Menangkap layar...',   en: 'Capturing...' },
+    capFail:    { ko: '화면 캡처에 실패했어요. 사진 촬영이나 파일 선택을 이용해 주세요.', id: 'Gagal menangkap layar.', en: 'Screen capture failed. Use photo or file instead.' },
+    pasted:     { ko: '붙여넣은 이미지를 첨부했어요.', id: 'Gambar ditempel.', en: 'Pasted image attached.' },
+    remove:     { ko: '첨부 지우기',           id: 'Hapus',                en: 'Remove' },
     submit:     { ko: '보내기',              id: 'Kirim',                en: 'Send' },
     sending:    { ko: '보내는 중...',        id: 'Mengirim...',          en: 'Sending...' },
     cancel:     { ko: '닫기',                id: 'Tutup',                en: 'Close' },
@@ -78,6 +87,9 @@
     + '.fbw-page{font-size:12px;color:#243bb2;background:#eef2ff;padding:6px 10px;border-radius:6px;display:inline-block}'
     + '.fbw-hint{font-size:11px;color:#888;margin-top:3px}'
     + '.fbw-prev{max-width:100%;max-height:160px;border-radius:8px;border:1px solid #e5e7eb;margin-top:6px;display:none}'
+    + '.fbw-shotbtns{display:flex;gap:6px;flex-wrap:wrap}.fbw-shotbtns button{padding:7px 10px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid #c7d2fe;background:#eef2ff;color:#243bb2;font-family:inherit}'
+    + '.fbw-shotbtns button:disabled{opacity:.5;cursor:default}'
+    + '.fbw-rm{display:none;margin-top:4px;font-size:11.5px;color:#b91c1c;background:none;border:none;cursor:pointer;padding:0;font-family:inherit}.fbw-rm.on{display:inline-block}'
     + '.fbw-act{display:flex;gap:8px;justify-content:flex-end;padding:0 18px 16px}'
     + '.fbw-act button{padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #d1d5db;background:#fff;font-family:inherit}'
     + '.fbw-act .pri{background:#243bb2;color:#fff;border-color:#243bb2}.fbw-act .pri:disabled{opacity:.6;cursor:default}'
@@ -104,7 +116,10 @@
     + '    <div class="fbw-row"><label>' + esc(t('page')) + '</label><span class="fbw-page" id="fbw-page"></span></div>'
     + '    <div class="fbw-row"><label>' + esc(t('category')) + '</label><select id="fbw-cat"><option value="오류">' + esc(t('catBug')) + '</option><option value="개선" selected>' + esc(t('catImprove')) + '</option><option value="문의">' + esc(t('catAsk')) + '</option></select></div>'
     + '    <div class="fbw-row"><label>' + esc(t('content')) + '</label><textarea id="fbw-txt" placeholder="' + esc(t('contentPh')) + '"></textarea></div>'
-    + '    <div class="fbw-row"><label>' + esc(t('shot')) + '</label><input type="file" id="fbw-file" accept="image/*"><div class="fbw-hint">' + esc(t('shotHint')) + '</div><img class="fbw-prev" id="fbw-prev" alt=""></div>'
+    + '    <div class="fbw-row"><label>' + esc(t('shot')) + '</label>'
+    + '      <div class="fbw-shotbtns"><button type="button" id="fbw-bcam">' + esc(t('btnCam')) + '</button><button type="button" id="fbw-bfile">' + esc(t('btnFile')) + '</button><button type="button" id="fbw-bshot">' + esc(t('btnShot')) + '</button></div>'
+    + '      <input type="file" id="fbw-file" accept="image/*" style="display:none"><input type="file" id="fbw-cam" accept="image/*" capture="environment" style="display:none">'
+    + '      <div class="fbw-hint">' + esc(t('shotHint')) + '</div><img class="fbw-prev" id="fbw-prev" alt=""><br><button type="button" class="fbw-rm" id="fbw-rm">✕ ' + esc(t('remove')) + '</button></div>'
     + '  </div>'
     + '  <div class="fbw-body" id="fbw-mine" style="display:none"></div>'
     + '  <div class="fbw-act"><button type="button" id="fbw-cancel">' + esc(t('cancel')) + '</button><button type="button" class="pri" id="fbw-send">' + esc(t('submit')) + '</button></div>'
@@ -145,6 +160,12 @@
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
     var tabs = ov.querySelectorAll('.fbw-tab'); for (var i = 0; i < tabs.length; i++) tabs[i].onclick = function () { showTab(this.getAttribute('data-tab')); };
     document.getElementById('fbw-file').onchange = onFile;
+    document.getElementById('fbw-cam').onchange = onFile;
+    document.getElementById('fbw-bfile').onclick = function () { document.getElementById('fbw-file').click(); };
+    document.getElementById('fbw-bcam').onclick = function () { document.getElementById('fbw-cam').click(); };
+    document.getElementById('fbw-bshot').onclick = captureScreen;
+    document.getElementById('fbw-rm').onclick = clearShot;
+    document.addEventListener('paste', onPaste);   // v4: 모달이 열려 있을 때 Ctrl+V 이미지 첨부
     document.getElementById('fbw-send').onclick = send;
   }
   function close() { ov.classList.remove('show'); }
@@ -189,25 +210,77 @@
     return { uid: u.id, name: info.name || '', dept: info.department || info.process || '', user_type: info.user_type || '' };
   }
 
-  // ── 스크린샷 축소 (긴 변 1280px, JPEG 0.8) ──
+  // ── 사진 축소 (긴 변 1280px, JPEG 0.8, 2MB 제한) — 파일·카메라·붙여넣기·화면 캡처 모두 이 함수 하나를 거침 ──
   var shotBlob = null;
-  function onFile(e) {
-    shotBlob = null; var f = e.target.files && e.target.files[0]; var prev = document.getElementById('fbw-prev'); prev.style.display = 'none';
-    if (!f) return;
+  function clearShot() {
+    shotBlob = null;
+    var prev = document.getElementById('fbw-prev'); prev.style.display = 'none'; prev.src = '';
+    document.getElementById('fbw-rm').classList.remove('on');
+    document.getElementById('fbw-file').value = ''; document.getElementById('fbw-cam').value = '';
+  }
+  function setShotFromCanvas(cv) {
+    cv.toBlob(function (b) {
+      if (!b) { msg(t('capFail'), 'err'); return; }
+      if (b.size > 2 * 1024 * 1024) { msg(t('tooBig'), 'err'); clearShot(); return; }
+      shotBlob = b;
+      var prev = document.getElementById('fbw-prev'); prev.src = cv.toDataURL('image/jpeg', 0.6); prev.style.display = 'block';
+      document.getElementById('fbw-rm').classList.add('on');
+    }, 'image/jpeg', 0.8);
+  }
+  function shrinkToCanvas(src, w, h) {   // src: Image 또는 canvas
+    var max = 1280, k = Math.min(1, max / Math.max(w, h));
+    var cv = document.createElement('canvas'); cv.width = Math.round(w * k); cv.height = Math.round(h * k);
+    cv.getContext('2d').drawImage(src, 0, 0, cv.width, cv.height);
+    return cv;
+  }
+  function setShotFromFile(f) {
+    if (!f || !/^image\//.test(f.type || '')) return;
     var img = new Image(); var url = URL.createObjectURL(f);
-    img.onload = function () {
-      var max = 1280, w = img.width, h = img.height, k = Math.min(1, max / Math.max(w, h));
-      var cv = document.createElement('canvas'); cv.width = Math.round(w * k); cv.height = Math.round(h * k);
-      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-      cv.toBlob(function (b) {
-        URL.revokeObjectURL(url);
-        if (!b) return;
-        if (b.size > 2 * 1024 * 1024) { msg(t('tooBig'), 'err'); e.target.value = ''; return; }
-        shotBlob = b; prev.src = cv.toDataURL('image/jpeg', 0.6); prev.style.display = 'block';
-      }, 'image/jpeg', 0.8);
-    };
-    img.onerror = function () { URL.revokeObjectURL(url); };
+    img.onload = function () { var cv = shrinkToCanvas(img, img.width, img.height); URL.revokeObjectURL(url); setShotFromCanvas(cv); };
+    img.onerror = function () { URL.revokeObjectURL(url); msg(t('capFail'), 'err'); };
     img.src = url;
+  }
+  function onFile(e) { var f = e.target.files && e.target.files[0]; if (f) setShotFromFile(f); }
+  // Ctrl+V: 모달이 열려 있을 때 클립보드의 이미지(PC 캡처 도구 결과)를 첨부
+  function onPaste(e) {
+    if (!ov.classList.contains('show') || document.getElementById('fbw-new').style.display === 'none') return;
+    var items = e.clipboardData && e.clipboardData.items; if (!items) return;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file' && /^image\//.test(items[i].type)) {
+        var f = items[i].getAsFile(); if (!f) continue;
+        e.preventDefault(); setShotFromFile(f); msg(t('pasted'), 'ok'); return;
+      }
+    }
+  }
+  // 🖥 이 화면 캡처: html2canvas(vendor, 처음 누를 때만 로드) 로 현재 페이지를 그림 → 같은 축소 경로. 모달은 잠시 숨기고 찍음
+  var _h2cLoading = null;
+  function loadH2C() {
+    if (window.html2canvas) return Promise.resolve();
+    if (_h2cLoading) return _h2cLoading;
+    _h2cLoading = new Promise(function (res, rej) {
+      var sc = document.createElement('script'); sc.src = 'vendor/html2canvas-1.4.1.min.js';
+      sc.onload = function () { window.html2canvas ? res() : rej(new Error('html2canvas')); }; sc.onerror = function () { _h2cLoading = null; rej(new Error('vendor/html2canvas 로드 실패')); };
+      document.head.appendChild(sc);
+    });
+    return _h2cLoading;
+  }
+  async function captureScreen() {
+    var b = document.getElementById('fbw-bshot'); b.disabled = true; msg(t('capturing'), 'ok');
+    try {
+      await loadH2C();
+      ov.classList.remove('show');
+      await new Promise(function (r) { setTimeout(r, 120); });   // 모달이 사라진 뒤 그리기
+      var vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+      var full = await window.html2canvas(document.documentElement, {
+        x: window.scrollX, y: window.scrollY, width: vw, height: vh, windowWidth: vw, windowHeight: vh,   // 지금 보이는 영역만
+        scale: Math.min(1, 1280 / Math.max(vw, vh)), useCORS: true, logging: false, backgroundColor: '#ffffff',
+        ignoreElements: function (n) { return n.id === 'fbw-ov' || n.id === 'fbw-btn'; }
+      });
+      ov.classList.add('show');
+      setShotFromCanvas(shrinkToCanvas(full, full.width, full.height));
+      msg('', '');
+    } catch (e) { ov.classList.add('show'); msg(t('capFail') + ' (' + (e.message || e) + ')', 'err'); }
+    b.disabled = false;
   }
 
   // ── 전송 ──
@@ -230,7 +303,7 @@
         category: document.getElementById('fbw-cat').value, content: txt, screenshot: path
       });
       if (ins.error) throw new Error(ins.error.message);
-      document.getElementById('fbw-txt').value = ''; document.getElementById('fbw-file').value = ''; shotBlob = null; document.getElementById('fbw-prev').style.display = 'none';
+      document.getElementById('fbw-txt').value = ''; clearShot();
       msg(t('done'), 'ok');
     } catch (e) { msg(t('fail') + (e.message || e), 'err'); }
     b.disabled = false; b.textContent = t('submit');

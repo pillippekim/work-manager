@@ -227,6 +227,6 @@ async function logout() {
 // =============================================
 (function () {
     if (document.getElementById('fbw-loader')) return;
-    var s = document.createElement('script'); s.id = 'fbw-loader'; s.src = 'feedback_widget.js?v=20261109'; s.defer = true;
+    var s = document.createElement('script'); s.id = 'fbw-loader'; s.src = 'feedback_widget.js?v=20261111'; s.defer = true;
     (document.head || document.documentElement).appendChild(s);
 })();
