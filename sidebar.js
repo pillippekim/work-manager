@@ -191,11 +191,12 @@ function initSidebar() {
                             '<span class="s-badge c-badge on">1차</span><span class="s-arrow">▼</span>' +
                         '</button>' +
                         '<div class="sub-body">' +
+                            // 2026-11-11 물류팀 의견: 재고 조회 → 입출고 → 적재대 → 랙 상세 → 대차 → 특별관리 순
+                            '<a class="nav-link' + invViewerActive + '" href="inventory_viewer.html"><span class="n-icon">📊</span>재고 조회</a>' +
+                            '<a class="nav-link' + invOutboundActive + '" href="inventory_io.html"><span class="n-icon">📤</span>입출고 관리</a>' +
                             '<a class="nav-link' + invLayoutActive + '" href="inventory_layout.html"><span class="n-icon">🗺️</span>적재대 현황</a>' +
                             '<a class="nav-link' + invRackActive + '" href="inventory_rack.html"><span class="n-icon">🗄️</span>랙 상세 현황</a>' +
                             '<a class="nav-link' + invZoneActive + '" href="inventory_zone.html"><span class="n-icon">🛒</span>대차 현황</a>' +
-                            '<a class="nav-link' + invOutboundActive + '" href="inventory_io.html"><span class="n-icon">📤</span>입출고 관리</a>' +
-                            '<a class="nav-link' + invViewerActive + '" href="inventory_viewer.html"><span class="n-icon">📊</span>재고 조회</a>' +
                             '<a class="nav-link' + invSpecialActive + '" href="inventory_special.html"><span class="n-icon">⭐</span>특별관리 품목</a>' +
                         '</div>' +
                     '</div>' +

@@ -80,6 +80,16 @@
       font-weight: 600; color: #555; border-bottom: 2px solid #ddd;
       white-space: nowrap;
     }
+    /* 2026-11-11 입고대기 목록 정렬·필터 */
+    .wl-th { cursor: pointer; user-select: none; }
+    .wl-th:hover { background: #ececec; }
+    .wl-th.on { color: #243bb2; }
+    .wl-arrow { font-size: 10px; margin-left: 3px; color: #aaa; }
+    .wl-th.on .wl-arrow { color: #243bb2; }
+    .wl-filter { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+    .wl-filter input, .wl-filter select { padding: 7px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; font-family: inherit; }
+    .wl-filter input { width: 240px; max-width: 100%; }
+    .wl-filter .wl-reset { padding: 7px 10px; border: 1px solid #ddd; border-radius: 6px; background: #fff; font-size: 12px; cursor: pointer; font-family: inherit; }
     .data-table td {
       padding: 7px 6px; border-bottom: 1px solid #eee; vertical-align: middle;
     }
@@ -386,33 +396,21 @@
       // ── 상단: 입고대기 목록 ──
       h += '<div class="section-box">';
       h += '<div class="section-title"><span class="title-icon">&#128230;</span>입고대기 목록';
-      if (totalWaiting > 0) {
-        h += ' <span style="font-size:12px;color:#E65100;font-weight:400;">(' + totalWaiting + '건 대기중)</span>';
-      }
+      h += ' <span id="wlCount" style="font-size:12px;color:#E65100;font-weight:400;"></span>';
       h += '</div>';
 
-      if (waitingLots.length === 0) {
-        h += '<div class="empty-msg">입고대기 항목이 없습니다</div>';
-      } else {
-        h += '<div class="data-table-wrap"><table class="data-table">';
-        h += '<thead><tr><th>No</th><th>사번</th><th>제품명</th><th>LOT</th>';
-        h += '<th style="text-align:right">수량</th><th>등록일</th><th>출처</th><th>처리</th></tr></thead><tbody>';
-
-        for (var j = 0; j < waitingLots.length; j++) {
-          var lot = waitingLots[j];
-          h += '<tr>';
-          h += '<td>' + (j + 1) + '</td>';
-          h += '<td><strong>' + (lot.product_code || '-') + '</strong></td>';
-          h += '<td>' + (lot.product_name || '-') + '</td>';
-          h += '<td>' + (lot.lot_no || '-') + '</td>';
-          h += '<td class="qty-cell">' + (lot.quantity || 0).toLocaleString() + '</td>';
-          h += '<td>' + fmtKst(lot.created_at) + '</td>';
-          h += '<td title="' + String(lot.note || '').replace(/"/g, '&quot;') + '">' + (SRC_KO[lot.source_type] || lot.source_type || '-') + '</td>';   // 2026-11-10 출처 한글 + 메모 툴팁
-          h += '<td><button class="row-btn inbound" onclick="openInboundModal(' + lot.id + ')">입고처리</button></td>';
-          h += '</tr>';
-        }
-        h += '</tbody></table></div>';
+      // 2026-11-11 검색·출처 필터 (입력창은 표와 분리 — 표만 다시 그려서 입력 중 포커스 유지)
+      if (waitingLots.length > 0) {
+        h += '<div class="wl-filter">';
+        h += '<input type="text" id="wlQ" placeholder="사번 · 제품명 · LOT 검색" value="' + escAttr(wlFilter.q) + '" oninput="wlSetFilter()">';
+        h += '<select id="wlSrc" onchange="wlSetFilter()"><option value="">출처 전체</option>';
+        ['packaging', 'manual', 'excel'].forEach(function(k) { h += '<option value="' + k + '"' + (wlFilter.src === k ? ' selected' : '') + '>' + SRC_KO[k] + '</option>'; });
+        h += '</select>';
+        h += '<button type="button" class="wl-reset" onclick="wlReset()">초기화</button>';
+        h += '<span style="font-size:11.5px;color:#888;">열 제목을 누르면 정렬돼요</span>';
+        h += '</div>';
       }
+      h += '<div id="wlTableBox"></div>';
       h += '</div>';
 
       // ── 하단: 수동 입고등록 + 엑셀 업로드 ──
@@ -451,6 +449,75 @@
       h += '</div>';
 
       document.getElementById('tabContent').innerHTML = h;
+      renderWaitingTable();   // 2026-11-11
+    }
+
+    // ── 2026-11-11 입고대기 목록: 정렬·필터 ──
+    var wlSort = { key: 'created_at', dir: 'asc' };     // 기본: 등록일 오래된 순(기존과 동일)
+    var wlFilter = { q: '', src: '' };
+    function escAttr(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+    function wlFiltered() {
+      var q = (wlFilter.q || '').trim().toLowerCase();
+      var arr = waitingLots.filter(function(l) {
+        if (wlFilter.src && l.source_type !== wlFilter.src) return false;
+        if (!q) return true;
+        return [l.product_code, l.product_name, l.lot_no].some(function(v) { return String(v || '').toLowerCase().indexOf(q) >= 0; });
+      });
+      var k = wlSort.key, d = wlSort.dir === 'desc' ? -1 : 1;
+      arr.sort(function(a, b) {
+        var c;
+        if (k === 'quantity') c = (a.quantity || 0) - (b.quantity || 0);
+        else c = String(a[k] || '').localeCompare(String(b[k] || ''), 'ko', { numeric: true });
+        return (c * d) || ((a.id || 0) - (b.id || 0));
+      });
+      return arr;
+    }
+    function wlSortBy(key) {
+      if (wlSort.key === key) wlSort.dir = (wlSort.dir === 'asc' ? 'desc' : 'asc');
+      else { wlSort.key = key; wlSort.dir = 'asc'; }
+      renderWaitingTable();
+    }
+    function wlSetFilter() {
+      var q = document.getElementById('wlQ'), s = document.getElementById('wlSrc');
+      wlFilter.q = q ? q.value : ''; wlFilter.src = s ? s.value : '';
+      renderWaitingTable();
+    }
+    function wlReset() {
+      wlFilter = { q: '', src: '' }; wlSort = { key: 'created_at', dir: 'asc' };
+      var q = document.getElementById('wlQ'), s = document.getElementById('wlSrc');
+      if (q) q.value = ''; if (s) s.value = '';
+      renderWaitingTable();
+    }
+    function renderWaitingTable() {
+      var box = document.getElementById('wlTableBox'); if (!box) return;
+      var arr = wlFiltered();
+      var cnt = document.getElementById('wlCount');
+      if (cnt) cnt.textContent = waitingLots.length ? '(' + (arr.length !== waitingLots.length ? arr.length + '건 표시 / ' : '') + waitingLots.length + '건 대기중)' : '';
+      if (waitingLots.length === 0) { box.innerHTML = '<div class="empty-msg">입고대기 항목이 없습니다</div>'; return; }
+      if (arr.length === 0) { box.innerHTML = '<div class="empty-msg">조건에 맞는 항목이 없습니다</div>'; return; }
+      function th(label, key, style) {
+        var on = wlSort.key === key;
+        return '<th class="wl-th' + (on ? ' on' : '') + '"' + (style ? ' style="' + style + '"' : '') + ' onclick="wlSortBy(\'' + key + '\')">' + label
+          + '<span class="wl-arrow">' + (on ? (wlSort.dir === 'asc' ? '&#9650;' : '&#9660;') : '&#8645;') + '</span></th>';
+      }
+      var h = '<div class="data-table-wrap"><table class="data-table">';
+      h += '<thead><tr><th>No</th>' + th('사번', 'product_code') + th('제품명', 'product_name') + th('LOT', 'lot_no');
+      h += th('수량', 'quantity', 'text-align:right') + th('등록일', 'created_at') + th('출처', 'source_type') + '<th>처리</th></tr></thead><tbody>';
+      for (var j = 0; j < arr.length; j++) {
+        var lot = arr[j];
+        h += '<tr>';
+        h += '<td>' + (j + 1) + '</td>';
+        h += '<td><strong>' + (lot.product_code || '-') + '</strong></td>';
+        h += '<td>' + (lot.product_name || '-') + '</td>';
+        h += '<td>' + (lot.lot_no || '-') + '</td>';
+        h += '<td class="qty-cell">' + (lot.quantity || 0).toLocaleString() + '</td>';
+        h += '<td>' + fmtKst(lot.created_at) + '</td>';
+        h += '<td title="' + String(lot.note || '').replace(/"/g, '&quot;') + '">' + (SRC_KO[lot.source_type] || lot.source_type || '-') + '</td>';   // 2026-11-10 출처 한글 + 메모 툴팁
+        h += '<td><button class="row-btn inbound" onclick="openInboundModal(' + lot.id + ')">입고처리</button></td>';
+        h += '</tr>';
+      }
+      h += '</tbody></table></div>';
+      box.innerHTML = h;
     }
 
     function countEmptySlots() {
@@ -492,8 +559,8 @@
       // 2026-11-10 ② 입고 위치 선택: 적재대(동/슬롯) 또는 대차장(라인)
       h += '<div class="form-group" style="margin-bottom:10px;"><label>입고 위치</label>';
       h += '<div style="display:flex;gap:16px;font-size:14px;padding:4px 0;">';
-      h += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="inbLocType" value="rack" checked onchange="toggleInbLoc()"> 적재대(동/슬롯)</label>';
-      h += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="inbLocType" value="zone" onchange="toggleInbLoc()"' + (allZones.length ? '' : ' disabled') + '> 대차장(라인)</label>';
+      h += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-size:13px;color:#333;font-weight:500;margin:0;"><input type="radio" name="inbLocType" value="rack" checked onchange="toggleInbLoc()"> 적재대(동/슬롯)</label>';
+      h += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-size:13px;color:#333;font-weight:500;margin:0;"><input type="radio" name="inbLocType" value="zone" onchange="toggleInbLoc()"' + (allZones.length ? '' : ' disabled') + '> 대차장(라인)</label>';
       h += '</div></div>';
       h += '<div id="inbLocZone" style="display:none;">';
       h += '<div class="form-group"><label>대차장 라인 선택</label><select id="modalZone"><option value="">-- 라인 선택 --</option>';
