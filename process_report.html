@@ -1896,6 +1896,9 @@ async function renderMesWeighing(rows){
    production_qty(양품 = C/V×Shot−불량) · defect_qty · start_time/end_time · note(JSON: text·face·conditions·downtime)
    ※ LOT 개념 없음(배치=batch_no). 비가동/식사 제외 계산은 data_viewer와 동일 규칙(#18). */
 function mdNote(r){ try { var n = JSON.parse(r.note); return (n && typeof n === 'object') ? n : {}; } catch(e){ return { text: r.note || '' }; } }
+/* 2026-11-12 금형교체 키용 면 정규화: 가/나/다면만 구분, 그 외('', '전체', '표준' 등 단면 표기)는 같은 교체로 봄
+   — data_viewer 수정창이 저장할 때 면을 행의 work_type 으로 다시 쓰면서 형제 사본과 표기가 달라져 2건으로 잡히던 문제 */
+function mcFaceKey(f){ f = (f || '').trim(); return (f === '가면' || f === '나면' || f === '다면') ? f : ''; }
 function mdToMin(t){ var p=(''+t).split(':'); return (+p[0])*60 + (+p[1]); }
 /* 구간(start~end) 순수 분 = 길이 − 점심(12:00~13:00)·저녁(17:00~17:30) 겹침 (자정 걸침 대응) */
 function mdNetMin(start, end){
@@ -1979,7 +1982,7 @@ async function renderMolding(rows){
     /* 5) 금형교체: data_viewer와 동일 규칙 — 키=날짜|설비|면|교체후사번(시각 제외), 본인 행 기록 우선 */
     (n.downtime || []).forEach(function(dt){
       if (!dt || dt.code !== '금형교체') return;
-      var key = [r.work_date, eq, dt.face||'', dt.sabun||''].join('|');
+      var key = [r.work_date, eq, mcFaceKey(dt.face), dt.sabun||''].join('|');   // 2026-11-12 면 정규화 (중복 제거)
       var isAuth = !!(dt.sabun && String(r.sabun) === String(dt.sabun));
       if (!mcMap[key] || (isAuth && !mcMap[key].auth)){
         mcMap[key] = { auth:isAuth, date:r.work_date, eq:eq, face:(dt.face && dt.face !== '전체') ? dt.face : '', sabun:dt.sabun||'',
