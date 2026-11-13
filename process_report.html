@@ -1917,10 +1917,28 @@ function mdFaceRank(f){ var m={'가면':0,'나면':1,'다면':2}; return (f in m
 function mdRateColor(rate){ return rate === '-' ? '#999' : (+rate >= 85 ? '#059669' : (+rate >= 70 ? '#d97706' : '#dc2626')); }
 function mdEqCmp(a, b){ return String(a).localeCompare(String(b), 'ko', {numeric:true}); }
 
+/* 2026-11-13 성형 설비 마스터(전체 호기·면수): 인젝션 계열 1면, 그 외(트랜스퍼·진공·일반) 3면 — molding.html detectFaces 와 같은 규칙. 휴면(is_dormant) 제외 */
+var MD_EQ_TOTAL = null;
+async function loadMoldingEquipTotal(){
+  if (MD_EQ_TOTAL) return MD_EQ_TOTAL;
+  try {
+    var res = await db.from('equipments').select('equipment_no, equip_type, is_dormant').eq('process', '성형').eq('is_active', true);
+    if (res.error || !res.data || !res.data.length) { console.warn('equipments 조회 실패/없음', res.error); return null; }
+    var eqs = 0, faces = 0, map = {};
+    res.data.forEach(function(e){
+      if (e.is_dormant) return;
+      var t = e.equip_type || '', f = (t === 'injection' || t === 'inj-vacuum') ? 1 : 3;
+      eqs++; faces += f; map[e.equipment_no] = f;
+    });
+    MD_EQ_TOTAL = { eqs: eqs, faces: faces, map: map };
+  } catch (e) { console.warn(e); return null; }
+  return MD_EQ_TOTAL;
+}
 async function renderMolding(rows){
   var body = document.getElementById('rpBody');
   if (!rows.length){ body.innerHTML = '<div class="empty-msg">해당 기간에 제출된 성형 작업일지가 없습니다.</div>'; return; }
   await loadProducts();
+  var EQT = await loadMoldingEquipTotal();   // 2026-11-13 전체 호기·면수 (실패 시 null → 작업분만 표시)
 
   var byEq = {}, bySabun = {}, byWorker = {}, totProd = 0, totDef = 0, totShot = 0;
   var shiftSeen = {}, shiftFaces = {}, dtSeen = {}, dtList = [], mcMap = {}, noteSeen = {}, notes = [], teams = {};
@@ -2037,6 +2055,42 @@ async function renderMolding(rows){
   var totRate = mdPct(totAvail - totDt, totAvail);
   var defRate = mdPct(totDef, totProd + totDef);
 
+  /* 2026-11-13 헤더 두 번째 줄 (사용자 승인: 분모=실생산, 작업면/전체면 표기, 2줄 배치)
+     ① 시간당 평균 Shot = 총 Shot ÷ 실생산 시간(가동가능 − 비가동, 면 기준 h) — 표의 '실생산(h)'와 같은 기준
+     ② 가동 설비 = 날짜별 기록이 있는 호기 수 / 전체 호기, 호기마다 실제 기록된 면 수 합(단면=1) / 전체 면수. 기간이 여러 날이면 작업분은 일평균
+     ③ 작업자 1인당 면수 = 근무조(날짜·반·근무)별 가동 면 합 ÷ 작업자 수 합
+     ④ 총 비가동 = 표의 비가동(h) 합계 (가동가능 대비 %) */
+  var kpiFaceDays = {}, kpiShiftFaces = {}, kpiShiftWorkers = {};
+  rows.forEach(function(r){
+    var d0 = r.work_date || '-', e0 = r.equipment_no || '(설비미지정)', f0 = r.work_type || '';
+    if (!kpiFaceDays[d0]) kpiFaceDays[d0] = {};
+    if (!kpiFaceDays[d0][e0]) kpiFaceDays[d0][e0] = {};
+    kpiFaceDays[d0][e0][f0] = 1;
+    var sk0 = [d0, r.team || '', r.shift_type || ''].join('|');
+    if (!kpiShiftFaces[sk0]) { kpiShiftFaces[sk0] = {}; kpiShiftWorkers[sk0] = {}; }
+    kpiShiftFaces[sk0][e0 + '|' + f0] = 1;
+    if (r.worker_name) kpiShiftWorkers[sk0][r.worker_name] = 1;
+  });
+  var kpiFaceCnt = function(fset){ var ks = Object.keys(fset).filter(function(f){ return f !== ''; }); return ks.length || 1; };
+  var kpiDays = Object.keys(kpiFaceDays), kpiEqSum = 0, kpiFaceSum = 0;
+  kpiDays.forEach(function(d0){ var eqm = kpiFaceDays[d0]; Object.keys(eqm).forEach(function(e0){ kpiEqSum++; kpiFaceSum += kpiFaceCnt(eqm[e0]); }); });
+  var kpiMulti = kpiDays.length > 1;
+  var kpiEqAvg = kpiMulti ? (Math.round(kpiEqSum / kpiDays.length * 10) / 10) : kpiEqSum;
+  var kpiFaceAvg = kpiMulti ? (Math.round(kpiFaceSum / kpiDays.length * 10) / 10) : kpiFaceSum;
+  var kpiNetH = (totAvail - totDt) / 60;
+  var kpiShotH = kpiNetH > 0 ? (Math.round(totShot / kpiNetH * 10) / 10) : null;
+  var kpiSF = 0, kpiSW = 0;
+  Object.keys(kpiShiftFaces).forEach(function(k){
+    var byE = {}; Object.keys(kpiShiftFaces[k]).forEach(function(ef){ var p0 = ef.split('|'); if (!byE[p0[0]]) byE[p0[0]] = {}; byE[p0[0]][p0[1]] = 1; });
+    Object.keys(byE).forEach(function(e0){ kpiSF += kpiFaceCnt(byE[e0]); });
+    kpiSW += Object.keys(kpiShiftWorkers[k]).length;
+  });
+  var kpiFacePerW = kpiSW > 0 ? (Math.round(kpiSF / kpiSW * 10) / 10) : null;
+  var kpiDtPct = mdPct(totDt, totAvail);
+  var kpiFmt = function(v){ return v.toLocaleString('ko-KR', { maximumFractionDigits: 1 }); };
+  var kpiSub = function(t){ return '<span style="color:#aab">— ' + t + '</span>'; };
+  var kpiUnit = function(t){ return '<span style="font-size:10px;font-weight:600;color:#777">' + t + '</span>'; };
+
   /* 비가동 코드별 */
   var byCode = {}, dtTotal = 0;
   dtList.forEach(function(x){
@@ -2063,6 +2117,18 @@ async function renderMolding(rows){
     + '<div class="sum-card"><div class="n" style="color:#2563eb">'+totRate+(totRate!=='-'?'%':'')+'</div><div class="l">설비 가동률</div></div>'
     + '<div class="sum-card"><div class="n" style="color:'+(mcs.length?'#d97706':'#222')+'">'+num(mcs.length)+'</div><div class="l">금형교체</div></div>'
     + '<div class="sum-card"><div class="n">'+num(workers.length)+'</div><div class="l">작업자'+(Object.keys(teams).length?' ('+esc(Object.keys(teams).sort().join('·'))+')':'')+'</div></div>'
+    + '</div>';
+  /* 2026-11-13 두 번째 줄 */
+  h += '<div class="sum-grid" style="grid-template-columns:repeat(4,1fr);margin-top:-10px">'
+    + '<div class="sum-card"><div class="n">'+(kpiShotH === null ? '-' : kpiFmt(kpiShotH))+kpiUnit(' shot/h')+'</div>'
+    +   '<div class="l">시간당 평균 Shot '+kpiSub('총 Shot ÷ 실생산 '+kpiFmt(Math.round(kpiNetH*10)/10)+'h (면 기준)')+'</div></div>'
+    + '<div class="sum-card"><div class="n">'+kpiFmt(kpiEqAvg)+(EQT ? '<span style="font-size:11px;color:#999">/'+EQT.eqs+'</span>' : '')+kpiUnit('호기')
+    +   ' · <span style="color:#2563eb">'+kpiFmt(kpiFaceAvg)+'</span>'+(EQT ? '<span style="font-size:11px;color:#999">/'+EQT.faces+'</span>' : '')+kpiUnit('면')+'</div>'
+    +   '<div class="l">가동 설비 '+kpiSub((kpiMulti ? kpiDays.length+'일 일평균 ' : '')+'작업 / 전체'+(EQT ? '' : ' (설비 마스터 조회 실패)'))+'</div></div>'
+    + '<div class="sum-card"><div class="n">'+(kpiFacePerW === null ? '-' : kpiFmt(kpiFacePerW))+kpiUnit(' 면/인')+'</div>'
+    +   '<div class="l">작업자 1인당 평균 면수 '+kpiSub('근무조별 면 '+num(kpiSF)+' ÷ 작업자 '+num(kpiSW))+'</div></div>'
+    + '<div class="sum-card"><div class="n" style="color:'+(totDt>0?'#dc2626':'#222')+'">'+mdHr(totDt)+kpiUnit(' h')+'</div>'
+    +   '<div class="l">총 비가동 '+kpiSub('가동가능 '+mdHr(totAvail)+'h 의 '+kpiDtPct+'%')+'</div></div>'
     + '</div>';
 
   /* 1. 호기별 실적·가동 */
