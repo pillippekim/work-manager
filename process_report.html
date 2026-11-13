@@ -2000,6 +2000,10 @@ async function renderMolding(rows){
     /* 5) 금형교체: data_viewer와 동일 규칙 — 키=날짜|설비|면|교체후사번(시각 제외), 본인 행 기록 우선 */
     (n.downtime || []).forEach(function(dt){
       if (!dt || dt.code !== '금형교체') return;
+      /* 2026-11-13 사번이 지정된 교체는 '교체 후 사번 본인 행'의 기록만 사용 (4. 비가동 집계와 같은 규칙)
+         — 현장 일지에서 교체 후 사번은 같은 제출의 사번 중에서만 고르므로 본인 행은 항상 존재.
+           형제 행에 남는 사본은 수정 전 옛 기록(사번 오입력 정정 포함)이라 집계에서 제외 */
+      if (dt.sabun && String(r.sabun) !== String(dt.sabun)) return;
       var key = [r.work_date, eq, mcFaceKey(dt.face), dt.sabun||''].join('|');   // 2026-11-12 면 정규화 (중복 제거)
       var isAuth = !!(dt.sabun && String(r.sabun) === String(dt.sabun));
       if (!mcMap[key] || (isAuth && !mcMap[key].auth)){

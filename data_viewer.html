@@ -1533,6 +1533,7 @@ function renderStats() {
         const dts = (JSON.parse(r.note).downtime) || [];
         dts.forEach(d => {
           if (!d || d.code !== '금형교체') return;
+          if (d.sabun && String(r.sabun) !== String(d.sabun)) return;   // 2026-11-13 교체 후 사번 본인 행 기록만 (형제 행의 옛 사본 제외, 리포트와 동일)
           const key = [r.work_date, r.equipment_no, mcFaceKey(d.face), d.sabun || ''].join('|');
           const isAuth = !!(d.sabun && String(r.sabun) === String(d.sabun));
           const line = r.work_date + ' ' + (r.equipment_no || '?') + (d.face && d.face !== '전체' ? ' ' + d.face : '') + ' · 교체 후 사번 ' + (d.sabun || '미지정') + ' · ' + (d.start || '?') + '~' + (d.end || '?');
