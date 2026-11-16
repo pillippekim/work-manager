@@ -22,9 +22,10 @@ function initSidebar() {
     var isMoldPage = ['mold_dashboard.html','mold_layout.html','mold_detail.html'].indexOf(page) !== -1;
     var isMesPage = ['mes_data.html'].indexOf(page) !== -1;
     var isQualityPage = ['inspection_round_viewer.html', 'inspection_report.html'].indexOf(page) !== -1;
+    var isLotPage = ['lot_trace.html', 'lot_upload.html'].indexOf(page) !== -1;   // 2026-11-16 품질관리 > LOT 관리
     var isDataPage = ['data_viewer.html','safety_viewer.html','docs_manager.html','process_report.html','molding_condition.html'].indexOf(page) !== -1;
     var isSystemPage = ['master_data.html','users.html','feedback_admin.html'].indexOf(page) !== -1; // 2026-11-04
-    var isInventoryPage = ['inventory_layout.html','inventory_rack.html','inventory_io.html','inventory_viewer.html','inventory_zone.html','inventory_special.html','lot_trace.html','lot_upload.html'].indexOf(page) !== -1;   // 2026-11-16 LOT 추적
+    var isInventoryPage = ['inventory_layout.html','inventory_rack.html','inventory_io.html','inventory_viewer.html','inventory_zone.html','inventory_special.html'].indexOf(page) !== -1;
     var isAssetPage = ['asset_manage.html'].indexOf(page) !== -1;
 
     // 금형관리 active
@@ -69,8 +70,9 @@ function initSidebar() {
     var prodOpen = isMoldPage ? ' open' : '';
     var mesOpen = isMesPage ? ' open' : '';
     var moldOpen = isMoldPage ? ' open' : '';
-    var qualityOpen = isQualityPage ? ' open' : '';
+    var qualityOpen = (isQualityPage || isLotPage) ? ' open' : '';
     var inspOpen = isQualityPage ? ' open' : '';
+    var lotOpen = isLotPage ? ' open' : '';   // 2026-11-16
     var dataOpen = (isDataPage || isMesPage) ? ' open' : '';
     var systemOpen = isSystemPage ? ' open' : '';
     var logisticsOpen = isInventoryPage ? ' open' : '';
@@ -176,6 +178,17 @@ function initSidebar() {
                             '<a class="nav-link' + inspReportActive + '" href="inspection_report.html"><span class="n-icon">📑</span>공정검사 리포트</a>' +
                         '</div>' +
                     '</div>' +
+                    /* 2026-11-16 LOT 관리 (하위 그룹) */
+                    '<div class="sub-item' + lotOpen + '" id="s-lot">' +
+                        '<button class="sub-btn" onclick="toggleCat(\'s-lot\')">' +
+                            '<span class="s-icon">🔍</span><span class="s-label">LOT 관리</span>' +
+                            '<span class="s-badge c-badge on">1차</span><span class="s-arrow">▼</span>' +
+                        '</button>' +
+                        '<div class="sub-body">' +
+                            '<a class="nav-link' + lotTraceActive + '" href="lot_trace.html"><span class="n-icon">🔎</span>LOT 추적</a>' +
+                            '<a class="nav-link' + lotUploadActive + '" href="lot_upload.html"><span class="n-icon">📥</span>MES 자료 업로드</a>' +
+                        '</div>' +
+                    '</div>' +
                 '</div>' +
             '</div>' +
 
@@ -200,8 +213,6 @@ function initSidebar() {
                             '<a class="nav-link' + invRackActive + '" href="inventory_rack.html"><span class="n-icon">🗄️</span>랙 상세 현황</a>' +
                             '<a class="nav-link' + invZoneActive + '" href="inventory_zone.html"><span class="n-icon">🛒</span>대차 현황</a>' +
                             '<a class="nav-link' + invSpecialActive + '" href="inventory_special.html"><span class="n-icon">⭐</span>특별관리 품목</a>' +
-                            '<a class="nav-link' + lotTraceActive + '" href="lot_trace.html"><span class="n-icon">🔍</span>LOT 추적</a>' +            // 2026-11-16
-                            '<a class="nav-link' + lotUploadActive + '" href="lot_upload.html"><span class="n-icon">📥</span>MES 자료 업로드</a>' +    // 2026-11-16
                         '</div>' +
                     '</div>' +
                 '</div>' +
