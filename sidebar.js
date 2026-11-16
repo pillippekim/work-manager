@@ -24,7 +24,7 @@ function initSidebar() {
     var isQualityPage = ['inspection_round_viewer.html', 'inspection_report.html'].indexOf(page) !== -1;
     var isDataPage = ['data_viewer.html','safety_viewer.html','docs_manager.html','process_report.html','molding_condition.html'].indexOf(page) !== -1;
     var isSystemPage = ['master_data.html','users.html','feedback_admin.html'].indexOf(page) !== -1; // 2026-11-04
-    var isInventoryPage = ['inventory_layout.html','inventory_rack.html','inventory_io.html','inventory_viewer.html','inventory_zone.html','inventory_special.html'].indexOf(page) !== -1;
+    var isInventoryPage = ['inventory_layout.html','inventory_rack.html','inventory_io.html','inventory_viewer.html','inventory_zone.html','inventory_special.html','lot_trace.html','lot_upload.html'].indexOf(page) !== -1;   // 2026-11-16 LOT 추적
     var isAssetPage = ['asset_manage.html'].indexOf(page) !== -1;
 
     // 금형관리 active
@@ -59,6 +59,8 @@ function initSidebar() {
     var invViewerActive = (page === 'inventory_viewer.html') ? ' nav-active' : '';
     var invSpecialActive = (page === 'inventory_special.html') ? ' nav-active' : '';
     var invZoneActive = (page === 'inventory_zone.html') ? ' nav-active' : '';
+    var lotTraceActive = (page === 'lot_trace.html') ? ' nav-active' : '';     // 2026-11-16
+    var lotUploadActive = (page === 'lot_upload.html') ? ' nav-active' : '';   // 2026-11-16
 
     // 경영지원 active
     var assetActive = (page === 'asset_manage.html') ? ' nav-active' : '';
@@ -198,6 +200,8 @@ function initSidebar() {
                             '<a class="nav-link' + invRackActive + '" href="inventory_rack.html"><span class="n-icon">🗄️</span>랙 상세 현황</a>' +
                             '<a class="nav-link' + invZoneActive + '" href="inventory_zone.html"><span class="n-icon">🛒</span>대차 현황</a>' +
                             '<a class="nav-link' + invSpecialActive + '" href="inventory_special.html"><span class="n-icon">⭐</span>특별관리 품목</a>' +
+                            '<a class="nav-link' + lotTraceActive + '" href="lot_trace.html"><span class="n-icon">🔍</span>LOT 추적</a>' +            // 2026-11-16
+                            '<a class="nav-link' + lotUploadActive + '" href="lot_upload.html"><span class="n-icon">📥</span>MES 자료 업로드</a>' +    // 2026-11-16
                         '</div>' +
                     '</div>' +
                 '</div>' +

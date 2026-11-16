@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://vpaixxlhzkwtgcllimvn.supabase.co; connect-src 'self' https://vpaixxlhzkwtgcllimvn.supabase.co wss://vpaixxlhzkwtgcllimvn.supabase.co; worker-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'"><!-- 2026-11-16 CSP -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LOT 추적 - 업무포탈</title>
+  <link rel="stylesheet" href="sidebar.css">
+  <link rel="stylesheet" href="common.css">
+  <style>
+    /* 2026-11-16 LOT 추적 1단계: 역추적(성형 LOT → 재료) · 정추적(배치/입고 LOT → 제품) */
+    .lt-container { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+    .lt-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px 18px; }
+    .lt-search { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .lt-search input { flex: 1 1 300px; min-width: 0; padding: 11px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; font-family: inherit; font-weight: 700; letter-spacing: .03em; }
+    .btn-primary { padding: 11px 20px; border: none; border-radius: 8px; background: #243bb2; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; }
+    .btn-secondary { padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #374151; font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; }
+    .lt-hint { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: #6b7280; margin-top: 8px; }
+    .lt-hint b { color: #243bb2; }
+    .lt-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    @media (max-width: 900px) { .lt-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .lt-sum .c { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; }
+    .lt-sum .l { font-size: 11px; color: #6b7280; } .lt-sum .n { font-size: 18px; font-weight: 700; letter-spacing: .02em; }
+    .lt-sum .c.hl { border-color: #fde68a; background: #fffbeb; } .lt-sum .c.hl .n, .lt-sum .c.hl .l { color: #92400e; }
+    .lbl { font-size: 11px; color: #6b7280; } .val { font-size: 13.5px; font-weight: 500; }
+    .kv { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 16px; }
+    @media (max-width: 900px) { .kv { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .stage { display: grid; grid-template-columns: 140px minmax(0, 1fr); }
+    .rail { display: flex; flex-direction: column; align-items: center; padding-top: 14px; }
+    .dot { width: 14px; height: 14px; border-radius: 50%; background: #243bb2; border: 3px solid #dbe3ff; box-sizing: border-box; flex: none; }
+    .dot.amber { background: #d97706; border-color: #fde68a; } .dot.gray { background: #9ca3af; border-color: #e5e7eb; }
+    .line { width: 2px; flex: 1; background: #c7d2fe; margin-top: 4px; }
+    .stg { font-size: 12px; font-weight: 700; color: #243bb2; margin-top: 6px; text-align: center; }
+    .stg.amber { color: #b45309; } .stg.gray { color: #6b7280; }
+    .sbody { padding: 10px 0 18px 12px; border-bottom: 1px dashed #e5e7eb; }
+    .sbody:last-child { border-bottom: none; }
+    .tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+    .tag.ok { background: #dcfce7; color: #166534; } .tag.warn { background: #fef3c7; color: #92400e; } .tag.gray { background: #f3f4f6; color: #6b7280; } .tag.red { background: #fee2e2; color: #991b1b; } .tag.blue { background: #eef2ff; color: #243bb2; }
+    .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #c7d2fe; background: #eef2ff; color: #243bb2; font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 8px; text-decoration: none; cursor: pointer; font-family: inherit; }
+    .data-table-wrap { overflow-x: auto; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .data-table th { background: #f8fafc; color: #475569; font-weight: 600; text-align: left; padding: 7px 10px; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
+    .data-table td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; vertical-align: middle; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .miss { padding: 10px 14px; border: 1px dashed #d1d5db; border-radius: 8px; background: #fafafa; font-size: 12.5px; color: #4b5563; line-height: 1.6; }
+    .empty-msg { padding: 30px; text-align: center; color: #6b7280; font-size: 13px; }
+    .fw-sum { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+    @media (max-width: 900px) { .fw-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .fw-sum .c { padding: 10px 12px; border-radius: 8px; }
+    .fw-sum .n { font-size: 20px; font-weight: 700; }
+    .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 9000; align-items: center; justify-content: center; }
+    .loading-overlay.show { display: flex; }
+    .loading-box { background: #fff; padding: 22px 28px; border-radius: 10px; font-size: 14px; font-weight: 600; }
+    .toast-msg { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1f2937; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 9100; white-space: pre-line; }
+    .toast-msg.show { opacity: 1; }
+    @media print { .sidebar, .top-header, .lt-search, .lt-hint, .btn, .no-print { display: none !important; } .main { margin: 0 !important; } }
+  </style>
+</head>
+<body>
+  <div id="top-header" class="top-header"></div>
+  <nav id="sidebar-nav" class="sidebar"></nav>
+
+  <div class="main">
+    <div class="page-header">
+      <h1 class="page-title">LOT 추적</h1>
+      <p class="page-desc">제품 ↔ 재료 LOT 정·역추적 — 작업일보 + 기존 MES 발행내역(업로드) 기준</p>
+    </div>
+
+    <div class="lt-container">
+      <div class="lt-card">
+        <form class="lt-search" onsubmit="runSearch(); return false;">
+          <label for="q" style="font-size:13px;font-weight:700;white-space:nowrap;">LOT 검색</label>
+          <input id="q" type="text" placeholder="예) C261102010 · M261022015 · I261103023 · 사번 503117" autocomplete="off">
+          <button type="submit" class="btn-primary">추적</button>
+          <a href="lot_upload.html" class="btn-secondary no-print" style="text-decoration:none;">MES 자료 업로드</a>
+        </form>
+        <div class="lt-hint">
+          <span><b>C…</b> 성형 LOT → 역추적 (재료까지 거슬러 올라감)</span>
+          <span><b>M…</b> 혼련 배치 · <b>I…</b> 입고 LOT → 정추적 (어느 제품까지 퍼졌나)</span>
+          <span><b>사번</b> 6자리 → 그 제품의 최근 성형 LOT 목록</span>
+        </div>
+      </div>
+      <div id="result"></div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay"><div class="loading-box" id="loadingText">조회 중...</div></div>
+  <div class="toast-msg" id="toastMsg"></div>
+
+  <script src="vendor/supabase-2.119.0.js"></script>
+  <script src="auth_guard.js"></script>
+  <script>
+    var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+    var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+    var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    var PACK_LOTS_JSONB = false;   // packaging_reports.lot_nos 가 jsonb 면 true (text[] 면 false)
+
+    var racks = {}, zones = {};
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof checkAuth === 'function') { checkAuth(); }
+      Promise.all([
+        supabase.from('inventory_racks').select('id, rack_name, rack_code'),
+        supabase.from('inventory_zones').select('id, zone_name, zone_code, lane_name, lane_no')
+      ]).then(function(res) {
+        (res[0].data || []).forEach(function(r) { racks[r.id] = r; });
+        (res[1].data || []).forEach(function(z) { zones[z.id] = z; });
+      });
+      var qp = new URLSearchParams(location.search).get('q');
+      if (qp) { document.getElementById('q').value = qp; runSearch(); }
+    });
+
+    // ───────── 검색 분기 ─────────
+    function runSearch() {
+      var q = document.getElementById('q').value.trim().toUpperCase();
+      if (!q) return;
+      var out = document.getElementById('result'); out.innerHTML = '';
+      history.replaceState(null, '', '?q=' + encodeURIComponent(q));
+      if (/^C\d{9}$/.test(q)) return traceBack(q);
+      if (/^M\d/.test(q)) return traceForward(q, 'batch');
+      if (/^I\d/.test(q)) return traceForward(q, 'receipt');
+      if (/^\d{6}$/.test(q)) return listBySabun(q);
+      // 부분 입력 → 라벨 후보
+      showLoading('검색 중...');
+      supabase.from('lot_labels').select('label, work_date, equipment_no, face, sabun, batch_no').ilike('label', '%' + q + '%').order('work_date', { ascending: false }).limit(50)
+        .then(function(r) {
+          hideLoading();
+          if (r.error) { showToast('조회 실패: ' + r.error.message); return; }
+          if (!r.data || !r.data.length) { out.innerHTML = '<div class="lt-card empty-msg">"' + esc(q) + '" 에 해당하는 LOT 을 찾지 못했어요.<br>성형 LOT(C…) · 혼련 배치(M…) · 입고 LOT(I…) · 사번 6자리로 검색해 주세요.</div>'; return; }
+          out.innerHTML = '<div class="lt-card"><div style="font-size:13px;font-weight:700;margin-bottom:8px;">"' + esc(q) + '" 가 포함된 성형 LOT ' + r.data.length + '건</div>' + labelListTable(r.data) + '</div>';
+        });
+    }
+    function listBySabun(sabun) {
+      showLoading('조회 중...');
+      supabase.from('lot_labels').select('label, work_date, equipment_no, face, sabun, batch_no, production_qty').eq('sabun', sabun).order('work_date', { ascending: false }).limit(100)
+        .then(function(r) {
+          hideLoading();
+          if (r.error) { showToast('조회 실패: ' + r.error.message); return; }
+          var out = document.getElementById('result');
+          if (!r.data || !r.data.length) { out.innerHTML = '<div class="lt-card empty-msg">사번 ' + esc(sabun) + ' 의 성형 LOT 발행 내역이 없어요. (MES 자료 업로드 범위를 확인해 주세요)</div>'; return; }
+          out.innerHTML = '<div class="lt-card"><div style="font-size:13px;font-weight:700;margin-bottom:8px;">사번 ' + esc(sabun) + ' · 최근 성형 LOT ' + r.data.length + '건 — 클릭하면 역추적</div>' + labelListTable(r.data) + '</div>';
+        });
+    }
+    function labelListTable(rows) {
+      var h = '<div class="data-table-wrap"><table class="data-table"><thead><tr><th>성형 LOT</th><th>일자</th><th>호기·면</th><th>사번</th><th>BatchNo</th><th class="num">생산</th></tr></thead><tbody>';
+      rows.forEach(function(r) {
+        h += '<tr><td><a href="?q=' + esc(r.label) + '" onclick="go(\'' + esc(r.label) + '\');return false;"><b>' + esc(r.label) + '</b></a></td><td>' + esc(r.work_date) + '</td><td>' + esc(r.equipment_no || r.equip_raw || '-') + ' ' + esc(r.face || '') + '</td><td>' + esc(r.sabun || '-') + '</td>'
+          + '<td>' + (r.batch_no ? '<a href="#" onclick="go(\'' + esc(r.batch_no) + '\');return false;">' + esc(r.batch_no) + '</a>' : '-') + '</td><td class="num">' + (r.production_qty != null ? r.production_qty.toLocaleString() : '-') + '</td></tr>';
+      });
+      return h + '</tbody></table></div>';
+    }
+    function go(v) { document.getElementById('q').value = v; runSearch(); window.scrollTo(0, 0); }
+
+    // ───────── 역추적: 성형 LOT → 재료 ─────────
+    function traceBack(L) {
+      showLoading('역추적 중...');
+      var ctx = { L: L };
+      supabase.from('lot_labels').select('*').eq('label', L).maybeSingle().then(function(r) {
+        if (r.error) throw new Error('라벨 조회 실패: ' + r.error.message);
+        ctx.lab = r.data || null;
+        var qs = [
+          supabase.from('sasang_reports').select('id, work_date, worker_name, sabun, production_qty, defect_qty, deleted_at').eq('lot_no', L),
+          supabase.from('assembly_reports').select('id, work_date, worker_name, sabun, production_qty, defect_qty, deleted_at').eq('lot_no', L),
+          supabase.from('shot_reports').select('id, work_date, worker_name, worker_id, work_qty, shot_type, deleted_at').eq('lot_no', L),
+          packagingByLots([L]),
+          supabase.from('inventory_lots').select('*').ilike('lot_no', '%' + L + '%'),
+          supabase.from('inventory_movements').select('*').ilike('lot_no', '%' + L + '%').order('moved_at', { ascending: true })
+        ];
+        if (ctx.lab) {
+          qs.push(supabase.from('molding_reports').select('id, work_date, equipment_no, work_type, sabun, worker_name, team, shift_type, start_time, end_time, production_qty, defect_qty, shot_count, batch_no')
+            .eq('work_date', ctx.lab.work_date).eq('sabun', ctx.lab.sabun).is('deleted_at', null));
+          var b = ctx.lab.batch_no || '';
+          qs.push(/^M/i.test(b) ? supabase.from('cmb_reports').select('id, work_date, worker_id, worker_name, material_name, weight, lot_no, is_remix').eq('lot_no', b)
+                                : /^I/i.test(b) ? supabase.from('material_receipts').select('*').eq('lot_id', b).maybeSingle() : Promise.resolve({ data: null }));
+          qs.push(ctx.lab.insert_lot ? supabase.from('material_receipts').select('*').eq('lot_id', ctx.lab.insert_lot).maybeSingle() : Promise.resolve({ data: null }));
+          qs.push(b ? supabase.from('lot_labels').select('label', { count: 'exact', head: true }).eq('batch_no', b) : Promise.resolve({ count: 0 }));
+        }
+        return Promise.all(qs);
+      }).then(function(res) {
+        res.forEach(function(x) { if (x && x.error) console.warn(x.error); });
+        ctx.sasang = alive(res[0].data); ctx.assembly = alive(res[1].data); ctx.shot = alive(res[2].data);
+        ctx.pack = alive(res[3].data).filter(function(p) { return (p.lot_nos || []).indexOf(L) >= 0; });
+        ctx.inv = (res[4].data || []).filter(function(l) { return splitLots(l.lot_no).indexOf(L) >= 0; });
+        ctx.mv = (res[5].data || []).filter(function(m) { return splitLots(m.lot_no).indexOf(L) >= 0; });
+        if (ctx.lab) {
+          ctx.mold = (res[6].data || []).filter(function(m) { return eqKey(m.equipment_no) === eqKey(ctx.lab.equipment_no); });
+          ctx.batchRows = res[7] ? res[7].data : null;
+          ctx.insertRow = res[8] ? res[8].data : null;
+          ctx.batchLabelCount = res[9] ? (res[9].count || 0) : 0;
+        }
+        hideLoading(); renderBack(ctx);
+      }).catch(function(e) { hideLoading(); showToast(e.message || String(e)); console.error(e); });
+    }
+
+    function renderBack(c) {
+      var L = c.L, lab = c.lab, h = '';
+      // 요약
+      var invLive = c.inv.filter(function(l) { return l.status !== 'shipped' && (l.quantity || 0) > 0; });
+      var shipped = c.mv.filter(function(m) { return m.movement_type === 'outbound'; });
+      var shipQty = shipped.reduce(function(s, m) { return s + (m.quantity || 0); }, 0);
+      var where = invLive.length ? invLive.map(locLabel).join(', ') : (shipped.length ? '출하 완료' : (c.pack.length ? '포장 완료 (재고 미등록)' : (c.shot.length || c.assembly.length || c.sasang.length ? '공정 진행 중' : (lab ? '성형 완료 (후공정 기록 없음)' : '기록 없음'))));
+      var prodName = (c.mold && c.mold[0] && c.mold[0].product_name) || (c.inv[0] && c.inv[0].product_name) || '';
+      var steps = [!!lab, !!(c.mold && c.mold.length), !!(c.sasang.length || c.assembly.length || c.shot.length), !!c.pack.length, !!c.inv.length];
+      h += '<div class="lt-sum">'
+        + '<div class="c"><div class="l">검색 LOT</div><div class="n">' + esc(L) + '</div><div class="l">' + (lab ? '성형 LOT · ' + esc(lab.work_date) + ' · ' + esc(lab.equipment_no || lab.equip_raw) + ' ' + esc(lab.face || '') : '성형 LOT · 발행내역 미업로드') + '</div></div>'
+        + '<div class="c"><div class="l">사번 · 품명</div><div class="n">' + esc(lab ? lab.sabun : (c.inv[0] ? c.inv[0].product_code : '-')) + '</div><div class="l">' + esc(prodName || (lab ? '재질 ' + (lab.material_code || '-') : '')) + '</div></div>'
+        + '<div class="c"><div class="l">추적 범위</div><div class="n" style="font-size:14px;">' + steps.filter(Boolean).length + ' / 5 단계 연결</div><div class="l">발행 · 성형일지 · 후공정 · 포장 · 재고</div></div>'
+        + '<div class="c hl"><div class="l">현재 위치</div><div class="n" style="font-size:14px;">' + esc(where) + '</div><div class="l">' + (invLive.length ? '잔량 ' + invLive.reduce(function(s, l) { return s + (l.quantity || 0); }, 0).toLocaleString() + '개' : (shipped.length ? '출하 ' + shipQty.toLocaleString() + '개' : '')) + '</div></div>'
+        + '</div>';
+
+      h += '<div class="lt-card"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;"><h2 style="margin:0;font-size:15px;">역추적 경로 <span style="font-weight:400;color:#6b7280;font-size:12px;">— 위(재고)에서 아래(재료)로 내려갑니다</span></h2>'
+        + '<button class="btn no-print" style="margin-left:auto" onclick="window.print()">인쇄</button></div>';
+
+      // 재고·출하
+      h += stage('amber', '재고 · 출하', (function() {
+        if (!c.inv.length && !c.mv.length) return '<div class="miss">재고 등록 기록이 없어요. (포장 후 입고대기 등록 전이거나, 11/10 이전 포장분)</div>';
+        var s = '';
+        c.inv.forEach(function(l) {
+          s += '<div class="kv" style="margin-bottom:8px;"><div><div class="lbl">재고 LOT</div><div class="val">#' + l.id + ' · ' + statusKo(l.status) + (l.stocked_at ? ' · 입고 ' + fmtKst(l.stocked_at, true) : '') + '</div></div>'
+            + '<div><div class="lbl">위치</div><div class="val">' + esc(locLabel(l)) + '</div></div>'
+            + '<div><div class="lbl">수량</div><div class="val">' + (l.quantity || 0).toLocaleString() + ' / ' + (l.initial_quantity || 0).toLocaleString() + '</div></div>'
+            + '<div><div class="lbl">출처</div><div class="val">' + esc({ manual: '수동', excel: '엑셀', packaging: '포장일지' }[l.source_type] || l.source_type || '-') + '</div></div></div>';
+          var others = splitLots(l.lot_no).filter(function(x) { return x !== L; });
+          if (others.length) s += '<div style="font-size:12px;color:#6b7280;margin-bottom:6px;">같은 재고 LOT에 묶인 성형 LOT ' + others.length + '개: ' + others.map(function(x) { return '<a href="#" onclick="go(\'' + esc(x) + '\');return false;">' + esc(x) + '</a>'; }).join(' · ') + '</div>';
+        });
+        if (c.mv.length) {
+          s += '<div class="data-table-wrap" style="margin-top:6px;"><table class="data-table"><thead><tr><th>일시</th><th>구분</th><th>위치</th><th class="num">수량</th><th>사유</th></tr></thead><tbody>';
+          c.mv.forEach(function(m) { s += '<tr><td>' + fmtKst(m.moved_at, true) + '</td><td>' + (m.movement_type === 'outbound' ? '<span class="tag red">출고</span>' : '<span class="tag ok">입고</span>') + '</td><td>' + esc(m.to_location || m.from_location || '-') + '</td><td class="num">' + (m.quantity || 0).toLocaleString() + '</td><td>' + esc(m.reason || '-') + '</td></tr>'; });
+          s += '</tbody></table></div>';
+        }
+        return s;
+      })());
+
+      // 포장
+      h += stage('', '포장', c.pack.length ? c.pack.map(function(p) {
+        return '<div class="kv"><div><div class="lbl">포장 일지</div><div class="val">#' + p.id + ' · ' + esc(p.work_date) + '</div></div><div><div class="lbl">작업자</div><div class="val">' + esc(p.worker_name || p.created_by_name || '-') + '</div></div>'
+          + '<div><div class="lbl">수량</div><div class="val">' + (p.quantity || 0).toLocaleString() + '</div></div><div><div class="lbl">함께 포장된 LOT</div><div class="val">' + ((p.lot_nos || []).length - 1) + '개</div></div></div>';
+      }).join('<hr style="border:none;border-top:1px solid #f1f5f9;margin:8px 0">') : '<div class="miss">포장 일지에 이 LOT 기록이 없어요.</div>');
+
+      // 쇼트·조립·사상
+      var procRows = [];
+      c.shot.forEach(function(r) { procRows.push(['쇼트' + (r.shot_type ? '(' + r.shot_type + ')' : ''), r.work_date, r.worker_name, r.work_qty, null]); });
+      c.assembly.forEach(function(r) { procRows.push(['조립', r.work_date, r.worker_name, r.production_qty, r.defect_qty]); });
+      c.sasang.forEach(function(r) { procRows.push(['사상', r.work_date, r.worker_name, r.production_qty, r.defect_qty]); });
+      procRows.sort(function(a, b) { return (b[1] || '').localeCompare(a[1] || ''); });
+      h += stage('', '쇼트 · 조립 · 사상', procRows.length
+        ? '<div class="data-table-wrap"><table class="data-table"><thead><tr><th>공정</th><th>일자</th><th>작업자</th><th class="num">양품</th><th class="num">불량</th></tr></thead><tbody>'
+          + procRows.map(function(r) { return '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td><td>' + esc(r[2] || '-') + '</td><td class="num">' + num(r[3]) + '</td><td class="num">' + (r[4] == null ? '-' : num(r[4])) + '</td></tr>'; }).join('')
+          + '</tbody></table></div><div style="font-size:11.5px;color:#6b7280;margin-top:4px;">코팅 일지는 LOT 칸이 없어 표시되지 않아요 (3단계에서 추가 예정)</div>'
+        : '<div class="miss">사상·조립·쇼트 일지에 이 LOT 기록이 없어요. (LOT 미입력이거나 아직 진행 전)</div>');
+
+      // 성형
+      h += stage('', '성형', (function() {
+        if (!lab) return '<div class="miss"><b>기존 MES 성형 라벨 발행 내역이 아직 업로드되지 않은 LOT</b>이에요.<br>MES 자료 업로드에서 해당 날짜 파일을 올리면 호기·작업자·시간·혼련 배치가 여기에 채워집니다.</div>';
+        var s = '<div class="kv"><div><div class="lbl">성형 LOT (라벨)</div><div class="val">' + esc(lab.label) + '</div></div>'
+          + '<div><div class="lbl">호기 · 면 · 금형</div><div class="val">' + esc(lab.equipment_no || lab.equip_raw) + ' · ' + esc(lab.face || '-') + ' · 금형 ' + esc(lab.mold_no || '-') + '</div></div>'
+          + '<div><div class="lbl">작업자 · 시간</div><div class="val">' + esc(lab.worker || '-') + ' · ' + tm(lab.start_time) + ' ~ ' + tm(lab.end_time) + '</div></div>'
+          + '<div><div class="lbl">판수 · 생산 · 불량</div><div class="val">' + num(lab.shots) + '판 · ' + num(lab.production_qty) + '개' + (lab.defect_qty ? ' · 불량 ' + num(lab.defect_qty) : '') + '</div></div></div>';
+        s += '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">';
+        if (c.mold && c.mold.length) {
+          var m = c.mold[0];
+          s += '<span class="tag ok">성형 일지 일치</span><span style="font-size:12px;color:#4b5563;">' + esc(m.team || '') + ' ' + esc(m.shift_type || '') + ' · ' + esc(m.worker_name || '') + ' · ' + tm(m.start_time) + '~' + tm(m.end_time) + ' · 생산 ' + num(m.production_qty) + ' · Shot ' + num(m.shot_count) + (c.mold.length > 1 ? ' (외 ' + (c.mold.length - 1) + '행)' : '') + '</span>';
+          s += '<a class="btn" href="data_viewer.html">데이터 조회에서 보기</a>';
+        } else s += '<span class="tag warn">성형 일지 없음</span><span style="font-size:12px;color:#6b7280;">같은 날짜·호기·사번의 성형 작업일지가 없어요 (미제출 또는 호기 표기 불일치)</span>';
+        s += '<span class="tag gray">발행내역 업로드 ' + fmtKst(lab.uploaded_at) + '</span></div>';
+        return s;
+      })());
+
+      // 혼련 배치 / 구매 재료
+      h += stage('', '혼련 배치', (function() {
+        if (!lab) return '<div class="miss">성형 발행내역이 있어야 배치를 알 수 있어요.</div>';
+        var b = lab.batch_no;
+        if (!b) return '<div class="miss">발행내역에 BatchNo 가 비어 있어요.</div>';
+        var s = '';
+        if (/^I/i.test(b)) {
+          s += '<div style="font-size:12.5px;margin-bottom:6px;"><span class="tag blue">구매 재료 직접 투입</span> BatchNo 가 입고 LOT(<b>' + esc(b) + '</b>)라 혼련 없이 바로 성형된 건이에요.</div>' + receiptBlock(c.batchRows, b);
+        } else {
+          var rows = c.batchRows || [];
+          s += '<div class="kv"><div><div class="lbl">Batch No</div><div class="val">' + esc(b) + '</div></div>';
+          if (rows.length) {
+            var r0 = rows[0];
+            s += '<div><div class="lbl">혼련 일지</div><div class="val">' + esc(r0.work_date) + ' · ' + esc(r0.material_name || '-') + (r0.is_remix ? ' · 재혼련' : '') + '</div></div><div><div class="lbl">작업자 · 중량</div><div class="val">' + esc(r0.worker_name || '-') + ' · ' + num(r0.weight) + 'kg' + (rows.length > 1 ? ' (제품 ' + rows.length + '건)' : '') + '</div></div>';
+          } else s += '<div style="grid-column:span 2"><span class="tag warn">혼련 일지 없음</span> <span style="font-size:12px;color:#6b7280;">이 배치번호의 혼련 작업일지를 찾지 못했어요</span></div>';
+          s += '<div><div class="lbl">같은 배치에서 나온 성형 LOT</div><div class="val">' + c.batchLabelCount + '개 <a href="#" onclick="go(\'' + esc(b) + '\');return false;">정추적으로 보기</a></div></div></div>';
+        }
+        return s;
+      })());
+
+      // 인서트
+      if (lab && lab.insert_lot) h += stage('', '인서트 부자재', receiptBlock(c.insertRow, lab.insert_lot));
+
+      // 원자재
+      h += stage('gray', '원자재 입고', (function() {
+        if (lab && /^I/i.test(lab.batch_no || '')) return '<div style="font-size:12.5px;color:#4b5563;">위 구매 재료 입고 정보가 원자재 단계예요.</div>';
+        return '<div class="miss"><span class="tag gray">미연결</span> 혼련 배치에 투입된 원자재 LOT 은 <b>혼련 일지 재료 LOT 선택(2단계)</b> 도입 후 기록된 배치부터 표시돼요.</div>';
+      })(), true);
+
+      h += '</div>';
+      document.getElementById('result').innerHTML = h;
+    }
+    function receiptBlock(r, lotId) {
+      if (!r) return '<div class="miss"><span class="tag warn">입고 내역 없음</span> <b>' + esc(lotId) + '</b> — 원자재 입고 내역 업로드 범위에 없어요. (해당 입고일 파일을 올리면 채워짐)</div>';
+      return '<div class="kv"><div><div class="lbl">입고 LOT</div><div class="val">' + esc(r.lot_id) + '</div></div><div><div class="lbl">거래처 · 입고일</div><div class="val">' + esc(r.supplier || '-') + ' · ' + esc(r.received_date) + '</div></div>'
+        + '<div><div class="lbl">품명 · 수량</div><div class="val">' + esc(r.item_name || '-') + ' · ' + num(r.quantity) + ' ' + esc(r.unit || '') + '</div></div><div><div class="lbl">제조일 · 창고</div><div class="val">' + esc(r.mfg_date || '미입력') + ' · ' + esc(r.warehouse || '-') + '</div></div></div>'
+        + '<div style="margin-top:6px;"><a href="#" class="btn" onclick="go(\'' + esc(r.lot_id) + '\');return false;">이 입고 LOT 정추적</a></div>';
+    }
+    function stage(kind, title, body, last) {
+      return '<div class="stage"><div class="rail"><div class="dot ' + kind + '"></div><div class="stg ' + kind + '">' + esc(title) + '</div>' + (last ? '' : '<div class="line"></div>') + '</div><div class="sbody">' + body + '</div></div>';
+    }
+
+    // ───────── 정추적: 배치/입고 LOT → 제품 ─────────
+    function traceForward(X, type) {
+      showLoading('정추적 중...');
+      var ctx = { X: X, type: type };
+      var head = type === 'batch'
+        ? supabase.from('cmb_reports').select('id, work_date, worker_id, worker_name, material_name, weight, lot_no, is_remix').eq('lot_no', X)
+        : supabase.from('material_receipts').select('*').eq('lot_id', X).maybeSingle();
+      var labelsQ = type === 'batch'
+        ? supabase.from('lot_labels').select('*').eq('batch_no', X).order('work_date').order('start_time')
+        : supabase.from('lot_labels').select('*').or('batch_no.eq.' + X + ',insert_lot.eq.' + X).order('work_date').order('start_time');
+      var batchesQ = type === 'receipt' ? supabase.from('cmb_reports').select('id, work_date, material_name, lot_no').eq('lot_no', 'x-none') : Promise.resolve({ data: [] });   // 2단계: 혼련 일지 재료 LOT → 배치
+      Promise.all([head, labelsQ, batchesQ]).then(function(res) {
+        if (res[0].error) throw new Error(res[0].error.message);
+        if (res[1].error) throw new Error(res[1].error.message);
+        ctx.head = res[0].data; ctx.labels = res[1].data || [];
+        var Ls = ctx.labels.map(function(l) { return l.label; });
+        if (!Ls.length) return [];
+        var minDate = ctx.labels[0].work_date;
+        return Promise.all([
+          inChunks(Ls, 100, function(ch) { return supabase.from('sasang_reports').select('lot_no, work_date, deleted_at').in('lot_no', ch); }),
+          inChunks(Ls, 100, function(ch) { return supabase.from('assembly_reports').select('lot_no, work_date, deleted_at').in('lot_no', ch); }),
+          inChunks(Ls, 100, function(ch) { return supabase.from('shot_reports').select('lot_no, work_date, deleted_at').in('lot_no', ch); }),
+          packagingByLots(Ls, minDate),
+          inChunks(Ls, 25, function(ch) { return supabase.from('inventory_lots').select('*').or(ch.map(function(l) { return 'lot_no.ilike.%' + l + '%'; }).join(',')); }),
+          inChunks(Ls, 25, function(ch) { return supabase.from('inventory_movements').select('*').eq('movement_type', 'outbound').or(ch.map(function(l) { return 'lot_no.ilike.%' + l + '%'; }).join(',')); })
+        ]);
+      }).then(function(res) {
+        ctx.by = {};
+        ctx.labels.forEach(function(l) { ctx.by[l.label] = { lab: l, sasang: null, assembly: null, shot: null, pack: null, inv: [], ship: [] }; });
+        if (res.length) {
+          alive(res[0]).forEach(function(r) { if (ctx.by[r.lot_no]) ctx.by[r.lot_no].sasang = r.work_date; });
+          alive(res[1]).forEach(function(r) { if (ctx.by[r.lot_no]) ctx.by[r.lot_no].assembly = r.work_date; });
+          alive(res[2]).forEach(function(r) { if (ctx.by[r.lot_no]) ctx.by[r.lot_no].shot = r.work_date; });
+          alive(res[3].data).forEach(function(p) { (p.lot_nos || []).forEach(function(l) { if (ctx.by[l] && !ctx.by[l].pack) ctx.by[l].pack = p; }); });
+          res[4].forEach(function(l) { splitLots(l.lot_no).forEach(function(x) { if (ctx.by[x]) ctx.by[x].inv.push(l); }); });
+          res[5].forEach(function(m) { splitLots(m.lot_no).forEach(function(x) { if (ctx.by[x]) ctx.by[x].ship.push(m); }); });
+        }
+        hideLoading(); renderForward(ctx);
+      }).catch(function(e) { hideLoading(); showToast(e.message || String(e)); console.error(e); });
+    }
+
+    function renderForward(c) {
+      var X = c.X, h = '';
+      var labs = c.labels, n = labs.length;
+      var prodTotal = labs.reduce(function(s, l) { return s + (l.production_qty || 0); }, 0);
+      var st = { inproc: 0, inprocQty: 0, stock: 0, stockQty: 0, shipped: 0, shipQty: 0, packedOnly: 0 };
+      labs.forEach(function(l) {
+        var b = c.by[l.label];
+        var live = b.inv.filter(function(x) { return x.status !== 'shipped' && (x.quantity || 0) > 0; });
+        if (live.length) { st.stock++; st.stockQty += live.reduce(function(s, x) { return s + (x.quantity || 0); }, 0); }
+        if (b.ship.length) { st.shipped++; st.shipQty += b.ship.reduce(function(s, x) { return s + (x.quantity || 0); }, 0); }
+        if (!b.pack) { st.inproc++; st.inprocQty += (l.production_qty || 0); }
+        else if (!b.inv.length && !b.ship.length) st.packedOnly++;
+      });
+      // 머리
+      var headHtml;
+      if (c.type === 'batch') {
+        var rows = c.head || [];
+        headHtml = '<div class="lbl">검색 LOT</div><div style="font-size:20px;font-weight:700;letter-spacing:.03em;">' + esc(X) + '</div>'
+          + (rows.length ? '<div class="lbl" style="margin-top:2px;">혼련 배치 · ' + esc(rows[0].work_date) + ' · ' + esc(rows[0].material_name || '-') + ' · ' + esc(rows[0].worker_name || '-') + ' · ' + num(rows[0].weight) + 'kg' + (rows.length > 1 ? ' · 제품 ' + rows.length + '건' : '') + '</div>'
+                        : '<div class="lbl" style="margin-top:2px;"><span class="tag warn">혼련 일지 없음</span> 이 배치번호의 혼련 작업일지를 찾지 못했어요</div>')
+          + '<div style="margin-top:10px;font-size:12.5px;"><span class="lbl">투입 재료 LOT</span> <span class="tag gray">미연결 (2단계 이후 표시)</span></div>';
+      } else {
+        var r = c.head;
+        headHtml = '<div class="lbl">검색 LOT</div><div style="font-size:20px;font-weight:700;letter-spacing:.03em;">' + esc(X) + '</div>'
+          + (r ? '<div class="lbl" style="margin-top:2px;">입고 LOT · ' + esc(r.received_date) + ' · ' + esc(r.supplier || '-') + ' · ' + esc(r.item_name || '-') + ' · ' + num(r.quantity) + ' ' + esc(r.unit || '') + (r.mfg_date ? ' · 제조 ' + esc(r.mfg_date) : '') + '</div>'
+                 : '<div class="lbl" style="margin-top:2px;"><span class="tag warn">입고 내역 없음</span> 업로드 범위에 없는 입고 LOT 이에요</div>')
+          + '<div style="margin-top:10px;font-size:12.5px;color:#6b7280;">아래는 이 입고 LOT 이 <b>BatchNo 또는 InsertNo 로 직접 쓰인 성형 LOT</b> 이에요. 혼련을 거친 경우는 2단계(혼련 일지 재료 LOT) 이후 이어집니다.</div>';
+      }
+      h += '<div class="lt-card" style="display:grid;grid-template-columns:280px minmax(0,1fr);gap:18px;">'
+        + '<div>' + headHtml + '</div>'
+        + '<div style="border-left:1px solid #e5e7eb;padding-left:18px;"><div style="font-size:13px;font-weight:700;margin-bottom:8px;">회수 범위 요약 <span style="font-weight:400;color:#6b7280;font-size:12px;">— 이 LOT 이 어디까지 퍼졌나</span></div>'
+        + '<div class="fw-sum">'
+        + '<div class="c" style="background:#eef2ff"><div class="lbl">성형 LOT</div><div class="n" style="color:#243bb2">' + n + '</div><div class="lbl">' + num(prodTotal) + '개 생산</div></div>'
+        + '<div class="c" style="background:#fef3c7"><div class="lbl">공정 진행 중</div><div class="n" style="color:#92400e">' + st.inproc + '</div><div class="lbl">포장 전 ' + num(st.inprocQty) + '개</div></div>'
+        + '<div class="c" style="background:#dcfce7"><div class="lbl">재고 보유</div><div class="n" style="color:#166534">' + st.stock + '</div><div class="lbl">잔량 ' + num(st.stockQty) + '개</div></div>'
+        + '<div class="c" style="background:#fee2e2"><div class="lbl">출하 완료</div><div class="n" style="color:#991b1b">' + st.shipped + '</div><div class="lbl">' + num(st.shipQty) + '개</div></div>'
+        + '<div class="c" style="background:#f3f4f6"><div class="lbl">포장 후 재고 미등록</div><div class="n" style="color:#374151">' + st.packedOnly + '</div><div class="lbl">11/10 이전 포장분 등</div></div>'
+        + '</div></div></div>';
+
+      h += '<div class="lt-card"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;"><h2 style="margin:0;font-size:15px;">성형 LOT별 현재 상태</h2>'
+        + '<button class="btn no-print" style="margin-left:auto" onclick="window.print()">회수 대상 목록 인쇄</button></div>';
+      if (!n) h += '<div class="empty-msg">이 LOT 을 BatchNo/InsertNo 로 쓴 성형 라벨 발행 내역이 없어요. (업로드 범위를 확인해 주세요)</div>';
+      else {
+        h += '<div class="data-table-wrap"><table class="data-table"><thead><tr><th>성형 LOT</th><th>일자</th><th>호기·면</th><th>사번</th><th class="num">생산</th><th>사상</th><th>조립</th><th>쇼트</th><th>포장</th><th>재고 LOT · 위치</th><th class="num">잔량</th><th>출하</th></tr></thead><tbody>';
+        labs.forEach(function(l) {
+          var b = c.by[l.label];
+          var live = b.inv.filter(function(x) { return x.status !== 'shipped' && (x.quantity || 0) > 0; });
+          var rowBg = (!b.pack) ? ' style="background:#fffbeb"' : '';
+          h += '<tr' + rowBg + '><td><a href="#" onclick="go(\'' + esc(l.label) + '\');return false;"><b>' + esc(l.label) + '</b></a></td><td>' + esc(md(l.work_date)) + '</td><td>' + esc((l.equipment_no || l.equip_raw || '-') + ' ' + (l.face || '')) + '</td><td>' + esc(l.sabun || '-') + '</td><td class="num">' + num(l.production_qty) + '</td>'
+            + '<td>' + chk(b.sasang) + '</td><td>' + chk(b.assembly) + '</td><td>' + chk(b.shot) + '</td>'
+            + '<td>' + (b.pack ? esc(md(b.pack.work_date)) + ' #' + b.pack.id : '<span class="tag warn">대기</span>') + '</td>'
+            + '<td>' + (live.length ? live.map(function(x) { return '#' + x.id + ' · ' + esc(locLabel(x)); }).join('<br>') : (b.ship.length ? '<span style="color:#6b7280">출하됨</span>' : (b.pack ? '<span style="color:#9ca3af">재고 미등록</span>' : '<span style="color:#9ca3af">공정 중</span>'))) + '</td>'
+            + '<td class="num">' + (live.length ? num(live.reduce(function(s, x) { return s + (x.quantity || 0); }, 0)) : (b.pack || b.ship.length ? '0' : num(l.production_qty))) + '</td>'
+            + '<td>' + (b.ship.length ? b.ship.map(function(m) { return '<span class="tag red">' + esc(md(fmtKst(m.moved_at))) + ' 출하 ' + num(m.quantity) + '</span>'; }).join(' ') : '<span style="color:#6b7280">—</span>') + '</td></tr>';
+        });
+        h += '</tbody></table></div><div style="margin-top:8px;font-size:12px;color:#6b7280;">✓ = 해당 공정 일지에 이 LOT 이 기록됨 · 노란 줄 = 아직 포장 전 · 잔량은 재고 LOT 기준(여러 성형 LOT 이 한 재고 LOT 에 묶이면 같은 잔량이 표시됨)</div>';
+      }
+      h += '</div>';
+      document.getElementById('result').innerHTML = h;
+    }
+
+    // ───────── 공통 ─────────
+    function packagingByLots(Ls, minDate) {
+      var q = supabase.from('packaging_reports').select('id, work_date, worker_id, worker_name, lot_nos, quantity, created_by_name, deleted_at');
+      if (Ls.length === 1) q = PACK_LOTS_JSONB ? q.contains('lot_nos', JSON.stringify([Ls[0]])) : q.contains('lot_nos', [Ls[0]]);
+      else q = q.gte('work_date', minDate || '2026-01-01').limit(5000);
+      return q;
+    }
+    function inChunks(arr, size, fn) {
+      var chunks = []; for (var i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+      return Promise.all(chunks.map(function(ch) { return fn(ch).then(function(r) { if (r.error) console.warn(r.error); return r.data || []; }); }))
+        .then(function(parts) { return [].concat.apply([], parts); });
+    }
+    function alive(rows) { return (rows || []).filter(function(r) { return !r.deleted_at; }); }
+    function splitLots(s) { return String(s || '').split(',').map(function(x) { return x.trim().toUpperCase(); }).filter(Boolean); }
+    function eqKey(e) { var m = String(e || '').match(/([AB]).*?(\d{1,2})/i); return m ? m[1].toUpperCase() + ('0' + parseInt(m[2], 10)).slice(-2) : String(e || '').replace(/\s+/g, '').toLowerCase(); }
+    function locLabel(l) {
+      if (l.status === 'waiting') return '입고대기';
+      if (l.location_type === 'zone') { var z = zones[l.zone_id]; return z ? ((z.zone_name || z.zone_code || '') + ' ' + (z.lane_name || (z.lane_no ? z.lane_no + '라인' : ''))).trim() + ' (대차장)' : '대차장'; }
+      var r = racks[l.rack_id]; return (r ? r.rack_name : '') + (l.slot_code ? ' ' + l.slot_code : '') + (r || l.slot_code ? ' (적재대)' : (l.status === 'shipped' ? '출하됨' : '-'));
+    }
+    function statusKo(s) { return { waiting: '입고대기', stocked: '재고', shipped: '출하완료' }[s] || s || '-'; }
+    function chk(d) { return d ? '<span style="color:#166534">' + esc(md(d)) + ' ✓</span>' : '<span style="color:#9ca3af">—</span>'; }
+    function md(d) { return d ? String(d).slice(5, 10).replace('-', '/') : ''; }
+    function tm(t) { return t ? String(t).slice(0, 5) : '-'; }
+    function num(v) { return v == null ? '-' : Number(v).toLocaleString(); }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function fmtKst(iso, withTime) {
+      if (!iso) return '-'; var d = new Date(iso); var p = function(n) { return ('0' + n).slice(-2); };
+      var s = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+      return withTime ? s + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) : s;
+    }
+    function showToast(msg) { var t = document.getElementById('toastMsg'); t.textContent = msg; t.className = 'toast-msg show'; setTimeout(function() { t.className = 'toast-msg'; }, 3500); }
+    function showLoading(text) { document.getElementById('loadingText').textContent = text || '조회 중...'; document.getElementById('loadingOverlay').className = 'loading-overlay show'; }
+    function hideLoading() { document.getElementById('loadingOverlay').className = 'loading-overlay'; }
+  </script>
+  <script src="sidebar.js"></script>
+</body>
+</html>

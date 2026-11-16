@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://vpaixxlhzkwtgcllimvn.supabase.co; connect-src 'self' https://vpaixxlhzkwtgcllimvn.supabase.co wss://vpaixxlhzkwtgcllimvn.supabase.co; worker-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'"><!-- 2026-11-16 CSP -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MES 자료 업로드 - 업무포탈</title>
+  <link rel="stylesheet" href="sidebar.css">
+  <link rel="stylesheet" href="common.css">
+  <script src="vendor/xlsx-0.18.5.full.min.js"></script>
+  <style>
+    /* 2026-11-16 LOT 추적 1단계: 기존 MES 엑셀(성형 라벨 발행 내역 · 원자재 입고 내역) 업로드 */
+    .lu-container { padding: 16px 20px; }
+    .io-tabs { display: flex; gap: 0; margin-bottom: 18px; border-bottom: 3px solid #eee; }
+    .io-tab { padding: 12px 22px; font-size: 14px; font-weight: 600; color: #999; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -3px; }
+    .io-tab:hover { color: #555; }
+    .io-tab.active { color: #243bb2; border-bottom-color: #243bb2; }
+    .lu-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+    @media (max-width: 1000px) { .lu-grid { grid-template-columns: 1fr; } }
+    .lu-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px 18px; }
+    .lu-drop { border: 2px dashed #c7d2fe; border-radius: 10px; background: #f8faff; padding: 24px 16px; text-align: center; cursor: pointer; }
+    .lu-drop.over { background: #eef2ff; border-color: #243bb2; }
+    .lu-drop b { color: #243bb2; font-size: 14px; }
+    .lu-drop .hint { font-size: 12px; color: #6b7280; margin-top: 4px; }
+    .lu-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+    .lu-stat { padding: 9px 11px; border-radius: 8px; background: #f3f4f6; }
+    .lu-stat .l { font-size: 11px; color: #6b7280; }
+    .lu-stat .n { font-size: 18px; font-weight: 700; }
+    .lu-stat.new { background: #dcfce7; } .lu-stat.new .n { color: #166534; }
+    .lu-stat.warn { background: #fef3c7; } .lu-stat.warn .n { color: #92400e; }
+    .lu-stat.err { background: #fee2e2; } .lu-stat.err .n { color: #991b1b; }
+    .data-table-wrap { overflow-x: auto; max-height: 520px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .data-table th { background: #f8fafc; color: #475569; font-weight: 600; text-align: left; padding: 7px 10px; border-bottom: 1px solid #e5e7eb; white-space: nowrap; position: sticky; top: 0; }
+    .data-table td { padding: 6px 10px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
+    .data-table tr.skip td { color: #9ca3af; }
+    .tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+    .tag.ok { background: #dcfce7; color: #166534; } .tag.warn { background: #fef3c7; color: #92400e; } .tag.gray { background: #f3f4f6; color: #6b7280; } .tag.err { background: #fee2e2; color: #991b1b; }
+    .lu-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+    .btn-primary { padding: 10px 20px; border: none; border-radius: 8px; background: #243bb2; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; }
+    .btn-primary:disabled { background: #aaa; cursor: not-allowed; }
+    .btn-secondary { padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #374151; font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; }
+    .lu-kv { font-size: 12.5px; line-height: 1.8; color: #4b5563; }
+    .lu-kv b { color: #1f2937; }
+    .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 9000; align-items: center; justify-content: center; }
+    .loading-overlay.show { display: flex; }
+    .loading-box { background: #fff; padding: 22px 28px; border-radius: 10px; font-size: 14px; font-weight: 600; }
+    .toast-msg { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1f2937; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 9100; white-space: pre-line; }
+    .toast-msg.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="top-header" class="top-header"></div>
+  <nav id="sidebar-nav" class="sidebar"></nav>
+
+  <div class="main">
+    <div class="page-header">
+      <h1 class="page-title">MES 자료 업로드</h1>
+      <p class="page-desc">기존 MES 에서 내려받은 성형 라벨 발행 내역 · 원자재 입고 내역을 LOT 추적용으로 등록 (하루 1회, 최근 며칠치를 그대로 올려도 중복 없음)</p>
+    </div>
+
+    <div class="lu-container">
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+        <a href="lot_trace.html" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#243bb2;color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">&#128269; LOT 추적으로</a>
+      </div>
+
+      <div class="io-tabs">
+        <div class="io-tab active" id="tabLabels" onclick="switchKind('labels')">성형 라벨 발행 내역</div>
+        <div class="io-tab" id="tabReceipts" onclick="switchKind('receipts')">원자재 입고 내역</div>
+        <div class="io-tab" id="tabHistory" onclick="switchKind('history')">업로드 이력</div>
+      </div>
+
+      <div id="uploadPane" class="lu-grid">
+        <div class="lu-card">
+          <div class="lu-drop" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <b id="dropTitle">기존 MES 에서 내려받은 엑셀을 여기에 끌어다 놓거나 클릭해서 선택</b>
+            <div class="hint" id="dropHint">.xlsm / .xlsx · 열 이름으로 자동 인식 (열 순서가 바뀌어도 됨)</div>
+            <input type="file" id="fileInput" accept=".xlsx,.xlsm,.xls" style="display:none">
+          </div>
+          <div id="previewBox" style="display:none;">
+            <div style="font-size:13px;font-weight:700;margin-top:14px;" id="previewTitle"></div>
+            <div class="lu-stats" id="statBox"></div>
+            <div class="data-table-wrap"><table class="data-table"><thead id="previewHead"></thead><tbody id="previewBody"></tbody></table></div>
+            <div class="lu-actions">
+              <button class="btn-primary" id="btnCommit" onclick="commitUpload()">등록</button>
+              <button class="btn-secondary" onclick="resetUpload()">취소</button>
+              <span id="commitHint" style="font-size:12px;color:#6b7280;"></span>
+            </div>
+          </div>
+        </div>
+        <div class="lu-card">
+          <div style="font-size:13px;font-weight:700;margin-bottom:6px;">열 인식 결과</div>
+          <div class="lu-kv" id="colBox">파일을 올리면 어떤 열을 어떻게 읽었는지 여기에 표시돼요.</div>
+          <div style="border-top:1px solid #e5e7eb;margin-top:12px;padding-top:10px;">
+            <div style="font-size:13px;font-weight:700;margin-bottom:4px;">최근 업로드</div>
+            <div class="lu-kv" id="recentBox">-</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="historyPane" style="display:none;" class="lu-card">
+        <div class="data-table-wrap" style="max-height:none;"><table class="data-table">
+          <thead><tr><th>일시</th><th>종류</th><th>파일</th><th style="text-align:right">읽음</th><th style="text-align:right">신규</th><th style="text-align:right">건너뜀</th><th>자료 기간</th><th>업로더</th></tr></thead>
+          <tbody id="historyBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loadingOverlay"><div class="loading-box" id="loadingText">처리 중...</div></div>
+  <div class="toast-msg" id="toastMsg"></div>
+
+  <script src="vendor/supabase-2.119.0.js"></script>
+  <script src="auth_guard.js"></script>
+  <script>
+    var SUPABASE_URL = 'https://vpaixxlhzkwtgcllimvn.supabase.co';
+    var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwYWl4eGxoemt3dGdjbGxpbXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNzk4NjMsImV4cCI6MjA5MTk1NTg2M30.V8Bj0cMbM0E2TFhklYYa7TM-vO6Fi70ctACA7uUf4Ig';
+    var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    var kind = 'labels';          // labels | receipts | history
+    var parsed = null;            // { rows:[], stats:{}, cols:{}, fileName }
+    var ME = (function(){ try { return JSON.parse(sessionStorage.getItem('userInfo') || '{}'); } catch(e){ return {}; } })();
+
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof checkAuth === 'function') { checkAuth(); }
+      var fi = document.getElementById('fileInput');
+      fi.addEventListener('change', function(e) { if (e.target.files[0]) handleFile(e.target.files[0]); fi.value = ''; });
+      var dz = document.getElementById('dropZone');
+      dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('over'); });
+      dz.addEventListener('dragleave', function() { dz.classList.remove('over'); });
+      dz.addEventListener('drop', function(e) { e.preventDefault(); dz.classList.remove('over'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+      loadRecent();
+    });
+
+    function switchKind(k) {
+      kind = k; resetUpload();
+      ['Labels', 'Receipts', 'History'].forEach(function(n) { document.getElementById('tab' + n).className = 'io-tab' + (k === n.toLowerCase() ? ' active' : ''); });
+      document.getElementById('uploadPane').style.display = (k === 'history') ? 'none' : '';
+      document.getElementById('historyPane').style.display = (k === 'history') ? '' : 'none';
+      document.getElementById('dropTitle').textContent = (k === 'labels' ? '성형 라벨 발행 내역' : '원자재 입고 내역') + ' 엑셀을 여기에 끌어다 놓거나 클릭해서 선택';
+      document.getElementById('dropHint').textContent = k === 'labels'
+        ? '.xlsm / .xlsx · 열 이름(라벨·일자·호기·사번·BatchNo…)으로 자동 인식 · PL(작업지시) 행과 소계 행은 자동 제외'
+        : '.xlsm / .xlsx · 열 이름(LotID·입고일자·거래처·사번·품명·입고수량…)으로 자동 인식';
+      if (k === 'history') loadHistory(); else loadRecent();
+    }
+
+    // ───────── 공통 파서 ─────────
+    function norm(s) { return String(s == null ? '' : s).replace(/\s+/g, '').toLowerCase(); }
+    function findHeaderRow(aoa, mustHave) {
+      for (var i = 0; i < Math.min(aoa.length, 15); i++) {
+        var cells = (aoa[i] || []).map(norm);
+        if (mustHave.every(function(k) { return cells.indexOf(norm(k)) >= 0; })) return i;
+      }
+      return -1;
+    }
+    function colIndex(headerCells, names) {   // 후보 이름 중 처음 맞는 열 번호
+      var hc = headerCells.map(norm);
+      for (var i = 0; i < names.length; i++) { var j = hc.indexOf(norm(names[i])); if (j >= 0) return j; }
+      return -1;
+    }
+    function colLike(headerCells, substr) {
+      var hc = headerCells.map(norm);
+      for (var j = 0; j < hc.length; j++) if (hc[j].indexOf(norm(substr)) >= 0) return j;
+      return -1;
+    }
+    function parseDate(v) {   // '26-11-02' | '2026-11-02' | '2026.11.02' | Date | 엑셀 일련번호
+      if (v == null || v === '') return null;
+      if (v instanceof Date) return !isNaN(v) ? fmtD(v) : null;
+      if (typeof v === 'number') { var d = XLSX.SSF.parse_date_code(v); return d ? pad4(d.y) + '-' + p2(d.m) + '-' + p2(d.d) : null; }
+      var s = String(v).trim(); var m = s.match(/^(\d{2}|\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
+      if (!m) return null;
+      var y = m[1].length === 2 ? 2000 + parseInt(m[1], 10) : parseInt(m[1], 10);
+      return y + '-' + p2(m[2]) + '-' + p2(m[3]);
+    }
+    function parseTime(v) {   // '8:05:59' | Date | 엑셀 시간 분수 → 'HH:MM:SS'
+      if (v == null || v === '') return null;
+      if (v instanceof Date) return !isNaN(v) ? p2(v.getHours()) + ':' + p2(v.getMinutes()) + ':' + p2(v.getSeconds()) : null;
+      if (typeof v === 'number') { var t = XLSX.SSF.parse_date_code(v); return t ? p2(t.H) + ':' + p2(t.M) + ':' + p2(Math.floor(t.S)) : null; }
+      var m = String(v).trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+      return m ? p2(m[1]) + ':' + m[2] + ':' + (m[3] || '00') : null;
+    }
+    function parseInt0(v) { if (v == null || v === '') return null; var n = parseInt(String(v).replace(/[^\d-]/g, ''), 10); return isNaN(n) ? null : n; }
+    function parseNum(v) { if (v == null || v === '') return null; var n = parseFloat(String(v).replace(/[^\d.-]/g, '')); return isNaN(n) ? null : n; }
+    function p2(n) { return ('0' + n).slice(-2); } function pad4(n) { return ('000' + n).slice(-4); }
+    function fmtD(d) { return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); }
+    function str(v) { return v == null ? null : String(v).trim() || null; }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+    // 기존 MES 호기 표기 'A01-가' → 우리 표기 'A반-01호기' + '가면'
+    function mapEquip(raw) {
+      var m = String(raw || '').trim().match(/^([AB])\s*(\d{1,2})\s*-?\s*([가나다])?/i);
+      if (!m) return { equipment_no: null, face: null };
+      return { equipment_no: m[1].toUpperCase() + '반-' + p2(parseInt(m[2], 10)) + '호기', face: m[3] ? m[3] + '면' : null };
+    }
+
+    function readWorkbook(file, cb) {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
+          cb(null, wb);
+        } catch (err) { cb(err); }
+      };
+      reader.onerror = function() { cb(new Error('파일을 읽을 수 없어요')); };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function handleFile(file) {
+      showLoading('파일 읽는 중...');
+      readWorkbook(file, function(err, wb) {
+        if (err) { hideLoading(); showToast('엑셀 읽기 실패: ' + err.message); return; }
+        try {
+          var res = (kind === 'labels') ? parseLabels(wb) : parseReceipts(wb);
+          res.fileName = file.name;
+          checkExisting(res);
+        } catch (e2) { hideLoading(); showToast('해석 실패: ' + e2.message); console.error(e2); }
+      });
+    }
+
+    // ───────── ① 성형 라벨 발행 내역 ─────────
+    function parseLabels(wb) {
+      var ws = wb.Sheets[wb.SheetNames.indexOf('dgdMain') >= 0 ? 'dgdMain' : wb.SheetNames[0]];
+      var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+      var hr = findHeaderRow(aoa, ['라벨', '일자', '호기', '사번']);
+      if (hr < 0) throw new Error('헤더(라벨·일자·호기·사번)를 찾지 못했어요. 성형 라벨 발행 내역 파일이 맞는지 확인해 주세요.');
+      var H = aoa[hr];
+      var C = {
+        label: colIndex(H, ['라벨']), date: colIndex(H, ['일자']), equip: colIndex(H, ['호기']), sabun: colIndex(H, ['사번']),
+        mold: colIndex(H, ['금형']), material: colIndex(H, ['사내재질명', '재질명']), batch: colIndex(H, ['BatchNo', 'Batch No', '배치번호']),
+        insert: colIndex(H, ['InsertNo', 'Insert No']), worker: colIndex(H, ['성형작업', '작업자']),
+        start: colIndex(H, ['작업시작']), end: colIndex(H, ['작업종료']), shots: colIndex(H, ['판수']),
+        prod: colIndex(H, ['생산']), def: colIndex(H, ['불량']), mfg: colLike(H, '제조일')
+      };
+      var rows = [], stats = { read: 0, subtotal: 0, pl: 0, bad: 0 };
+      for (var i = hr + 1; i < aoa.length; i++) {
+        var r = aoa[i]; if (!r || r.every(function(v) { return v == null || v === ''; })) continue;
+        stats.read++;
+        var label = str(r[C.label]);
+        var mat = str(r[C.material]) || '';
+        if (!label) { if (/▶|계\]/.test(mat)) stats.subtotal++; else stats.bad++; continue; }
+        if (/^PL/i.test(label)) { stats.pl++; rows.push({ _skip: 'PL', label: label, work_date: parseDate(r[C.date]), equip_raw: str(r[C.equip]), sabun: str(r[C.sabun]) }); continue; }
+        var wd = parseDate(r[C.date]);
+        if (!wd) { stats.bad++; rows.push({ _skip: 'BAD', label: label, equip_raw: str(r[C.equip]), sabun: str(r[C.sabun]) }); continue; }
+        var eq = mapEquip(r[C.equip]);
+        var rawObj = {}; H.forEach(function(h, j) { if (h != null && h !== '') rawObj[String(h)] = (r[j] instanceof Date) ? r[j].toISOString() : r[j]; });
+        rows.push({
+          label: label, work_date: wd, equip_raw: str(r[C.equip]), equipment_no: eq.equipment_no, face: eq.face,
+          sabun: str(r[C.sabun]), mold_no: str(r[C.mold]), material_code: mat || null,
+          batch_no: str(r[C.batch]), insert_lot: str(r[C.insert]), worker: str(r[C.worker]),
+          start_time: parseTime(r[C.start]), end_time: parseTime(r[C.end]),
+          shots: parseInt0(r[C.shots]), production_qty: parseInt0(r[C.prod]), defect_qty: parseInt0(r[C.def]),
+          mfg_date: C.mfg >= 0 ? parseDate(r[C.mfg]) : null,
+          raw: rawObj, uploaded_by: ME.name || null
+        });
+      }
+      var colInfo = [
+        ['라벨', '→ 성형 LOT (필수)', C.label >= 0], ['일자 · 호기 · 사번', '→ 성형 일지 매칭 키', C.date >= 0 && C.equip >= 0 && C.sabun >= 0],
+        ['BatchNo', '→ 혼련 배치(M) / 입고 LOT(I)', C.batch >= 0], ['InsertNo', '→ 인서트 입고 LOT', C.insert >= 0],
+        ['금형 · 사내재질명', '→ 참고 정보', C.mold >= 0], ['작업시작·종료 · 판수 · 생산 · 불량', '→ 일지 수량 대조용', C.start >= 0],
+        ['제조일자', C.mfg >= 0 ? '→ 인식됨' : '열 없음 · 생기면 자동', true]
+      ];
+      return { kind: 'labels', rows: rows, stats: stats, colInfo: colInfo };
+    }
+
+    // ───────── ② 원자재 입고 내역 ─────────
+    function parseReceipts(wb) {
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+      var hr = findHeaderRow(aoa, ['LotID', '입고일자', '거래처']);
+      if (hr < 0) throw new Error('헤더(LotID·입고일자·거래처)를 찾지 못했어요. 입고 내역 파일이 맞는지 확인해 주세요.');
+      var H = aoa[hr];
+      var C = {
+        lot: colIndex(H, ['LotID', 'Lot ID', 'LOT']), date: colIndex(H, ['입고일자']), supplier: colIndex(H, ['거래처']), item: colIndex(H, ['사번']),
+        cpn: colIndex(H, ['고객품번']), car: colIndex(H, ['차종']), name: colIndex(H, ['품명']), qty: colIndex(H, ['입고수량']), unit: colLike(H, '단위'),
+        remark: colIndex(H, ['비고']), rtype: colIndex(H, ['입고구분']), wh: colIndex(H, ['입고후창고']), recv: colIndex(H, ['입고처명']),
+        ono: colIndex(H, ['발주번호']), oname: colIndex(H, ['발주명']), rno: colIndex(H, ['입고번호']), mfg: colLike(H, '제조일')
+      };
+      // '입고\n단위' 처럼 줄바꿈 포함 헤더 → 화폐단위와 구분
+      var hc = H.map(norm); for (var j = 0; j < hc.length; j++) if (hc[j] === '입고단위') C.unit = j;
+      var rows = [], stats = { read: 0, subtotal: 0, pl: 0, bad: 0 };
+      for (var i = hr + 1; i < aoa.length; i++) {
+        var r = aoa[i]; if (!r || r.every(function(v) { return v == null || v === ''; })) continue;
+        stats.read++;
+        var lot = str(r[C.lot]);
+        if (!lot) { stats.bad++; continue; }
+        var rd = parseDate(r[C.date]);
+        if (!rd) { stats.bad++; rows.push({ _skip: 'BAD', lot_id: lot, supplier: str(r[C.supplier]), item_name: str(r[C.name]) }); continue; }
+        var itemRaw = str(r[C.item]);
+        var items = itemRaw ? itemRaw.split(/[,\s]+/).map(function(s) { return s.trim(); }).filter(Boolean) : [];
+        var rawObj = {}; H.forEach(function(h, j) { if (h != null && h !== '') rawObj[String(h)] = (r[j] instanceof Date) ? r[j].toISOString() : r[j]; });
+        rows.push({
+          lot_id: lot, received_date: rd, supplier: str(r[C.supplier]), item_code: itemRaw, item_codes: items,
+          customer_part_no: str(r[C.cpn]), car_model: str(r[C.car]), item_name: str(r[C.name]),
+          quantity: parseNum(r[C.qty]), unit: str(r[C.unit]), receipt_type: str(r[C.rtype]), warehouse: str(r[C.wh]), receiver: str(r[C.recv]),
+          order_no: str(r[C.ono]), order_name: str(r[C.oname]), remark: str(r[C.remark]), receipt_no: str(r[C.rno]),
+          mfg_date: C.mfg >= 0 ? parseDate(r[C.mfg]) : null,
+          raw: rawObj, uploaded_by: ME.name || null
+        });
+      }
+      var colInfo = [
+        ['LotID', '→ 입고 LOT (필수)', C.lot >= 0], ['입고일자 · 거래처', '→ 공급사 · 입고일', C.date >= 0 && C.supplier >= 0],
+        ['사번', '→ 쓰이는 제품 (여러 개면 콤마로 분리)', C.item >= 0], ['품명 · 입고수량 · 단위 · 입고후창고', '→ 재료 정보', C.name >= 0 && C.qty >= 0],
+        ['제조일자', C.mfg >= 0 ? '→ 인식됨' : '열 없음 · 생기면 자동', true]
+      ];
+      return { kind: 'receipts', rows: rows, stats: stats, colInfo: colInfo };
+    }
+
+    // ───────── 기존 등록분 확인 + 성형 일지 매칭 → 미리보기 ─────────
+    function checkExisting(res) {
+      var keyCol = res.kind === 'labels' ? 'label' : 'lot_id';
+      var table = res.kind === 'labels' ? 'lot_labels' : 'material_receipts';
+      var keys = res.rows.filter(function(r) { return !r._skip; }).map(function(r) { return r[keyCol]; });
+      var existing = {};
+      var chunks = []; for (var i = 0; i < keys.length; i += 200) chunks.push(keys.slice(i, i + 200));
+      var p = Promise.resolve();
+      chunks.forEach(function(ch) {
+        p = p.then(function() {
+          return supabase.from(table).select(keyCol).in(keyCol, ch).then(function(q) {
+            if (q.error) throw new Error('기존 등록분 조회 실패: ' + q.error.message);
+            (q.data || []).forEach(function(x) { existing[x[keyCol]] = true; });
+          });
+        });
+      });
+      p.then(function() {
+        res.rows.forEach(function(r) { if (!r._skip && existing[r[keyCol]]) r._skip = 'DUP'; });
+        return res.kind === 'labels' ? matchMolding(res) : null;
+      }).then(function() {
+        hideLoading(); parsed = res; renderPreview();
+      }).catch(function(e) { hideLoading(); showToast(e.message || String(e)); console.error(e); });
+    }
+
+    // 성형 일지(molding_reports)와 날짜·호기·사번 매칭 (참고 표시용 — 매칭 안 돼도 등록은 됨)
+    function matchMolding(res) {
+      var live = res.rows.filter(function(r) { return !r._skip; });
+      if (!live.length) return Promise.resolve();
+      var dates = live.map(function(r) { return r.work_date; }).sort();
+      return supabase.from('molding_reports').select('work_date, equipment_no, sabun, work_type')
+        .gte('work_date', dates[0]).lte('work_date', dates[dates.length - 1]).is('deleted_at', null).limit(5000)
+        .then(function(q) {
+          if (q.error) { console.warn('성형 일지 조회 실패', q.error); return; }
+          var set = {};
+          (q.data || []).forEach(function(m) { set[m.work_date + '|' + eqKey(m.equipment_no) + '|' + String(m.sabun || '').trim()] = true; });
+          live.forEach(function(r) { r._match = !!set[r.work_date + '|' + eqKey(r.equipment_no) + '|' + String(r.sabun || '').trim()]; });
+        });
+    }
+    function eqKey(e) { var m = String(e || '').match(/([AB]).*?(\d{1,2})/i); return m ? m[1].toUpperCase() + p2(parseInt(m[2], 10)) : norm(e); }
+
+    function renderPreview() {
+      var res = parsed, rows = res.rows, st = res.stats;
+      var nNew = rows.filter(function(r) { return !r._skip; }).length;
+      var nDup = rows.filter(function(r) { return r._skip === 'DUP'; }).length;
+      document.getElementById('previewBox').style.display = '';
+      document.getElementById('previewTitle').textContent = '업로드 전 검토 — ' + res.fileName;
+      var sb = '<div class="lu-stat"><div class="l">읽은 행</div><div class="n">' + st.read.toLocaleString() + '</div></div>';
+      if (res.kind === 'labels') {
+        sb += '<div class="lu-stat"><div class="l">소계 행 제외</div><div class="n" style="color:#6b7280">' + st.subtotal + '</div></div>';
+        sb += '<div class="lu-stat warn"><div class="l">PL(작업지시) 제외</div><div class="n">' + st.pl + '</div></div>';
+      } else {
+        sb += '<div class="lu-stat' + (st.bad ? ' err' : '') + '"><div class="l">읽기 실패</div><div class="n">' + st.bad + '</div></div>';
+        sb += '<div class="lu-stat"><div class="l">-</div><div class="n">&nbsp;</div></div>';
+      }
+      sb += '<div class="lu-stat"><div class="l">이미 등록됨</div><div class="n" style="color:#6b7280">' + nDup + '</div></div>';
+      sb += '<div class="lu-stat new"><div class="l">새로 등록</div><div class="n">' + nNew + '</div></div>';
+      document.getElementById('statBox').innerHTML = sb;
+
+      var hh, bb = '';
+      var shown = rows.slice(0, 300);
+      if (res.kind === 'labels') {
+        hh = '<tr><th>라벨(성형 LOT)</th><th>일자</th><th>호기·면 → 우리 표기</th><th>사번</th><th>BatchNo</th><th>InsertNo</th><th>작업자</th><th>시간</th><th style="text-align:right">생산</th><th>상태</th></tr>';
+        shown.forEach(function(r) {
+          bb += '<tr' + (r._skip ? ' class="skip"' : '') + '><td><b>' + esc(r.label) + '</b></td><td>' + esc(r.work_date || '-') + '</td>'
+            + '<td>' + esc(r.equip_raw || '-') + (r.equipment_no ? ' → ' + esc(r.equipment_no) + (r.face ? ' ' + r.face : '') : '') + '</td>'
+            + '<td>' + esc(r.sabun || '-') + '</td><td>' + esc(r.batch_no || '-') + '</td><td>' + esc(r.insert_lot || '-') + '</td><td>' + esc(r.worker || '-') + '</td>'
+            + '<td>' + (r.start_time ? r.start_time.slice(0, 5) + '~' + (r.end_time || '').slice(0, 5) : '-') + '</td>'
+            + '<td style="text-align:right">' + (r.production_qty != null ? r.production_qty.toLocaleString() : '-') + '</td>'
+            + '<td>' + statusTag(r) + '</td></tr>';
+        });
+      } else {
+        hh = '<tr><th>LotID</th><th>입고일</th><th>거래처</th><th>사번</th><th>품명</th><th style="text-align:right">수량</th><th>단위</th><th>창고</th><th>제조일</th><th>상태</th></tr>';
+        shown.forEach(function(r) {
+          bb += '<tr' + (r._skip ? ' class="skip"' : '') + '><td><b>' + esc(r.lot_id) + '</b></td><td>' + esc(r.received_date || '-') + '</td><td>' + esc(r.supplier || '-') + '</td>'
+            + '<td>' + esc(r.item_code || '-') + '</td><td>' + esc(r.item_name || '-') + '</td>'
+            + '<td style="text-align:right">' + (r.quantity != null ? r.quantity.toLocaleString() : '-') + '</td><td>' + esc(r.unit || '-') + '</td><td>' + esc(r.warehouse || '-') + '</td>'
+            + '<td>' + esc(r.mfg_date || '-') + '</td><td>' + statusTag(r) + '</td></tr>';
+        });
+      }
+      if (rows.length > shown.length) bb += '<tr><td colspan="10" style="color:#6b7280">… 외 ' + (rows.length - shown.length) + '행 (등록에는 모두 포함)</td></tr>';
+      document.getElementById('previewHead').innerHTML = hh;
+      document.getElementById('previewBody').innerHTML = bb;
+      document.getElementById('btnCommit').textContent = nNew + '건 등록';
+      document.getElementById('btnCommit').disabled = nNew === 0;
+      document.getElementById('commitHint').textContent = res.kind === 'labels'
+        ? '"일지 없음" 건도 등록되며, 성형 일지가 나중에 들어오면 추적 화면에서 자동으로 이어져요.' : '';
+      document.getElementById('colBox').innerHTML = res.colInfo.map(function(c) {
+        return '<div>' + (c[2] ? '✓' : '<span style="color:#991b1b">✗</span>') + ' <b>' + esc(c[0]) + '</b> <span style="color:#6b7280">' + esc(c[1]) + '</span></div>';
+      }).join('');
+    }
+    function statusTag(r) {
+      if (r._skip === 'PL') return '<span class="tag gray">작업지시 → 제외</span>';
+      if (r._skip === 'DUP') return '<span class="tag gray">이미 등록</span>';
+      if (r._skip === 'BAD') return '<span class="tag err">날짜 없음 → 제외</span>';
+      if (parsed.kind === 'labels') return r._match ? '<span class="tag ok">일지 일치</span>' : '<span class="tag warn">일지 없음</span>';
+      return '<span class="tag ok">신규</span>';
+    }
+
+    function resetUpload() {
+      parsed = null;
+      document.getElementById('previewBox').style.display = 'none';
+      document.getElementById('colBox').textContent = '파일을 올리면 어떤 열을 어떻게 읽었는지 여기에 표시돼요.';
+    }
+
+    // ───────── 등록 ─────────
+    function commitUpload() {
+      if (!parsed) return;
+      var res = parsed, table = res.kind === 'labels' ? 'lot_labels' : 'material_receipts';
+      var live = res.rows.filter(function(r) { return !r._skip; }).map(function(r) {
+        var o = {}; Object.keys(r).forEach(function(k) { if (k.charAt(0) !== '_') o[k] = r[k]; }); return o;
+      });
+      if (!live.length) return;
+      document.getElementById('btnCommit').disabled = true;
+      showLoading('등록 중... 0 / ' + live.length);
+      var done = 0, p = Promise.resolve();
+      for (var i = 0; i < live.length; i += 300) {
+        (function(chunk) {
+          p = p.then(function() {
+            return supabase.from(table).insert(chunk).select('id').then(function(q) {
+              if (q.error) throw new Error(q.error.message);
+              done += (q.data || []).length;
+              document.getElementById('loadingText').textContent = '등록 중... ' + done + ' / ' + live.length;
+            });
+          });
+        })(live.slice(i, i + 300));
+      }
+      p.then(function() {
+        var dates = live.map(function(r) { return r.work_date || r.received_date; }).filter(Boolean).sort();
+        return supabase.from('lot_uploads').insert({
+          kind: res.kind, file_name: res.fileName, rows_read: res.stats.read, rows_new: done, rows_skipped: res.stats.read - done,
+          date_from: dates[0] || null, date_to: dates[dates.length - 1] || null, uploaded_by: ME.name || null
+        }).then(function(q) { if (q.error) console.warn('이력 기록 실패', q.error); });
+      }).then(function() {
+        hideLoading(); showToast(done + '건 등록 완료'); resetUpload(); loadRecent();
+      }).catch(function(e) {
+        hideLoading(); document.getElementById('btnCommit').disabled = false;
+        showToast('등록 실패 (' + done + '건까지 등록됨): ' + e.message + '\n같은 파일을 다시 올리면 등록된 건은 건너뛰고 이어서 등록돼요.');
+      });
+    }
+
+    // ───────── 이력 ─────────
+    function loadRecent() {
+      supabase.from('lot_uploads').select('*').order('uploaded_at', { ascending: false }).limit(5).then(function(q) {
+        if (q.error) { document.getElementById('recentBox').textContent = '조회 실패: ' + q.error.message; return; }
+        if (!q.data || !q.data.length) { document.getElementById('recentBox').textContent = '아직 업로드 이력이 없어요'; return; }
+        document.getElementById('recentBox').innerHTML = q.data.map(function(u) {
+          return fmtKst(u.uploaded_at, true) + ' · ' + (u.kind === 'labels' ? '성형 라벨' : '입고 내역') + ' · <b>' + (u.rows_new || 0) + '건</b> · ' + esc(u.uploaded_by || '-');
+        }).join('<br>');
+      });
+    }
+    function loadHistory() {
+      supabase.from('lot_uploads').select('*').order('uploaded_at', { ascending: false }).limit(200).then(function(q) {
+        var tb = document.getElementById('historyBody');
+        if (q.error) { tb.innerHTML = '<tr><td colspan="8">조회 실패: ' + esc(q.error.message) + '</td></tr>'; return; }
+        if (!q.data || !q.data.length) { tb.innerHTML = '<tr><td colspan="8" style="color:#6b7280">아직 업로드 이력이 없어요</td></tr>'; return; }
+        tb.innerHTML = q.data.map(function(u) {
+          return '<tr><td>' + fmtKst(u.uploaded_at, true) + '</td><td>' + (u.kind === 'labels' ? '성형 라벨 발행 내역' : '원자재 입고 내역') + '</td><td>' + esc(u.file_name || '-') + '</td>'
+            + '<td style="text-align:right">' + (u.rows_read || 0) + '</td><td style="text-align:right"><b>' + (u.rows_new || 0) + '</b></td><td style="text-align:right">' + (u.rows_skipped || 0) + '</td>'
+            + '<td>' + esc(u.date_from || '-') + ' ~ ' + esc(u.date_to || '-') + '</td><td>' + esc(u.uploaded_by || '-') + '</td></tr>';
+        }).join('');
+      });
+    }
+
+    // ───────── 유틸 ─────────
+    function fmtKst(iso, withTime) {
+      if (!iso) return '-'; var d = new Date(iso);
+      var s = d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+      return withTime ? s + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()) : s;
+    }
+    function showToast(msg) { var t = document.getElementById('toastMsg'); t.textContent = msg; t.className = 'toast-msg show'; setTimeout(function() { t.className = 'toast-msg'; }, 3500); }
+    function showLoading(text) { document.getElementById('loadingText').textContent = text || '처리 중...'; document.getElementById('loadingOverlay').className = 'loading-overlay show'; }
+    function hideLoading() { document.getElementById('loadingOverlay').className = 'loading-overlay'; }
+  </script>
+  <script src="sidebar.js"></script>
+</body>
+</html>

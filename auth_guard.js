@@ -45,7 +45,7 @@ window.agHeaders = function (extra) {
 window.MENU_STRUCTURE = {
     production: { name: '생산관리', pages: ['mold_dashboard.html', 'mold_layout.html', 'mold_detail.html'] }, // 2026-10-26 mold_admin.html(구) 삭제
     quality:    { name: '품질관리', pages: ['inspection_round_viewer.html', 'inspection_report.html'] },
-    logistics:  { name: '물류관리', pages: ['inventory_layout.html', 'inventory_rack.html', 'inventory_zone.html', 'inventory_io.html', 'inventory_viewer.html', 'inventory_special.html'] },
+    logistics:  { name: '물류관리', pages: ['inventory_layout.html', 'inventory_rack.html', 'inventory_zone.html', 'inventory_io.html', 'inventory_viewer.html', 'inventory_special.html', 'lot_trace.html', 'lot_upload.html'] },   // 2026-11-16 LOT 추적
     management: { name: '경영지원', pages: ['asset_manage.html'], sensitive: true },
     data:       { name: '데이터 관리', pages: ['data_viewer.html', 'safety_viewer.html', 'docs_manager.html', 'process_report.html', 'molding_condition.html'] },
     system:     { name: '시스템 관리', pages: ['master_data.html', 'users.html', 'permissions.html', 'feedback_admin.html'] } // 2026-11-04 개선 요청 관리
