@@ -632,8 +632,8 @@ th.sortable.desc::after { content:'▼'; color:#243bb2; }
         <input class="modal-input" id="emld_sabun" />
       </div>
       <div class="modal-field">
-        <span class="modal-label">제품명</span>
-        <input class="modal-input" id="emld_product_name" />
+        <span class="modal-label">재질명</span><!-- 2026-11-20 성형은 product_name 에 재질명이 저장됨 (현장 성형 일지가 제품 마스터의 재질명을 자동 입력) -->
+        <input class="modal-input" id="emld_product_name" placeholder="예) E601-A0C" />
       </div>
     </div>
     <div class="modal-grid modal-grid-3">
@@ -2699,7 +2699,7 @@ function renderMoldingTable(data) {
         <td>${i+1}</td><td>${esc(r.work_date||'')}</td><td>${esc(r.shift_type||'')}</td>
         <td style="font-size:11px">${esc(r.equipment_no||'')}</td>
         <td><span style="background:${tc}15;color:${tc};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">${esc(r.work_type||'표준')}</span></td>
-        <td>${esc(r.sabun||'')}</td><td style="font-size:11px">${(PRODUCTS[r.sabun]&&PRODUCTS[r.sabun].materialName)||'-'}</td>
+        <td>${esc(r.sabun||'')}</td><td style="font-size:11px">${esc(r.product_name || (PRODUCTS[r.sabun]&&PRODUCTS[r.sabun].materialName) || '-')}</td><!-- 2026-11-20 행 저장값 우선(수정 반영), 없으면 마스터 -->
         <td style="font-size:11px">${esc(r.batch_no||'')}</td><td>${esc(r.cavity||'')}</td><td>${esc(r.shot_count||'')}</td>
         <td style="text-align:right;font-weight:600">${(r.production_qty||0).toLocaleString()}</td>
         <td style="text-align:right;color:${(r.defect_qty||0)>0?'#dc2626':'#666'}">${esc(r.defect_qty||0)}</td>
@@ -3476,7 +3476,7 @@ function downloadExcel() {
       '설비': r.equipment_no || '',
       '관리번호': r.equipment_id || '',
       '사번': r.sabun || '',
-      '재질명': (PRODUCTS[r.sabun] && PRODUCTS[r.sabun].materialName) || '',
+      '재질명': r.product_name || (PRODUCTS[r.sabun] && PRODUCTS[r.sabun].materialName) || '',   // 2026-11-20 행 저장값 우선
       'Batch No.': r.batch_no || '',
       'C/V': r.cavity || '',
       'Shot': r.shot_count || '',
