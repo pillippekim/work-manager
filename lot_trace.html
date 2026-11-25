@@ -15,10 +15,26 @@
     .lt-nav .btn-secondary { padding: 7px 12px; font-size: 12.5px; }
     .lt-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px 18px; }
     .lt-search { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    .lt-search input { flex: 1 1 300px; min-width: 0; padding: 11px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; font-family: inherit; font-weight: 700; letter-spacing: .03em; }
-    .btn-primary { padding: 11px 20px; border: none; border-radius: 8px; background: #243bb2; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; font-family: inherit; }
-    .btn-secondary { padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #374151; font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; }
-    .lt-hint { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: #6b7280; margin-top: 8px; }
+    /* 2026-11-25 컴팩트 검색줄: 입력칸은 LOT 번호 길이만큼, 나머지 공간은 본문에 */
+    .lt-search input { flex: 0 1 280px; min-width: 160px; padding: 7px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; font-family: inherit; font-weight: 700; letter-spacing: .03em; }
+    .btn-primary { padding: 8px 16px; border: none; border-radius: 8px; background: #243bb2; color: #fff; font-weight: 700; font-size: 13px; cursor: pointer; font-family: inherit; }
+    .btn-secondary { padding: 7px 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #374151; font-weight: 600; font-size: 12.5px; cursor: pointer; font-family: inherit; }
+    .lt-hint { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: #6b7280; margin-top: 6px; }
+    .lt-sticky.lt-card { padding: 10px 14px; }
+    .lt-sumline { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 8px; font-size: 12.5px; }
+    .lt-sumline .chip { background: #f3f4f6; border-radius: 8px; padding: 4px 10px; white-space: nowrap; color: #374151; }
+    .lt-sumline .chip b { color: #1f2937; letter-spacing: .02em; }
+    .lt-sumline .chip.hl { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; } .lt-sumline .chip.hl b { color: #92400e; }
+    .lt-sumline .chip.ok { background: #eef2ff; color: #243bb2; }
+    /* 단계 접기/펼치기 */
+    .stg-head { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: none; padding: 6px 0; cursor: pointer; font-family: inherit; font-size: 13px; color: #1f2937; min-height: 36px; }
+    .stg-head:hover { background: #f8fafc; }
+    .stg-sum { flex: 1; min-width: 0; line-height: 1.5; }
+    .stg-arrow { font-size: 11px; color: #9ca3af; flex: none; transition: transform .15s; }
+    .stage.open .stg-arrow { transform: rotate(180deg); }
+    .stg-detail { display: none; padding-top: 6px; }
+    .stage.open .stg-detail { display: block; }
+    .stage.open .stg-head { color: #243bb2; }
     .lt-hint b { color: #243bb2; }
     .lt-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
     @media (max-width: 900px) { .lt-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -56,7 +72,7 @@
     .loading-box { background: #fff; padding: 22px 28px; border-radius: 10px; font-size: 14px; font-weight: 600; }
     .toast-msg { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1f2937; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 9100; white-space: pre-line; }
     .toast-msg.show { opacity: 1; }
-    @media print { .sidebar, .top-header, .lt-search, .lt-hint, .btn, .no-print { display: none !important; } .main { margin: 0 !important; } }
+    @media print { .sidebar, .top-header, .lt-search, .lt-hint, .btn, .no-print { display: none !important; } .main { margin: 0 !important; } .stg-detail { display: block !important; } .lt-sticky { position: static !important; box-shadow: none !important; } }
   </style>
 </head>
 <body>
@@ -73,16 +89,17 @@
       <div class="lt-card lt-sticky">
         <form class="lt-search" onsubmit="runSearch(); return false;">
           <label for="q" style="font-size:13px;font-weight:700;white-space:nowrap;">LOT 검색</label>
-          <input id="q" type="text" placeholder="예) C261102010 · M261022015 · I261103023 · 사번 503117" autocomplete="off">
+          <input id="q" type="text" placeholder="C… / M… / I… / 사번" autocomplete="off">
           <button type="submit" class="btn-primary">추적</button>
-          <a href="lot_upload.html" class="btn-secondary no-print" style="text-decoration:none;">MES 자료 업로드</a>
+          <span class="lt-nav no-print" id="navBar" style="display:none;"></span>
+          <a href="lot_upload.html" class="btn-secondary no-print" style="text-decoration:none;margin-left:auto;">MES 자료 업로드</a>
         </form>
-        <div class="lt-hint">
+        <div class="lt-hint" id="hintBar">
           <span><b>C…</b> 성형 LOT → 역추적 (재료까지 거슬러 올라감)</span>
           <span><b>M…</b> 혼련 배치 · <b>I…</b> 입고 LOT → 정추적 (어느 제품까지 퍼졌나)</span>
           <span><b>사번</b> 6자리 → 그 제품의 최근 성형 LOT 목록</span>
         </div>
-        <div class="lt-nav no-print" id="navBar" style="display:none;margin-top:8px;"></div>
+        <div class="lt-sumline" id="sumBox" style="display:none;"></div><!-- 2026-11-25 검색 결과 요약(고정) -->
       </div>
       <div id="result"></div>
     </div>
@@ -118,8 +135,15 @@
       var st = e.state || {};
       lastListQ = st.list || null;
       if (st.q) { document.getElementById('q').value = st.q; runSearch(false); }
-      else { document.getElementById('q').value = ''; document.getElementById('result').innerHTML = ''; renderNav(null); }
+      else { document.getElementById('q').value = ''; document.getElementById('result').innerHTML = ''; renderNav(null); setSummary(''); document.getElementById('hintBar').style.display = ''; }
     });
+    function setSummary(html) { var b = document.getElementById('sumBox'); b.innerHTML = html; b.style.display = html ? '' : 'none'; }
+    function toggleStage(btn) { btn.closest('.stage').classList.toggle('open'); }
+    function toggleAllStages(btn) {
+      var open = btn.dataset.open !== '1';
+      document.querySelectorAll('#result .stage').forEach(function(st) { st.classList.toggle('open', open); });
+      btn.dataset.open = open ? '1' : '0'; btn.textContent = open ? '모두 접기' : '모두 펼치기';
+    }
     var lastListQ = null;   // 직전에 본 목록(사번/부분검색) — "목록으로" 버튼용
     function renderNav(kind) {
       var nb = document.getElementById('navBar'); var h = '';
@@ -129,6 +153,7 @@
     }
     function goHome() {
       lastListQ = null; document.getElementById('q').value = ''; document.getElementById('result').innerHTML = ''; renderNav(null);
+      setSummary(''); document.getElementById('hintBar').style.display = '';   // 2026-11-25
       history.pushState({ q: null, list: null }, '', location.pathname);
       document.getElementById('q').focus();
     }
@@ -138,6 +163,7 @@
       var q = document.getElementById('q').value.trim().toUpperCase();
       if (!q) return;
       var out = document.getElementById('result'); out.innerHTML = '';
+      setSummary(''); document.getElementById('hintBar').style.display = 'none';   // 2026-11-25
       var isList = /^\d{6}$/.test(q) || !(/^C\d{9}$/.test(q) || /^[MI]\d/.test(q));
       if (isList) lastListQ = q;
       if (push !== false) history.pushState({ q: q, list: lastListQ }, '', '?q=' + encodeURIComponent(q));   // 2026-11-24 검색마다 기록 → 뒤로가기로 복귀
@@ -246,15 +272,37 @@
       var where = invLive.length ? invLive.map(locLabel).join(', ') : (shipped.length ? '출하 완료' : (c.pack.length ? '포장 완료 (재고 미등록)' : (c.shot.length || c.assembly.length || c.sasang.length ? '공정 진행 중' : (lab ? '성형 완료 (후공정 기록 없음)' : '기록 없음'))));
       var prodName = (c.mold && c.mold[0] && c.mold[0].product_name) || (c.inv[0] && c.inv[0].product_name) || '';
       var steps = [!!lab, !!(c.mold && c.mold.length), !!(c.sasang.length || c.assembly.length || c.shot.length), !!c.pack.length, !!c.inv.length];
-      h += '<div class="lt-sum">'
-        + '<div class="c"><div class="l">검색 LOT</div><div class="n">' + esc(L) + '</div><div class="l">' + (lab ? '성형 LOT · ' + esc(lab.work_date) + ' · ' + esc(lab.equipment_no || lab.equip_raw) + ' ' + esc(lab.face || '') : '성형 LOT · 발행내역 미업로드') + '</div></div>'
-        + '<div class="c"><div class="l">사번 · 품명</div><div class="n">' + esc(lab ? lab.sabun : (c.inv[0] ? c.inv[0].product_code : '-')) + '</div><div class="l">' + esc(prodName || (lab ? '재질 ' + (lab.material_code || '-') : '')) + '</div></div>'
-        + '<div class="c"><div class="l">추적 범위</div><div class="n" style="font-size:14px;">' + steps.filter(Boolean).length + ' / 5 단계 연결</div><div class="l">발행 · 성형일지 · 후공정 · 포장 · 재고</div></div>'
-        + '<div class="c hl"><div class="l">현재 위치</div><div class="n" style="font-size:14px;">' + esc(where) + '</div><div class="l">' + (invLive.length ? '잔량 ' + invLive.reduce(function(s, l) { return s + (l.quantity || 0); }, 0).toLocaleString() + '개' : (shipped.length ? '출하 ' + shipQty.toLocaleString() + '개' : '')) + '</div></div>'
-        + '</div>';
+      var liveQty = invLive.reduce(function(s, l) { return s + (l.quantity || 0); }, 0);
+      // 2026-11-25 요약은 고정 영역에 한 줄로
+      setSummary(
+          '<span class="chip ok"><b>' + esc(L) + '</b> ' + (lab ? esc(lab.work_date) + ' · ' + esc(lab.equipment_no || lab.equip_raw) + ' ' + esc(lab.face || '') : '발행내역 미업로드') + '</span>'
+        + '<span class="chip">사번 <b>' + esc(lab ? lab.sabun : (c.inv[0] ? c.inv[0].product_code : '-')) + '</b>' + (prodName ? ' ' + esc(prodName) : (lab && lab.material_code ? ' 재질 ' + esc(lab.material_code) : '')) + '</span>'
+        + '<span class="chip">' + steps.filter(Boolean).length + '/5 단계</span>'
+        + '<span class="chip hl">현재 <b>' + esc(where) + '</b>' + (invLive.length ? ' · 잔량 ' + liveQty.toLocaleString() : (shipped.length ? ' · 출하 ' + shipQty.toLocaleString() : '')) + '</span>');
+      // 단계별 요약 한 줄 (접힌 상태에서 표시)
+      var firstDate = function(arr) { return arr && arr.length ? md(arr[0].work_date) + ' ✓' : '—'; };
+      var SUM = {};
+      SUM['재고 · 출하'] = invLive.length ? '재고 ' + invLive.length + '건 · 잔량 <b>' + liveQty.toLocaleString() + '</b> · ' + esc(invLive.map(locLabel).join(', ')) + (shipped.length ? ' · 출고 ' + shipped.length + '건 ' + shipQty.toLocaleString() : '')
+                        : (shipped.length ? '<b>출하 완료</b> · ' + shipQty.toLocaleString() + '개 (' + shipped.length + '건)' : (c.inv.length ? '재고 ' + c.inv.length + '건 · 잔량 0' : '재고 기록 없음'));
+      SUM['포장'] = c.pack.length ? '#' + c.pack[0].id + ' · ' + esc(c.pack[0].work_date) + ' · ' + esc(c.pack[0].worker_name || c.pack[0].created_by_name || '-') + ' · <b>' + (c.pack[0].quantity || 0).toLocaleString() + '</b>' + (c.pack.length > 1 ? ' (외 ' + (c.pack.length - 1) + '건)' : '') : '포장 기록 없음';
+      SUM['검사 · 쇼트 · 조립 · 사상'] = '사상 ' + firstDate(c.sasang) + ' · 조립 ' + firstDate(c.assembly) + ' · 쇼트 ' + firstDate(c.shot) + ' · 검사 ' + firstDate(c.insp);
+      SUM['성형'] = lab ? esc(lab.equipment_no || lab.equip_raw) + ' ' + esc(lab.face || '') + ' · ' + esc(lab.worker || '-') + ' · ' + tm(lab.start_time) + '~' + tm(lab.end_time) + ' · <b>' + num(lab.production_qty) + '</b>개 · ' + (c.mold && c.mold.length ? '<span class="tag ok">일지 일치</span>' : '<span class="tag warn">일지 없음</span>') : '<span class="tag warn">발행내역 미업로드</span>';
+      SUM['혼련 배치'] = (function() {
+        if (!lab || !lab.batch_no) return '배치 정보 없음';
+        var b = lab.batch_no; if (/^I/i.test(b)) return '<b>' + esc(b) + '</b> · 구매 재료 직접 투입';
+        var r0 = (c.batchRows && c.batchRows[0]) || null, mm = (c.mesMix && c.mesMix[0]) || null;
+        if (r0) return '<b>' + esc(b) + '</b> · ' + esc(r0.work_date) + ' · ' + esc(r0.material_name || '-') + ' · 혼련 일지';
+        if (mm) return '<b>' + esc(b) + '</b> · ' + esc(mm.work_date) + ' · ' + esc(mm.material || '-') + ' · MES 원자료';
+        return '<b>' + esc(b) + '</b> · <span class="tag warn">혼련 기록 없음</span>';
+      })();
+      SUM['인서트 부자재'] = lab && lab.insert_lot ? '<b>' + esc(lab.insert_lot) + '</b>' + (c.insertRow ? ' · ' + esc(c.insertRow.supplier || '-') + ' · ' + esc(c.insertRow.received_date) : ' · 입고 내역 없음') : '';
+      SUM['원자재 입고'] = c.cmbLot ? '<b>' + esc(c.cmbLot) + '</b>' + (c.cmbReceipt ? ' · ' + esc(c.cmbReceipt.supplier || '-') + ' · ' + esc(c.cmbReceipt.received_date) + (c.cmbReceipt.mfg_date ? ' · 제조 ' + esc(c.cmbReceipt.mfg_date) : '') : ' · <span class="tag warn">입고 내역 없음</span>')
+                       : (lab && /^I/i.test(lab.batch_no || '') ? '위 구매 재료 = 원자재' : '<span class="tag gray">미연결</span>');
+      stageSummaries = SUM;
 
       h += '<div class="lt-card"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;"><h2 style="margin:0;font-size:15px;">역추적 경로 <span style="font-weight:400;color:#6b7280;font-size:12px;">— 위(재고)에서 아래(재료)로 내려갑니다</span></h2>'
-        + '<button class="btn no-print" style="margin-left:auto" onclick="window.print()">인쇄</button></div>';
+        + '<button class="btn no-print" style="margin-left:auto" data-open="0" onclick="toggleAllStages(this)">모두 펼치기</button><button class="btn no-print" onclick="window.print()">인쇄</button></div>'
+        + '<div style="font-size:11.5px;color:#6b7280;margin-bottom:4px;">각 단계를 누르면 상세가 펼쳐져요</div>';
 
       // 재고·출하
       h += stage('amber', '재고 · 출하', (function() {
@@ -356,8 +404,12 @@
         + '<div><div class="lbl">품명 · 수량</div><div class="val">' + esc(r.item_name || '-') + ' · ' + num(r.quantity) + ' ' + esc(r.unit || '') + '</div></div><div><div class="lbl">제조일 · 창고</div><div class="val">' + esc(r.mfg_date || '미입력') + ' · ' + esc(r.warehouse || '-') + '</div></div></div>'
         + '<div style="margin-top:6px;"><a href="#" class="btn" onclick="go(\'' + esc(r.lot_id) + '\');return false;">이 입고 LOT 정추적</a></div>';
     }
+    var stageSummaries = {};
     function stage(kind, title, body, last) {
-      return '<div class="stage"><div class="rail"><div class="dot ' + kind + '"></div><div class="stg ' + kind + '">' + esc(title) + '</div>' + (last ? '' : '<div class="line"></div>') + '</div><div class="sbody">' + body + '</div></div>';
+      var sum = stageSummaries[title] || '';   // 2026-11-25 접힌 상태 요약 한 줄
+      return '<div class="stage"><div class="rail"><div class="dot ' + kind + '"></div><div class="stg ' + kind + '">' + esc(title) + '</div>' + (last ? '' : '<div class="line"></div>') + '</div>'
+        + '<div class="sbody"><button type="button" class="stg-head" onclick="toggleStage(this)" aria-label="' + esc(title) + ' 상세 펼치기"><span class="stg-sum">' + sum + '</span><span class="stg-arrow">▼</span></button>'
+        + '<div class="stg-detail">' + body + '</div></div></div>';
     }
 
     // ───────── 정추적: 배치/입고 LOT → 제품 ─────────
@@ -449,6 +501,7 @@
               : '<span class="lbl">혼련 배치</span> <span class="tag gray">MES 혼련 원자료에 이 CMB LotNo 없음</span>') + '</div>'
           + '<div style="margin-top:6px;font-size:12px;color:#6b7280;">아래는 이 입고 LOT 이 <b>BatchNo/InsertNo 로 직접 쓰인 성형 LOT</b> + 위 혼련 배치들에서 나온 성형 LOT 이에요.</div>';
       }
+      setSummary('<span class="chip ok"><b>' + esc(X) + '</b> ' + (c.type === 'batch' ? '혼련 배치' : '입고 LOT') + '</span><span class="chip">성형 LOT <b>' + n + '</b> · ' + num(prodTotal) + '개</span><span class="chip">공정 중 ' + st.inproc + '</span><span class="chip ok">재고 ' + st.stock + ' · ' + num(st.stockQty) + '</span><span class="chip hl">출하 ' + st.shipped + ' · ' + num(st.shipQty) + '</span>');   // 2026-11-25
       h += '<div class="lt-card" style="display:grid;grid-template-columns:280px minmax(0,1fr);gap:18px;">'
         + '<div>' + headHtml + '</div>'
         + '<div style="border-left:1px solid #e5e7eb;padding-left:18px;"><div style="font-size:13px;font-weight:700;margin-bottom:8px;">회수 범위 요약 <span style="font-weight:400;color:#6b7280;font-size:12px;">— 이 LOT 이 어디까지 퍼졌나</span></div>'
