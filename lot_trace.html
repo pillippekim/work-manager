@@ -232,10 +232,15 @@
         }
         return Promise.all(qs);
       }).then(function(res) {
-        // 2026-11-24 검사 일지 (lot_nos 배열)
-        return inspectionByLots([L]).then(function(ri) {
-          if (ri.error) console.warn('inspection_reports', ri.error);
-          ctx.insp = alive(ri.data).filter(function(p) { return (p.lot_nos || []).indexOf(L) >= 0; });
+        // 2026-11-24 검사 일지 (lot_nos 배열) + 2026-11-25 도포 일지 (인서트 입고 LOT 기준)
+        var coatQ = (ctx.lab && ctx.lab.insert_lot)
+          ? supabase.from('coating_reports').select('id, work_date, worker_id, worker_name, work_type, total_qty, defect_qty, lot_no, deleted_at').eq('lot_no', ctx.lab.insert_lot).order('work_date')
+          : Promise.resolve({ data: [] });
+        return Promise.all([inspectionByLots([L]), coatQ]).then(function(rr) {
+          if (rr[0].error) console.warn('inspection_reports', rr[0].error);
+          if (rr[1].error) console.warn('coating_reports', rr[1].error);
+          ctx.insp = alive(rr[0].data).filter(function(p) { return (p.lot_nos || []).indexOf(L) >= 0; });
+          ctx.coat = alive(rr[1].data);
           return res;
         });
       }).then(function(res) {
@@ -295,6 +300,7 @@
         if (mm) return '<b>' + esc(b) + '</b> · ' + esc(mm.work_date) + ' · ' + esc(mm.material || '-') + ' · MES 원자료';
         return '<b>' + esc(b) + '</b> · <span class="tag warn">혼련 기록 없음</span>';
       })();
+      SUM['도포 (약칠)'] = (c.coat && c.coat.length) ? c.coat.map(function(r) { return esc(md(r.work_date)) + ' ' + esc((r.work_type || '').replace(/\s*\(.*\)/, '')) + ' ' + num(r.total_qty); }).join(' · ') + ' <span class="tag ok">' + c.coat.length + '건</span>' : '<span class="tag warn">도포 기록 없음</span>';
       SUM['인서트 부자재'] = lab && lab.insert_lot ? '<b>' + esc(lab.insert_lot) + '</b>' + (c.insertRow ? ' · ' + esc(c.insertRow.supplier || '-') + ' · ' + esc(c.insertRow.received_date) : ' · 입고 내역 없음') : '';
       SUM['원자재 입고'] = c.cmbLot ? '<b>' + esc(c.cmbLot) + '</b>' + (c.cmbReceipt ? ' · ' + esc(c.cmbReceipt.supplier || '-') + ' · ' + esc(c.cmbReceipt.received_date) + (c.cmbReceipt.mfg_date ? ' · 제조 ' + esc(c.cmbReceipt.mfg_date) : '') : ' · <span class="tag warn">입고 내역 없음</span>')
                        : (lab && /^I/i.test(lab.batch_no || '') ? '위 구매 재료 = 원자재' : '<span class="tag gray">미연결</span>');
@@ -340,7 +346,7 @@
       h += stage('', '검사 · 쇼트 · 조립 · 사상', procRows.length
         ? '<div class="data-table-wrap"><table class="data-table"><thead><tr><th>공정</th><th>일자</th><th>작업자</th><th class="num">양품</th><th class="num">불량</th></tr></thead><tbody>'
           + procRows.map(function(r) { return '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td><td>' + esc(r[2] || '-') + '</td><td class="num">' + num(r[3]) + '</td><td class="num">' + (r[4] == null ? '-' : num(r[4])) + '</td></tr>'; }).join('')
-          + '</tbody></table></div><div style="font-size:11.5px;color:#6b7280;margin-top:4px;">코팅 일지는 LOT 칸이 없어 표시되지 않아요 (3단계에서 추가 예정)</div>'
+          + '</tbody></table></div><div style="font-size:11.5px;color:#6b7280;margin-top:4px;">도포(약칠)는 성형 전 인서트 공정이라 아래 "도포 (약칠)" 단계에 표시돼요</div>'
         : '<div class="miss">사상·조립·쇼트·검사 일지에 이 LOT 기록이 없어요. (LOT 미입력이거나 아직 진행 전)</div>');
 
       // 성형
@@ -359,6 +365,18 @@
         s += '<span class="tag gray">발행내역 업로드 ' + fmtKst(lab.uploaded_at) + '</span></div>';
         return s;
       })());
+
+      // 2026-11-25 도포(약칠): 성형 라벨 InsertNo 로 도포 일지 연결
+      if (lab && lab.insert_lot) h += stage('', '도포 (약칠)', (function() {
+        var rows = c.coat || [];
+        if (!rows.length) return '<div class="miss">인서트 LOT <b>' + esc(lab.insert_lot) + '</b> 로 기록된 도포 일지가 없어요. (도포 일지 인서트 LOT 칸은 11/25 부터 — 그 이전 작업이거나 미입력)</div>';
+        return '<div class="data-table-wrap"><table class="data-table"><thead><tr><th>일자</th><th>작업종류</th><th>사번</th><th>작업자</th><th class="num">수량</th><th class="num">불량</th></tr></thead><tbody>'
+          + rows.map(function(r) { return '<tr><td>' + esc(r.work_date) + '</td><td>' + esc(r.work_type || '-') + '</td><td>' + esc(r.worker_id || '-') + '</td><td>' + esc(r.worker_name || '-') + '</td><td class="num">' + num(r.total_qty) + '</td><td class="num">' + num(r.defect_qty) + '</td></tr>'; }).join('')
+          + '</tbody></table></div>';
+      })());
+
+      // 인서트
+      if (lab && lab.insert_lot) h += stage('', '인서트 부자재', receiptBlock(c.insertRow, lab.insert_lot));
 
       // 혼련 배치 / 구매 재료
       h += stage('', '혼련 배치', (function() {
@@ -383,9 +401,6 @@
         }
         return s;
       })());
-
-      // 인서트
-      if (lab && lab.insert_lot) h += stage('', '인서트 부자재', receiptBlock(c.insertRow, lab.insert_lot));
 
       // 원자재
       h += stage(c.cmbLot ? '' : 'gray', '원자재 입고', (function() {
@@ -423,10 +438,11 @@
       var mixQ = type === 'batch'
         ? supabase.from('mes_mixing_raw').select('work_date, batch_no, product_code, material, cmb_lot_no, cmb_name, batch_qty, total_weight, worker').in('batch_no', batchForms(X))
         : supabase.from('mes_mixing_raw').select('work_date, batch_no, product_code, material, cmb_lot_no, cmb_name, batch_qty, total_weight, worker').eq('cmb_lot_no', X).order('work_date');
-      Promise.all([head, mixQ]).then(function(res0) {
+      var coatQ = type === 'receipt' ? supabase.from('coating_reports').select('id, work_date, work_type, worker_id, total_qty, deleted_at').eq('lot_no', X).order('work_date') : Promise.resolve({ data: [] });   // 2026-11-25
+      Promise.all([head, mixQ, coatQ]).then(function(res0) {
         if (res0[0].error) throw new Error(res0[0].error.message);
         if (res0[1].error) console.warn('mes_mixing_raw', res0[1].error);
-        ctx.head = res0[0].data; ctx.mesMix = res0[1].data || [];
+        ctx.head = res0[0].data; ctx.mesMix = res0[1].data || []; ctx.coat = alive(res0[2].data);
         var batches = type === 'batch' ? batchForms(X) : [];
         if (type === 'receipt') ctx.mesMix.forEach(function(m) { batchForms(m.batch_no).forEach(function(f) { if (batches.indexOf(f) < 0) batches.push(f); }); });
         ctx.batches = batches;
@@ -499,6 +515,7 @@
           + '<div style="margin-top:10px;font-size:12.5px;">' + (c.mesMix && c.mesMix.length
               ? '<span class="lbl">이 재료가 들어간 혼련 배치</span> ' + c.mesMix.map(function(m) { return '<a href="#" onclick="go(\'' + esc(m.batch_no) + '\');return false;"><b>' + esc(m.batch_no) + '</b></a><span style="color:#6b7280">(' + esc(md(m.work_date)) + ')</span>'; }).join(' · ')
               : '<span class="lbl">혼련 배치</span> <span class="tag gray">MES 혼련 원자료에 이 CMB LotNo 없음</span>') + '</div>'
+          + (c.coat && c.coat.length ? '<div style="margin-top:6px;font-size:12.5px;"><span class="lbl">도포(약칠) 일지</span> ' + c.coat.map(function(r) { return esc(md(r.work_date)) + ' ' + esc(r.worker_id || '') + ' ' + num(r.total_qty); }).join(' · ') + ' <span class="tag ok">' + c.coat.length + '건</span></div>' : '')
           + '<div style="margin-top:6px;font-size:12px;color:#6b7280;">아래는 이 입고 LOT 이 <b>BatchNo/InsertNo 로 직접 쓰인 성형 LOT</b> + 위 혼련 배치들에서 나온 성형 LOT 이에요.</div>';
       }
       setSummary('<span class="chip ok"><b>' + esc(X) + '</b> ' + (c.type === 'batch' ? '혼련 배치' : '입고 LOT') + '</span><span class="chip">성형 LOT <b>' + n + '</b> · ' + num(prodTotal) + '개</span><span class="chip">공정 중 ' + st.inproc + '</span><span class="chip ok">재고 ' + st.stock + ' · ' + num(st.stockQty) + '</span><span class="chip hl">출하 ' + st.shipped + ' · ' + num(st.shipQty) + '</span>');   // 2026-11-25
