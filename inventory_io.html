@@ -947,14 +947,20 @@
           var ws = wb.Sheets[wb.SheetNames[0]];
           var jsonData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
           parseEcountData(jsonData);
-          hideLoading();
-          if (parsedRows.length === 0) { showToast('유효한 출하 데이터 없음'); return; }
-          renderOutPreview();
+          if (parsedRows.length === 0) { hideLoading(); showToast('유효한 출하 데이터 없음'); return; }
+          // 2026-11-25 같은 출하일에 이미 처리된 행(거래처·사번·전표No·수량 동일)은 제외 → 누락분만 다시 올려도 이중 차감 없음
+          excludeProcessedRows().then(function() { hideLoading(); renderOutPreview(); });
         } catch (err) { hideLoading(); showToast('파일 오류: ' + err.message); }
       };
       reader.readAsArrayBuffer(file);
     }
 
+    function isSubtotalCell(v) {
+      var raw = String(v || '').trim();
+      if (/(^|\s)계$/.test(raw)) return true;                 // '계', '거래처 계', '○○ 계'
+      var c = raw.replace(/[\[\]\s]/g, '');
+      return /^(소|합|총|총합)?계$/.test(c) || /(소계|합계|총계|총합계)$/.test(c);
+    }
     function parseEcountData(jsonData) {
       parsedRows = [];
       var headerIdx = -1;
@@ -975,7 +981,8 @@
         var pn = String(r[5] || '').trim();
         var qty = parseInt(r[6]) || 0;
 
-        if (dateVal.indexOf('계') !== -1 || customer.indexOf('계') !== -1 || customer === '총합계') continue;
+        // 2026-11-25 소계/합계 행 판정: '계'로 끝나는 칸만 (예전엔 '계' 포함 여부라 ㈜광진기계·○○기계 거래처가 통째로 빠졌음)
+        if (isSubtotalCell(dateVal) || isSubtotalCell(customer) || isSubtotalCell(pc)) continue;
         if (!dateVal || !pc || qty <= 0) continue;
 
         var shipDate = '', shipNo = '';
@@ -995,11 +1002,30 @@
       }
     }
 
+    var skippedProcessed = [];   // 2026-11-25 이미 처리돼 제외된 행
+    function excludeProcessedRows() {
+      skippedProcessed = [];
+      var dates = {}; parsedRows.forEach(function(r) { if (r.ship_date) dates[r.ship_date] = 1; });
+      var dl = Object.keys(dates); if (!dl.length) return Promise.resolve();
+      return supabase.from('inventory_shipment_items').select('ship_date, ship_no, customer, product_code, quantity').in('ship_date', dl).limit(5000)
+        .then(function(res) {
+          if (res.error) { console.warn(res.error); return; }
+          var seen = {};
+          (res.data || []).forEach(function(x) { var k = [x.ship_date, x.ship_no || '', x.customer || '', x.product_code, x.quantity].join('|'); seen[k] = (seen[k] || 0) + 1; });
+          var keep = [];
+          parsedRows.forEach(function(r) {
+            var k = [r.ship_date, r.ship_no || '', r.customer || '', r.product_code, r.quantity].join('|');
+            if (seen[k] > 0) { seen[k]--; skippedProcessed.push(r); } else keep.push(r);
+          });
+          parsedRows = keep;
+          if (!parsedRows.length) showToast('이 파일의 ' + skippedProcessed.length + '건은 모두 이미 출고 처리된 행이에요');
+        });
+    }
     function renderOutPreview() {
       var h = '';
       h += '<div class="file-info">';
       h += '<div>&#128202;</div><div><div class="file-name">' + uploadedFile.name + '</div>';
-      h += '<div class="file-detail">' + parsedRows.length + '건의 출하 데이터</div></div>';
+      h += '<div class="file-detail">' + parsedRows.length + '건의 출하 데이터' + (skippedProcessed.length ? ' · <span style="color:#b45309">이미 처리된 ' + skippedProcessed.length + '건 제외</span>' : '') + '</div></div>';
       h += '<button class="btn-remove" onclick="renderOutbound()">&#10005;</button></div>';
 
       var totalQty = 0;
