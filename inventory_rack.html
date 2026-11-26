@@ -285,6 +285,10 @@
   <div class="modal-overlay" id="slotModal">
     <div class="modal-box" id="slotModalBody"></div>
   </div>
+  <!-- 2026-11-26 입고대기 → 슬롯 선택 입고 -->
+  <div class="modal-overlay" id="wiPickModal">
+    <div class="modal-box" id="wiPickBody"></div>
+  </div>
   <div class="toast-msg" id="toastMsg"></div>
 
   <script src="vendor/supabase-2.119.0.js"></script>
@@ -1041,9 +1045,33 @@
       }
       if (emptySlots.length === 0) { showToast('이 동에 빈 슬롯이 없습니다'); return; }
 
-      // 첫 번째 빈 슬롯에 입고
-      var targetSlot = emptySlots[0];
-      if (!confirm(lot.product_code + ' (LOT: ' + (lot.lot_no || '-') + ', ' + lot.quantity + '개)\n→ ' + currentRack.rack_name + '-' + targetSlot.slot_code + ' 에 입고하시겠습니까?')) return;
+      // 2026-11-26 슬롯 선택 모달 (기본값: 같은 사번이 있던 빈 슬롯 → 없으면 첫 빈 슬롯)
+      var preferred = null;
+      for (var k = 0; k < emptySlots.length; k++) { if (String(emptySlots[k].product_code || '').trim() && String(emptySlots[k].product_code).trim() === String(lot.product_code || '').trim()) { preferred = emptySlots[k]; break; } }
+      var def = preferred || emptySlots[0];
+      var h = '<div class="modal-header"><div class="modal-title">입고대기 → ' + currentRack.rack_name + ' 입고</div><div class="modal-badge empty">빈 슬롯 ' + emptySlots.length + '칸</div></div>';
+      h += '<div style="font-size:13px;color:#444;margin-bottom:10px;"><b>' + lot.product_code + '</b> ' + (lot.product_name ? '· ' + lot.product_name : '') + '<br><span style="color:#666">LOT ' + (lot.lot_no || '-') + ' · ' + (lot.quantity || 0).toLocaleString() + '개</span></div>';
+      h += '<div class="modal-form-group"><label>입고할 슬롯</label><select id="wiPickSlot" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:14px;">';
+      for (var m = 0; m < emptySlots.length; m++) {
+        var es = emptySlots[m], tag = (preferred && es.id === preferred.id) ? ' (같은 사번 있던 칸)' : (m === 0 && !preferred ? ' (가장 낮은 번호)' : '');
+        h += '<option value="' + es.id + '"' + (es.id === def.id ? ' selected' : '') + '>' + es.slot_code + '호' + tag + '</option>';
+      }
+      h += '</select></div>';
+      h += '<div style="font-size:11.5px;color:#888;margin-top:6px;">같은 사번이 있던 빈 칸이 있으면 그 칸이, 없으면 가장 낮은 번호가 기본 선택돼요. 다른 칸을 고르려면 목록에서 바꾸세요.</div>';
+      h += '<div class="modal-btn-row" style="margin-top:14px;"><button class="modal-btn blue" onclick="confirmQuickInbound(' + lotId + ')">입고 확정</button><button class="modal-btn" onclick="closeWiPick()">취소</button></div>';
+      document.getElementById('wiPickBody').innerHTML = h;
+      document.getElementById('wiPickModal').className = 'modal-overlay show';
+    }
+    function closeWiPick() { document.getElementById('wiPickModal').className = 'modal-overlay'; }
+    function confirmQuickInbound(lotId) {
+      var lot = null;
+      for (var i = 0; i < waitingLots.length; i++) { if (waitingLots[i].id === lotId) { lot = waitingLots[i]; break; } }
+      var slotId = parseInt(document.getElementById('wiPickSlot').value, 10);
+      var targetSlot = null;
+      for (var j = 0; j < currentSlots.length; j++) { if (currentSlots[j].id === slotId) { targetSlot = currentSlots[j]; break; } }
+      if (!lot || !targetSlot) { showToast('슬롯을 선택해주세요'); return; }
+      if (targetSlot.status !== 'empty') { showToast('그 사이 사용된 슬롯이에요 — 새로고침 후 다시 선택해주세요'); loadSlots(); return; }
+      closeWiPick();
 
       // 슬롯 업데이트 + LOT 상태 변경 + 이력 기록
       Promise.all([
@@ -1067,7 +1095,7 @@
           to_location: currentRack.rack_name + '-' + targetSlot.slot_code,
           quantity: lot.quantity,
           lot_no: lot.lot_no,
-          reason: '입고대기 → 랙 상세에서 바로 입고',
+          reason: '입고대기 → 랙 상세에서 입고 (슬롯 선택)',
           moved_by: 'system'
         })
       ]).then(function(results) {
@@ -1086,6 +1114,7 @@
     }
 
     document.getElementById('slotModal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+    document.getElementById('wiPickModal').addEventListener('click', function(e) { if (e.target === this) closeWiPick(); });
   </script>
   <script src="sidebar.js"></script>
 </body>
