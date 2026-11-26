@@ -1054,7 +1054,7 @@
       h += '<div class="modal-form-group"><label>입고할 슬롯</label><select id="wiPickSlot" style="width:100%;padding:9px;border:1px solid #ccc;border-radius:6px;font-size:14px;">';
       for (var m = 0; m < emptySlots.length; m++) {
         var es = emptySlots[m], tag = (preferred && es.id === preferred.id) ? ' (같은 사번 있던 칸)' : (m === 0 && !preferred ? ' (가장 낮은 번호)' : '');
-        h += '<option value="' + es.id + '"' + (es.id === def.id ? ' selected' : '') + '>' + es.slot_code + '호' + tag + '</option>';
+        h += '<option value="' + es.id + '"' + (es.id === def.id ? ' selected' : '') + '>' + es.slot_code + (/호$/.test(String(es.slot_code)) ? '' : '호') + tag + '</option>';   // slot_code 에 '호'가 이미 있으면 안 붙임
       }
       h += '</select></div>';
       h += '<div style="font-size:11.5px;color:#888;margin-top:6px;">같은 사번이 있던 빈 칸이 있으면 그 칸이, 없으면 가장 낮은 번호가 기본 선택돼요. 다른 칸을 고르려면 목록에서 바꾸세요.</div>';
