@@ -211,9 +211,10 @@
         if (r.error) throw new Error('라벨 조회 실패: ' + r.error.message);
         ctx.lab = r.data || null;
         var qs = [
-          supabase.from('sasang_reports').select('id, work_date, worker_name, sabun, production_qty, defect_qty, deleted_at').eq('lot_no', L),
-          supabase.from('assembly_reports').select('id, work_date, worker_name, sabun, production_qty, defect_qty, deleted_at').eq('lot_no', L),
-          supabase.from('shot_reports').select('id, work_date, worker_name, worker_id, work_qty, shot_type, deleted_at').eq('lot_no', L),
+          // 2026-11-26 사상·조립·쇼트 lot_no 는 'C1, C2' 처럼 여러 개가 콤마로 들어올 수 있음 → 포함 검색 후 정확히 분리해 확인
+          supabase.from('sasang_reports').select('id, work_date, worker_name, sabun, production_qty, defect_qty, lot_no, deleted_at').ilike('lot_no', '%' + L + '%'),
+          supabase.from('assembly_reports').select('id, work_date, worker_name, sabun, production_qty, defect_qty, lot_no, deleted_at').ilike('lot_no', '%' + L + '%'),
+          supabase.from('shot_reports').select('id, work_date, worker_name, worker_id, work_qty, shot_type, lot_no, deleted_at').ilike('lot_no', '%' + L + '%'),
           packagingByLots([L]),
           supabase.from('inventory_lots').select('*').ilike('lot_no', '%' + L + '%'),
           supabase.from('inventory_movements').select('*').ilike('lot_no', '%' + L + '%').order('moved_at', { ascending: true })
@@ -254,7 +255,8 @@
         return res;
       }).then(function(res) {
         res.forEach(function(x) { if (x && x.error) console.warn(x.error); });
-        ctx.sasang = alive(res[0].data); ctx.assembly = alive(res[1].data); ctx.shot = alive(res[2].data);
+        var hasL = function(r) { return splitLots(r.lot_no).indexOf(L) >= 0; };
+        ctx.sasang = alive(res[0].data).filter(hasL); ctx.assembly = alive(res[1].data).filter(hasL); ctx.shot = alive(res[2].data).filter(hasL);
         ctx.pack = alive(res[3].data).filter(function(p) { return (p.lot_nos || []).indexOf(L) >= 0; });
         ctx.inv = (res[4].data || []).filter(function(l) { return splitLots(l.lot_no).indexOf(L) >= 0; });
         ctx.mv = (res[5].data || []).filter(function(m) { return splitLots(m.lot_no).indexOf(L) >= 0; });
@@ -457,9 +459,9 @@
         if (!Ls.length) return [];
         var minDate = ctx.labels[0].work_date;
         return Promise.all([
-          inChunks(Ls, 100, function(ch) { return supabase.from('sasang_reports').select('lot_no, work_date, deleted_at').in('lot_no', ch); }),
-          inChunks(Ls, 100, function(ch) { return supabase.from('assembly_reports').select('lot_no, work_date, deleted_at').in('lot_no', ch); }),
-          inChunks(Ls, 100, function(ch) { return supabase.from('shot_reports').select('lot_no, work_date, deleted_at').in('lot_no', ch); }),
+          inChunks(Ls, 25, function(ch) { return supabase.from('sasang_reports').select('lot_no, work_date, deleted_at').or(lotLike(ch)); }),     // 2026-11-26 콤마 LOT 대응
+          inChunks(Ls, 25, function(ch) { return supabase.from('assembly_reports').select('lot_no, work_date, deleted_at').or(lotLike(ch)); }),
+          inChunks(Ls, 25, function(ch) { return supabase.from('shot_reports').select('lot_no, work_date, deleted_at').or(lotLike(ch)); }),
           packagingByLots(Ls, minDate),
           inChunks(Ls, 25, function(ch) { return supabase.from('inventory_lots').select('*').or(ch.map(function(l) { return 'lot_no.ilike.%' + l + '%'; }).join(',')); }),
           inChunks(Ls, 25, function(ch) { return supabase.from('inventory_movements').select('*').eq('movement_type', 'outbound').or(ch.map(function(l) { return 'lot_no.ilike.%' + l + '%'; }).join(',')); }),
@@ -469,9 +471,9 @@
         ctx.by = {};
         ctx.labels.forEach(function(l) { ctx.by[l.label] = { lab: l, sasang: null, assembly: null, shot: null, insp: null, pack: null, inv: [], ship: [] }; });
         if (res.length) {
-          alive(res[0]).forEach(function(r) { if (ctx.by[r.lot_no]) ctx.by[r.lot_no].sasang = r.work_date; });
-          alive(res[1]).forEach(function(r) { if (ctx.by[r.lot_no]) ctx.by[r.lot_no].assembly = r.work_date; });
-          alive(res[2]).forEach(function(r) { if (ctx.by[r.lot_no]) ctx.by[r.lot_no].shot = r.work_date; });
+          alive(res[0]).forEach(function(r) { splitLots(r.lot_no).forEach(function(x) { if (ctx.by[x] && !ctx.by[x].sasang) ctx.by[x].sasang = r.work_date; }); });
+          alive(res[1]).forEach(function(r) { splitLots(r.lot_no).forEach(function(x) { if (ctx.by[x] && !ctx.by[x].assembly) ctx.by[x].assembly = r.work_date; }); });
+          alive(res[2]).forEach(function(r) { splitLots(r.lot_no).forEach(function(x) { if (ctx.by[x] && !ctx.by[x].shot) ctx.by[x].shot = r.work_date; }); });
           alive(res[3].data).forEach(function(p) { (p.lot_nos || []).forEach(function(l) { if (ctx.by[l] && !ctx.by[l].pack) ctx.by[l].pack = p; }); });
           res[4].forEach(function(l) { splitLots(l.lot_no).forEach(function(x) { if (ctx.by[x]) ctx.by[x].inv.push(l); }); });
           res[5].forEach(function(m) { splitLots(m.lot_no).forEach(function(x) { if (ctx.by[x]) ctx.by[x].ship.push(m); }); });
@@ -573,6 +575,7 @@
         .then(function(parts) { return [].concat.apply([], parts); });
     }
     function alive(rows) { return (rows || []).filter(function(r) { return !r.deleted_at; }); }
+    function lotLike(ch) { return ch.map(function(l) { return 'lot_no.ilike.%' + l + '%'; }).join(','); }   // 2026-11-26
     // 2026-11-24 배치번호 두 표기: 'M261019016'(MES) ↔ 'M261019-016'(우리 혼련 일지)
     function batchForms(b) {
       b = String(b || '').trim().toUpperCase(); if (!b) return [];
