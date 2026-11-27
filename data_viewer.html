@@ -2606,13 +2606,13 @@ function moldingCondOf(r){
     var conds = n.conditions || {};
     var face = n.face || 'single';
     var c = (conds.standard||{})[face];
-    if (c && (c.pressure || c.upper || c.lower)){
-      return { p:c.pressure||'', u:c.upper||'', l:c.lower||'', t:'기준' };
+    if (c && (c.pressure || c.upper || c.lower || c.cure)){
+      return { p:c.pressure||'', u:c.upper||'', l:c.lower||'', c:c.cure||'', t:'기준' };   // 2026-11-27 c=가류시간(초)
     }
     if (n.conditions) return null;   // 조건표는 있으나 기준 미입력 → 다른 유형으로 대체하지 않음
   } catch(e){}
   if (r.upper_temp != null || r.lower_temp != null || (r.molding_pressure != null && r.molding_pressure !== '')){
-    return { p:r.molding_pressure||'', u:r.upper_temp!=null?r.upper_temp:'', l:r.lower_temp!=null?r.lower_temp:'', t:'기준' };
+    return { p:r.molding_pressure||'', u:r.upper_temp!=null?r.upper_temp:'', l:r.lower_temp!=null?r.lower_temp:'', c:'', t:'기준' };
   }
   return null;
 }
@@ -2707,7 +2707,7 @@ function renderMoldingTable(data) {
           var c = moldingCondOf(r);
           if (!c) return '-';
           var t = (c.u!==''?c.u:'-')+'/'+(c.l!==''?c.l:'-')+'℃';
-          return (c.t!=='기준'?'<span style="color:#7c3aed">'+c.t+'</span> ':'') + t + (c.p!==''?' · '+c.p:'');
+          return (c.t!=='기준'?'<span style="color:#7c3aed">'+c.t+'</span> ':'') + t + (c.p!==''?' · '+c.p:'') + (c.c?' · '+c.c+'초':'');   // 2026-11-27 가류시간
         })()}</td>
         <td style="font-size:11px;color:#e67e22">${esc(dtCode)}</td>
         <td style="font-size:11px;color:#e67e22">${dtMin}</td>
@@ -3486,6 +3486,7 @@ function downloadExcel() {
       '성형압력': (function(){ var c = moldingCondOf(r); return c ? c.p : ''; })(),
       '상판온도': (function(){ var c = moldingCondOf(r); return c ? c.u : ''; })(),
       '하판온도': (function(){ var c = moldingCondOf(r); return c ? c.l : ''; })(),
+      '가류시간(초)': (function(){ var c = moldingCondOf(r); return c ? (c.c || '') : ''; })(),   // 2026-11-27
       '조건유형': (function(){ var c = moldingCondOf(r); return c ? c.t : ''; })(),
       '비가동코드': moldingDtCodes(r),
       '비가동시간(분)': (function(){ var _d = moldingDowntimeMin(r); return _d > 0 ? _d : ''; })(),
